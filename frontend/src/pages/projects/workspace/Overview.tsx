@@ -26,7 +26,7 @@ const stageRoutes: Record<StageName, string> = {
   BOM: 'bom',
   'Product Design': 'product-design',
   Programming: 'programming',
-  Reporting: 'reporting',
+  'Testing & Validation': 'testing-validation',
   'Final Stage': 'final-stage'
 };
 
@@ -44,7 +44,7 @@ const nextActionText: Record<StageName, string[]> = {
   BOM: ['Review material costs', 'Update procurement stages', 'Confirm vendor readiness'],
   'Product Design': ['Upload CAD drawing', 'Review version history', 'Mark design complete'],
   Programming: ['Validate machine parameters', 'Complete PLC logic checklist', 'Run final programming validation'],
-  Reporting: ['Submit today report', 'Review pending reports', 'Approve report status'],
+  'Testing & Validation': ['Record validation test', 'Attach test report', 'Mark testing complete'],
   'Final Stage': ['Confirm testing status', 'Review production readiness', 'Mark project complete']
 };
 
@@ -234,8 +234,8 @@ export function Overview() {
               <FileText size={20} className="text-primary" />
               <h3 className="text-lg font-bold">Latest Report</h3>
             </div>
-            <Link to="../reporting" relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
-              View All Reports
+            <Link to="../testing-validation" relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
+              View Validation
               <ArrowRight size={16} />
             </Link>
           </div>

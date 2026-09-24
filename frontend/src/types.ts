@@ -5,7 +5,7 @@ export type StageName =
   | 'BOM'
   | 'Product Design'
   | 'Programming'
-  | 'Reporting'
+  | 'Testing & Validation'
   | 'Final Stage';
 
 export type ProjectStatus = 'Running' | 'On Hold' | 'Completed' | 'Delayed';

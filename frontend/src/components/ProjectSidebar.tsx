@@ -10,7 +10,7 @@ const items: { label: string; path: string; stage?: StageName }[] = [
   { label: 'BOM', path: 'bom', stage: 'BOM' },
   { label: 'Product Design', path: 'product-design', stage: 'Product Design' },
   { label: 'Programming', path: 'programming', stage: 'Programming' },
-  { label: 'Reporting', path: 'reporting', stage: 'Reporting' },
+  { label: 'Testing & Validation', path: 'testing-validation', stage: 'Testing & Validation' },
   { label: 'Final Stage', path: 'final-stage', stage: 'Final Stage' }
 ];
 
