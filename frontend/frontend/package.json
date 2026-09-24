@@ -1,0 +1,10 @@
+{
+  "name": "glassware-rnd-frontend-vercel-compat",
+  "private": true,
+  "scripts": {
+    "build": "cd .. && npm run build"
+  },
+  "dependencies": {
+    "glassware-rnd-frontend": "file:.."
+  }
+}

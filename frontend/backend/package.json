@@ -1,0 +1,7 @@
+{
+  "name": "glassware-rnd-backend-vercel-compat",
+  "private": true,
+  "dependencies": {
+    "glassware-rnd-frontend": "file:.."
+  }
+}
