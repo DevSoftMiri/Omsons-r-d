@@ -18,8 +18,8 @@ import {
   X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useProjectWorkspace } from './context';
 
 type ProgramStatus = 'Draft' | 'Testing' | 'Ready';
@@ -103,7 +103,7 @@ const seedPrograms: Program[] = [
 
 export function Programming() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const storageKey = `programming:${project.productCode}`;
   const initial = readStoredProgramming(storageKey);
   const [programs, setPrograms] = useState(initial.programs);
@@ -161,7 +161,7 @@ export function Programming() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectSummary currentStage="Programming" />
+      <ProjectStageHeader project={project} currentStage="Programming" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -286,7 +286,7 @@ export function Programming() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">At least one program must be marked Ready before completing this stage.</p> : null}
-          <button className="primary-button h-10 min-w-64 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'Programming' }))}>
+          <button className="primary-button h-10 min-w-64 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Programming')}>
             <Check size={18} />
             Mark Programming Complete
           </button>

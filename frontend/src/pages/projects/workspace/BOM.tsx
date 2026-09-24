@@ -2,8 +2,8 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CalendarDays, Check, ChevronRight, Download, Edit2, FileText, Filter, PackagePlus, Paperclip, Plus, ReceiptText, Search, ShoppingCart, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useProjectWorkspace } from './context';
 
 type BomStatus = 'Pending' | 'Ordered' | 'Procured';
@@ -26,7 +26,7 @@ const defaultNotes = 'BOM prepared based on current design specifications and su
 
 export function BOM() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const importRef = useRef<HTMLInputElement | null>(null);
   const storageKey = `bom:${project.productCode}`;
   const [rows, setRows] = useState<BomRow[]>(() => readStoredBom(storageKey, project.bom).rows);
@@ -163,7 +163,7 @@ export function BOM() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectSummary currentStage="BOM" />
+      <ProjectStageHeader project={project} currentStage="BOM" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -288,7 +288,7 @@ export function BOM() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid BOM item to complete this stage.</p> : null}
-          <button className="primary-button h-10 min-w-60 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'BOM' }))}><Check size={18} />Mark BOM Complete</button>
+          <button className="primary-button h-10 min-w-60 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('BOM')}><Check size={18} />Mark BOM Complete</button>
         </div>
       </section>
 

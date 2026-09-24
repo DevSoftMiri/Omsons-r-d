@@ -2,9 +2,10 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronRight, Download, Edit2, Eye, FileSpreadsheet, FileText, MoreVertical, Plus, Trash2, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
-import type { Stage, StageName } from '../../../types';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import type { Stage } from '../../../types';
+import { getStageRoute } from '../../../utils/stages';
 import { useProjectWorkspace } from './context';
 
 type Decision = 'approve' | 'further-development' | 'on-hold';
@@ -13,17 +14,6 @@ type FinalStageData = { summary: string; issues: string; decision: Decision; doc
 
 const defaultSummary = 'The product has met design, quality and manufacturing requirements. Trial production and testing results are satisfactory. The product is ready to proceed to production.';
 const defaultIssues = 'No remaining issues.';
-const stageRoutes: Record<StageName, string> = {
-  Prerequisites: 'prerequisites',
-  Benchmarking: 'benchmarking',
-  Attachments: 'attachments',
-  BOM: 'bom',
-  'Product Design': 'product-design',
-  Programming: 'programming',
-  'Testing & Validation': 'testing-validation',
-  'Final Stage': 'final-stage'
-};
-
 const seedDocuments: FinalDocument[] = [
   { id: 'doc1', fileName: 'Final_Approval_Report.pdf', description: 'Final evaluation and approval document', uploadedOn: '2026-09-16', size: 2.4 * 1024 * 1024, url: '' },
   { id: 'doc2', fileName: 'Production_Specification.pdf', description: 'Approved product specification', uploadedOn: '2026-09-15', size: 1.8 * 1024 * 1024, url: '' },
@@ -33,7 +23,7 @@ const seedDocuments: FinalDocument[] = [
 
 export function FinalStage() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const storageKey = `final-stage:${project.productCode}`;
   const initial = readStored(storageKey);
   const [summary, setSummary] = useState(initial.summary);
@@ -85,7 +75,7 @@ export function FinalStage() {
     setComments(data.comments);
     if (data.decision === 'approve' && blockers.length === 0) {
       setApproved(true);
-      dispatch(completeStage({ projectId: project.id, stage: 'Final Stage' }));
+      completeStage('Final Stage');
     } else if (data.decision === 'further-development') {
       setIssues(data.comments || 'Further development is required before production approval.');
     } else if (data.decision === 'on-hold') {
@@ -94,16 +84,10 @@ export function FinalStage() {
     setShowApproval(false);
   }
 
-  function completeBlockingStages() {
-    blockers.forEach((stage) => {
-      dispatch(completeStage({ projectId: project.id, stage: stage.name }));
-    });
-  }
-
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectSummary currentStage="Final Stage" approved={approved} />
+      <ProjectStageHeader project={project} currentStage="Final Stage" statusOverride={approved ? 'Completed' : undefined} />
 
       <section>
         <h2 className="text-2xl font-bold">Final Stage</h2>
@@ -116,7 +100,7 @@ export function FinalStage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left">
               <thead><tr className="bg-slate-50 text-xs text-slate-500"><th className="px-3 py-2.5">#</th><th className="px-3 py-2.5">Stage</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5">Completed / Due</th><th className="px-3 py-2.5">Time Remaining</th></tr></thead>
-              <tbody>{statusRows.map(({ stage, index, dueDate, deadline }) => <tr key={stage.name} className="border-b border-slate-200"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3"><Link to={`../${stageRoutes[stage.name]}`} relative="path" className="font-bold hover:text-primary">{stage.name}</Link></td><td className="px-3 py-3"><StageBadge stage={stage} overdue={deadline.overdue} /></td><td className="px-3 py-3">{formatDate(dueDate)}</td><td className={`px-3 py-3 font-semibold ${deadline.className}`}>{stage.status === 'Completed' ? '-' : deadline.label}</td></tr>)}</tbody>
+              <tbody>{statusRows.map(({ stage, index, dueDate, deadline }) => <tr key={stage.id} className="border-b border-slate-200"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3"><Link to={`../${getStageRoute(stage)}`} relative="path" className="font-bold hover:text-primary">{stage.name}</Link></td><td className="px-3 py-3"><StageBadge stage={stage} overdue={deadline.overdue} /></td><td className="px-3 py-3">{formatDate(dueDate)}</td><td className={`px-3 py-3 font-semibold ${deadline.className}`}>{stage.status === 'Completed' ? '-' : deadline.label}</td></tr>)}</tbody>
             </table>
           </div>
         </div>
@@ -136,7 +120,7 @@ export function FinalStage() {
         </div>
       </section>
 
-      <BlockerAlert blockers={blockers} onCompleteBlocking={completeBlockingStages} />
+      <BlockerAlert blockers={blockers} />
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500"><span>Last saved: {formatDateTime(lastSaved)}</span><span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span></div>
@@ -177,9 +161,9 @@ function DocumentModal({ onClose, onUpload }: { onClose: () => void; onUpload: (
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4"><form className="w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl" onSubmit={submit}><div className="mb-4 flex items-center justify-between"><h3 className="text-xl font-bold">Add Final Document</h3><button type="button" className="icon-button h-9 w-9" onClick={onClose}><X size={16} /></button></div><label className="grid min-h-28 cursor-pointer place-items-center rounded-lg border border-dashed border-blue-300 text-center text-primary"><input className="hidden" type="file" onChange={(event: ChangeEvent<HTMLInputElement>) => setFile(event.target.files?.[0] || null)} /><span className="font-bold">{file ? file.name : 'Upload Document'}</span></label><div className="mt-4"><Field label="Description"><input className="field" value={description} onChange={(event) => setDescription(event.target.value)} /></Field></div><div className="mt-5 flex justify-end gap-3"><button type="button" className="secondary-button h-10" onClick={onClose}>Cancel</button><button className="primary-button h-10" disabled={!file}>Upload Document</button></div></form></div>;
 }
 
-function BlockerAlert({ blockers, onCompleteBlocking }: { blockers: Stage[]; onCompleteBlocking: () => void }) {
+function BlockerAlert({ blockers }: { blockers: Stage[] }) {
   if (!blockers.length) return <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-800"><p className="font-bold">All development stages completed</p><p className="text-sm">The product is ready for final review and approval.</p></section>;
-  return <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-orange-800"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{blockers.length === 1 ? `${blockers[0].name} is still pending` : `${blockers.length} stages require completion`}</p><p className="mt-1 text-sm">These stages must be completed before the product can be approved for production.</p></div><button className="secondary-button h-9 bg-white text-orange-700" onClick={onCompleteBlocking}>Mark blockers complete</button></div><div className="mt-3 grid gap-1 text-sm">{blockers.map((stage, index) => <Link key={stage.name} to={`../${stageRoutes[stage.name]}`} relative="path" className="font-semibold hover:text-primary">{stage.name} - {getDeadline(stage, index).label}</Link>)}</div></section>;
+  return <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-orange-800"><div><p className="font-bold">{blockers.length === 1 ? `${blockers[0].name} is still pending` : `${blockers.length} stages require completion`}</p><p className="mt-1 text-sm">These stages must be completed in order before the product can be approved for production.</p></div><div className="mt-3 grid gap-1 text-sm">{blockers.map((stage, index) => <Link key={stage.id} to={`../${getStageRoute(stage)}`} relative="path" className="font-semibold hover:text-primary">{stage.name} - {getDeadline(stage, index).label}</Link>)}</div></section>;
 }
 
 function TopCrumbs({ title, code }: { title: string; code: string }) { return <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><Link to="../overview" relative="path" className="icon-button h-10 w-10"><ChevronRight className="rotate-180" size={18} /></Link><h1 className="text-xl font-bold">{title}</h1></div><div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-500"><Link to="/projects" className="hover:text-primary">Projects</Link><ChevronRight size={15} /><Link to="../overview" relative="path">{code}</Link><ChevronRight size={15} /><span className="font-bold text-ink">Final Stage</span></div></div>; }

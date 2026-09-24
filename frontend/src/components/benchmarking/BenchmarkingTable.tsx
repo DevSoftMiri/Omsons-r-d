@@ -1,4 +1,4 @@
-import { Edit3, MoreVertical } from 'lucide-react';
+import { Edit3, Maximize2, MoreVertical, X } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { useState } from 'react';
 import { BenchmarkingToolbar } from './BenchmarkingToolbar';
@@ -26,6 +26,7 @@ export function BenchmarkingTable({
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(table.name);
+  const [fullscreen, setFullscreen] = useState(false);
 
   function updateCell(rowId: string, columnId: string, value: string) {
     onChangeTable({
@@ -104,8 +105,8 @@ export function BenchmarkingTable({
     event.target.value = '';
   }
 
-  return (
-    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+  const content = (
+    <>
       <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <p className="text-lg font-bold">Table {index + 1}</p>
@@ -120,13 +121,18 @@ export function BenchmarkingTable({
             </button>
           )}
         </div>
-        <BenchmarkingToolbar
-          onAddColumn={addColumn}
-          onAddRow={addRow}
-          onDelete={() => onDeleteTable(table)}
-          onExport={() => onExportCsv(table)}
-          onImport={importFile}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="icon-button h-9 w-9 text-primary" onClick={() => setFullscreen(true)} title="Open full-window table" aria-label="Open full-window table">
+            <Maximize2 size={16} />
+          </button>
+          <BenchmarkingToolbar
+            onAddColumn={addColumn}
+            onAddRow={addRow}
+            onDelete={() => onDeleteTable(table)}
+            onExport={() => onExportCsv(table)}
+            onImport={importFile}
+          />
+        </div>
       </div>
       <SpreadsheetGrid
         selectedCell={selectedCell}
@@ -140,6 +146,28 @@ export function BenchmarkingTable({
       <div className="mt-2 flex justify-end text-slate-500">
         <MoreVertical size={18} />
       </div>
+    </>
+  );
+
+  return (
+    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      {content}
+      {fullscreen ? (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-slate-50 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-soft">
+            <div>
+              <p className="text-sm font-semibold text-primary">Full Table View</p>
+              <h2 className="text-xl font-bold">{table.name}</h2>
+            </div>
+            <button className="icon-button h-10 w-10" onClick={() => setFullscreen(false)} aria-label="Close full-window table">
+              <X size={18} />
+            </button>
+          </div>
+          <section className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+            {content}
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

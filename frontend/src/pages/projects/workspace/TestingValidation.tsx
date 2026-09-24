@@ -2,8 +2,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronRight, Download, Edit2, Eye, FileText, Filter, MoreVertical, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useProjectWorkspace } from './context';
 
 type TestResult = 'Pass' | 'Fail' | 'Retest';
@@ -36,7 +36,7 @@ const seedTests: TestRecord[] = [
 
 export function TestingValidation() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const storageKey = `testing-validation:${project.productCode}`;
   const initial = readStored(storageKey);
   const [tests, setTests] = useState(initial.tests);
@@ -79,7 +79,7 @@ export function TestingValidation() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectSummary currentStage="Testing & Validation" />
+      <ProjectStageHeader project={project} currentStage="Testing & Validation" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -119,7 +119,7 @@ export function TestingValidation() {
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500"><span>Last saved: {formatDateTime(lastSaved)}</span><span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span></div>
-        <div className="text-right">{!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Resolve failed tests before completing this stage.</p> : null}<button className="primary-button h-10 min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'Testing & Validation' }))}><Check size={18} />Mark Testing & Validation Complete</button></div>
+        <div className="text-right">{!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Resolve failed tests before completing this stage.</p> : null}<button className="primary-button h-10 min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Testing & Validation')}><Check size={18} />Mark Testing & Validation Complete</button></div>
       </section>
 
       {drawer ? <TestDrawer test={drawer === 'new' ? null : drawer} onClose={() => setDrawer(null)} onSave={saveTest} /> : null}

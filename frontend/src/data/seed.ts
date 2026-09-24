@@ -1,4 +1,5 @@
 import type { Project, Stage, TeamMember } from '../types';
+import { makeStage } from '../utils/stages';
 
 export const workflowStages: Stage['name'][] = [
   'Prerequisites',
@@ -12,14 +13,14 @@ export const workflowStages: Stage['name'][] = [
 ];
 
 export const teamMembers: TeamMember[] = [
-  { id: 'u1', name: 'Aarav Mehta', role: 'Admin' },
-  { id: 'u2', name: 'Riya Sharma', role: 'QA Engineer' },
-  { id: 'u3', name: 'Kabir Singh', role: 'Design Engineer' },
-  { id: 'u4', name: 'Meera Iyer', role: 'Programmer' }
+  { id: 'u1', name: 'Ravi', role: 'Admin' },
+  { id: 'u2', name: 'Ajay', role: 'Staff' },
+  { id: 'u3', name: 'Rahul', role: 'Staff' },
+  { id: 'u4', name: 'Shubham', role: 'Staff' }
 ];
 
 const makeStages = (completeThrough: number, active: number): Stage[] =>
-  workflowStages.map((name, index) => ({
+  workflowStages.map((name, index) => makeStage(name, index, {
     name,
     status: index < completeThrough ? 'Completed' : index === active ? 'In Progress' : index > active ? 'Locked' : 'Pending',
     progress: index < completeThrough ? 100 : index === active ? 65 : 0
@@ -34,7 +35,7 @@ export const initialProjects: Project[] = [
     description: 'Borosilicate laboratory beaker with 250 ml capacity and durable graduation marking.',
     startDate: '2026-09-01',
     targetDate: '2026-10-15',
-    reportTo: 'Aarav Mehta',
+    reportTo: 'Ravi',
     teamMembers: [teamMembers[1], teamMembers[2], teamMembers[3]],
     priority: 'High',
     status: 'Running',
@@ -46,7 +47,7 @@ export const initialProjects: Project[] = [
       { id: 'b2', materialName: 'Graduation Ink', vendor: 'ChemMark', quantity: 2, cost: 90, leadTimeDays: 5, procurementStage: 'Ordered' }
     ],
     reports: [
-      { id: 'r1', date: '2026-09-18', workDone: 'Completed calibration testing and updated graduation marking accuracy.', hours: 6, submittedBy: 'Riya Sharma', status: 'Approved' }
+      { id: 'r1', date: '2026-09-18', workDone: 'Completed calibration testing and updated graduation marking accuracy.', hours: 6, submittedBy: 'Ajay', status: 'Approved' }
     ]
   },
   {
@@ -57,7 +58,7 @@ export const initialProjects: Project[] = [
     description: 'Precision flask for volumetric analysis with narrow tolerance neck calibration.',
     startDate: '2026-08-20',
     targetDate: '2026-10-02',
-    reportTo: 'Aarav Mehta',
+    reportTo: 'Ravi',
     teamMembers: [teamMembers[1], teamMembers[2]],
     priority: 'Medium',
     status: 'On Hold',
@@ -77,7 +78,7 @@ export const initialProjects: Project[] = [
     description: 'Interchangeable condenser assembly for teaching and process laboratories.',
     startDate: '2026-07-25',
     targetDate: '2026-09-28',
-    reportTo: 'Aarav Mehta',
+    reportTo: 'Ravi',
     teamMembers: [teamMembers[2], teamMembers[3]],
     priority: 'High',
     status: 'Running',
@@ -89,7 +90,7 @@ export const initialProjects: Project[] = [
       { id: 'b5', materialName: 'Packaging Box', vendor: 'Packwell', quantity: 1, cost: 18, leadTimeDays: 3, procurementStage: 'Called' }
     ],
     reports: [
-      { id: 'r2', date: '2026-09-19', workDone: 'Validated laser marking program on trial batch.', hours: 5, submittedBy: 'Meera Iyer', status: 'Submitted' }
+      { id: 'r2', date: '2026-09-19', workDone: 'Validated laser marking program on trial batch.', hours: 5, submittedBy: 'Shubham', status: 'Submitted' }
     ]
   }
 ];

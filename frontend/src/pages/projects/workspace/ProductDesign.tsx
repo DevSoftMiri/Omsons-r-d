@@ -18,8 +18,8 @@ import {
   X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useProjectWorkspace } from './context';
 
 type DesignCategory = '3D Model' | 'Technical Drawing' | 'Rendering' | 'Concept' | 'Other';
@@ -59,7 +59,7 @@ const seedDesigns: DesignFile[] = [
 
 export function ProductDesign() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const storageKey = `product-design:${project.productCode}`;
   const initial = readStoredData(storageKey);
@@ -128,7 +128,7 @@ export function ProductDesign() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-2.5 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectSummary currentStage="Product Design" />
+      <ProjectStageHeader project={project} currentStage="Product Design" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -157,7 +157,7 @@ export function ProductDesign() {
           <div className="flex flex-wrap gap-3">
             <label className="relative block w-72 max-w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input className="field pl-10" placeholder="Search files..." value={query} onChange={(event) => setQuery(event.target.value)} />
+              <input className="field !pl-10" placeholder="Search files..." value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
             <button className="secondary-button h-9 gap-2"><Filter size={15} />Filter</button>
           </div>
@@ -223,7 +223,7 @@ export function ProductDesign() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Upload at least one technical drawing or 3D model to complete Product Design.</p> : null}
-          <button className="primary-button h-9 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'Product Design' }))}>
+          <button className="primary-button h-9 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Product Design')}>
             <Check size={18} />
             Mark Product Design Complete
           </button>

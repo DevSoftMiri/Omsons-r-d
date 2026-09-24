@@ -7,6 +7,7 @@ import { ProjectsPage } from './pages/projects/ProjectsPage';
 import { Attachments } from './pages/projects/workspace/Attachments';
 import { Benchmarking } from './pages/projects/workspace/Benchmarking';
 import { BOM } from './pages/projects/workspace/BOM';
+import { CustomStage } from './pages/projects/workspace/CustomStage';
 import { FinalStage } from './pages/projects/workspace/FinalStage';
 import { Overview } from './pages/projects/workspace/Overview';
 import { Prerequisites } from './pages/projects/workspace/Prerequisites';
@@ -29,6 +30,7 @@ export function App() {
         <Route path="programming" element={<Programming />} />
         <Route path="testing-validation" element={<TestingValidation />} />
         <Route path="reporting" element={<Navigate to="../testing-validation" replace />} />
+        <Route path="custom-stage/:stageSlug" element={<CustomStage />} />
         <Route path="final-stage" element={<FinalStage />} />
       </Route>
 

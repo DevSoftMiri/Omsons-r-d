@@ -1,4 +1,4 @@
-export type StageName =
+export type CoreStageName =
   | 'Prerequisites'
   | 'Benchmarking'
   | 'Attachments'
@@ -8,6 +8,7 @@ export type StageName =
   | 'Testing & Validation'
   | 'Final Stage';
 
+export type StageName = CoreStageName | string;
 export type ProjectStatus = 'Running' | 'On Hold' | 'Completed' | 'Delayed';
 export type Priority = 'Low' | 'Medium' | 'High';
 
@@ -18,7 +19,12 @@ export interface TeamMember {
 }
 
 export interface Stage {
+  id: string;
   name: StageName;
+  slug: string;
+  isCustom?: boolean;
+  notes?: string;
+  checklist?: { id: string; label: string; completed: boolean }[];
   status: 'Locked' | 'Pending' | 'In Progress' | 'Submitted' | 'Completed';
   progress: number;
 }

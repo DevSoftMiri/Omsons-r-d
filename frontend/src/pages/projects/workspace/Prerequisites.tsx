@@ -17,8 +17,8 @@ import {
   XCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import type { Project } from '../../../types';
 import {
   deletePrerequisite,
@@ -58,7 +58,7 @@ const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp';
 
 export function Prerequisites() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [payload, setPayload] = useState<PrerequisitePayload>(() => buildLocalPayload());
   const [customDocuments, setCustomDocuments] = useState<PrerequisiteDocument[]>([]);
@@ -164,13 +164,12 @@ export function Prerequisites() {
         <span className="font-bold text-ink">Prerequisites</span>
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
-        <div className="self-center">
-          <h2 className="text-3xl font-bold tracking-normal">Prerequisites</h2>
-          <p className="mt-2 text-base text-slate-600">Upload the required R&D starting documents for this product.</p>
-          {message ? <p className="mt-2 text-sm font-semibold text-amber-700">{message}</p> : null}
-        </div>
-        <ProductSummary project={project} />
+      <ProjectStageHeader project={project} currentStage="Prerequisites" />
+
+      <section>
+        <h2 className="text-2xl font-bold tracking-normal">Prerequisites</h2>
+        <p className="mt-1.5 text-sm text-slate-600">Upload the required R&D starting documents for this product.</p>
+        {message ? <p className="mt-2 text-sm font-semibold text-amber-700">{message}</p> : null}
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
@@ -259,7 +258,7 @@ export function Prerequisites() {
             <button
               className="primary-button min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300"
               disabled={!canComplete}
-              onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'Prerequisites' }))}
+              onClick={() => completeStage('Prerequisites')}
             >
               <Check size={18} />
               Mark Prerequisites Complete

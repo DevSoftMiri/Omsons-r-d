@@ -16,19 +16,9 @@ import {
   Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { BomItem, Project, Stage, StageName } from '../../../types';
+import type { BomItem, Project, Stage, CoreStageName } from '../../../types';
+import { getStageRoute } from '../../../utils/stages';
 import { useProjectWorkspace } from './context';
-
-const stageRoutes: Record<StageName, string> = {
-  Prerequisites: 'prerequisites',
-  Benchmarking: 'benchmarking',
-  Attachments: 'attachments',
-  BOM: 'bom',
-  'Product Design': 'product-design',
-  Programming: 'programming',
-  'Testing & Validation': 'testing-validation',
-  'Final Stage': 'final-stage'
-};
 
 const statusStyles: Record<Project['status'], string> = {
   Running: 'bg-emerald-100 text-emerald-700',
@@ -37,7 +27,7 @@ const statusStyles: Record<Project['status'], string> = {
   Delayed: 'bg-rose-100 text-rose-700'
 };
 
-const nextActionText: Record<StageName, string[]> = {
+const nextActionText: Record<CoreStageName, string[]> = {
   Prerequisites: ['Upload required certificates', 'Confirm assigned team', 'Complete prerequisite checklist'],
   Benchmarking: ['Review competitor specifications', 'Paste updated benchmark data', 'Mark benchmarking complete'],
   Attachments: ['Upload drawings and design files', 'Preview uploaded documents', 'Confirm file versions'],
@@ -47,6 +37,8 @@ const nextActionText: Record<StageName, string[]> = {
   'Testing & Validation': ['Record validation test', 'Attach test report', 'Mark testing complete'],
   'Final Stage': ['Confirm testing status', 'Review production readiness', 'Mark project complete']
 };
+
+const customStageActions = ['Update custom checklist', 'Add stage notes', 'Mark custom stage complete'];
 
 export function Overview() {
   const { project } = useProjectWorkspace();
@@ -117,7 +109,7 @@ export function Overview() {
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h3 className="text-lg font-bold">Project Stage Timeline</h3>
-          <Link to={`../${stageRoutes[project.currentStage]}`} relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
+          <Link to={`../${getStageRoute(project.currentStage, project)}`} relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
             View All Stages
             <ArrowRight size={16} />
           </Link>
@@ -144,7 +136,7 @@ export function Overview() {
             </div>
           </div>
           <div className="mt-4 space-y-3">
-            {nextActionText[project.currentStage].map((action, index) => (
+            {(nextActionText[project.currentStage as CoreStageName] || customStageActions).map((action, index) => (
               <div key={action} className="flex items-center justify-between gap-3 text-sm">
                 <div className="flex items-center gap-3">
                   {index === 0 ? <CheckCircle2 className="text-primary" size={19} /> : <Circle className="text-slate-300" size={19} />}
@@ -154,7 +146,7 @@ export function Overview() {
               </div>
             ))}
           </div>
-          <Link to={`../${stageRoutes[project.currentStage]}`} relative="path" className="primary-button mt-5 w-full justify-center">
+          <Link to={`../${getStageRoute(project.currentStage, project)}`} relative="path" className="primary-button mt-5 w-full justify-center">
             Go to {project.currentStage}
             <ArrowRight size={17} />
           </Link>
@@ -357,7 +349,7 @@ function TimelineStage({ stage, index }: { stage: Stage; index: number }) {
   const lineClass = complete ? 'bg-emerald-600' : active ? 'bg-primary' : 'bg-slate-300';
 
   return (
-    <Link to={`../${stageRoutes[stage.name]}`} relative="path" className="group text-center">
+    <Link to={`../${getStageRoute(stage)}`} relative="path" className="group text-center">
       <div className="relative flex items-center justify-center">
         {index > 0 ? <span className={`absolute right-1/2 top-1/2 hidden h-0.5 w-full -translate-y-1/2 2xl:block ${lineClass}`} /> : null}
         <span className={`relative z-10 grid h-8 w-8 place-items-center rounded-full text-sm font-bold ${dotClass}`}>

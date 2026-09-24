@@ -26,10 +26,10 @@ export function ProjectLayout() {
 
   return (
     <ProjectWorkspaceContext.Provider value={{ project }}>
-      <div className="min-h-screen bg-slate-50 text-ink">
-        <div className="grid min-h-screen lg:grid-cols-[250px_minmax(0,1fr)]">
+      <div className="workspace-compact min-h-screen bg-slate-50 text-ink">
+        <div className="grid min-h-screen lg:grid-cols-[215px_minmax(0,1fr)]">
           <ProjectSidebar project={project} />
-          <div className="min-w-0 p-4 lg:px-5 lg:py-4">
+          <div className="min-w-0 p-2.5 lg:px-3 lg:py-2.5">
             <Outlet />
           </div>
         </div>

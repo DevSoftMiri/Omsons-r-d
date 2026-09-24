@@ -11,18 +11,14 @@ const navItems = [
   { label: 'Settings', href: '/settings', icon: Settings }
 ];
 
+const brandImageUrl = 'https://res.cloudinary.com/dzrg0utcm/image/upload/v1784113445/ChatGPT_Image_Jul_15_2026_04_32_56_PM_koo8hz.png';
+
 export function AppLayout() {
   return (
     <div className="min-h-screen bg-slate-100 text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white lg:block">
-        <div className="flex h-20 items-center gap-3 px-6">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-primary text-white">
-            <FlaskConical size={24} />
-          </div>
-          <div>
-            <p className="text-lg font-bold">Omsons R&D</p>
-            <p className="text-xs text-slate-500">Glassware PLM</p>
-          </div>
+        <div className="flex h-20 items-center justify-center px-6">
+          <img className="h-14 w-full max-w-[190px] object-contain" src={brandImageUrl} alt="Omsons R&D" />
         </div>
         <nav className="space-y-1 px-4">
           {navItems.map((item) => (

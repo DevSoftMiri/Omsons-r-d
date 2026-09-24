@@ -16,8 +16,8 @@ import {
   X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useProjectWorkspace } from './context';
 
 type AttachmentFile = {
@@ -76,7 +76,7 @@ const seedFiles: AttachmentFile[] = [
 
 export function Attachments() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState(seedFiles);
   const [query, setQuery] = useState('');
@@ -154,29 +154,7 @@ export function Attachments() {
         </div>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="grid h-24 w-32 shrink-0 place-items-center rounded-lg bg-slate-100">
-            <BeakerVisual />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold">{project.name}</h2>
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                {project.status}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <Meta label="Product Code" value={project.productCode} />
-              <Meta label="Category" value="Laboratory Glassware" />
-              <Meta label="Current Stage" value="Attachments" />
-              <Meta label="Priority" value={project.priority} pill />
-              <Meta label="Target Date" value={formatTargetDate(project.targetDate)} icon={<CalendarDays size={20} className="text-primary" />} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <ProjectStageHeader project={project} currentStage="Attachments" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -188,7 +166,7 @@ export function Attachments() {
         </div>
         <button
           className="primary-button h-10 min-w-60 justify-center"
-          onClick={() => dispatch(completeStage({ projectId: project.id, stage: 'Attachments' }))}
+          onClick={() => completeStage('Attachments')}
         >
           <Check size={18} />
           Mark Attachments Complete

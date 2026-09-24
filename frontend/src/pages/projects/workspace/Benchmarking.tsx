@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { AddTableModal } from '../../../components/benchmarking/AddTableModal';
 import { BenchmarkingTable } from '../../../components/benchmarking/BenchmarkingTable';
 import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
+import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import type { BenchmarkingTableData, BenchmarkingWorkbook, SelectedCell } from '../../../components/benchmarking/types';
-import { useAppDispatch } from '../../../hooks';
-import { completeStage } from '../../../store';
+import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import {
   completeBenchmarking,
   createBenchmarkingTable,
@@ -24,7 +24,7 @@ const emptyWorkbook: BenchmarkingWorkbook = {
 
 export function Benchmarking() {
   const { project } = useProjectWorkspace();
-  const dispatch = useAppDispatch();
+  const { completeStage } = useStageCompletion(project);
   const [workbook, setWorkbook] = useState<BenchmarkingWorkbook>(emptyWorkbook);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -145,7 +145,7 @@ export function Benchmarking() {
   async function completeStageClick() {
     try {
       await completeBenchmarking(project.productCode);
-      dispatch(completeStage({ projectId: project.id, stage: 'Benchmarking' }));
+      completeStage('Benchmarking');
       setSaveStatus('saved');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to complete benchmarking');
@@ -162,29 +162,7 @@ export function Benchmarking() {
         <span className="font-bold text-ink">Benchmarking</span>
       </div>
 
-      <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="grid h-24 w-32 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100">
-            <BeakerVisual />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-bold">{project.name}</h2>
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                {project.status}
-              </span>
-            </div>
-            <div className="mt-3 grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-5">
-              <Fact label="Product Code" value={project.productCode} />
-              <Fact label="Category" value="Laboratory Glassware" />
-              <Fact label="Current Stage" value="Benchmarking" />
-              <Fact label="Priority" value={project.priority} />
-              <Fact label="Target Date" value={formatDate(project.targetDate)} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <ProjectStageHeader project={project} currentStage="Benchmarking" />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
