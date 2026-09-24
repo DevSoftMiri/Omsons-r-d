@@ -2,6 +2,7 @@
   "name": "glassware-rnd",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "node node_modules/concurrently/dist/bin/concurrently.js \"npm:backend:dev\" \"npm:frontend:dev\"",
     "frontend:dev": "npm --prefix frontend run dev",

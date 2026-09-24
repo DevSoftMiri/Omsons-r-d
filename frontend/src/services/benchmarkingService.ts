@@ -25,7 +25,7 @@ export interface BenchmarkingWorkbook {
   updatedAt?: string;
 }
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getToken() {
   return localStorage.getItem('token');
