@@ -99,7 +99,7 @@ export function Overview() {
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
         <ProgressSummaryCard progress={project.progress} completedStages={completedStages} totalStages={project.stages.length} />
         <DashboardCard icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-600" label="Completed Stages" value={`${completedStages} / ${project.stages.length}`} helper="Stages completed" />
         <DashboardCard icon={Layers3} iconClass="bg-blue-50 text-primary" label="Current Stage" value={project.currentStage} helper={currentStage?.status === 'In Progress' ? 'In progress' : currentStage?.status ?? 'Pending'} />
@@ -304,19 +304,19 @@ function BeakerVisual() {
 
 function ProgressSummaryCard({ progress, completedStages, totalStages }: { progress: number; completedStages: number; totalStages: number }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-      <div className="flex items-center gap-5">
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+      <div className="flex items-center gap-3">
         <div
-          className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
+          className="grid h-16 w-16 shrink-0 place-items-center rounded-full"
           style={{ background: `conic-gradient(#2563eb ${progress * 3.6}deg, #e2e8f0 0deg)` }}
         >
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-xl font-bold">{progress}%</div>
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-white text-base font-bold">{progress}%</div>
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-bold">Overall Progress</p>
-          <p className="mt-2 text-lg"><span className="font-bold">{completedStages}</span> / {totalStages} stages completed</p>
-          <div className="mt-4 h-2 rounded-full bg-slate-200">
-            <div className="h-2 rounded-full bg-primary" style={{ width: `${progress}%` }} />
+          <p className="mt-1 text-sm"><span className="font-bold">{completedStages}</span> / {totalStages} stages completed</p>
+          <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+            <div className="h-1.5 rounded-full bg-primary" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </div>
@@ -326,15 +326,15 @@ function ProgressSummaryCard({ progress, completedStages, totalStages }: { progr
 
 function DashboardCard({ icon: Icon, iconClass, label, value, helper, valueClass = 'text-ink' }: { icon: typeof CheckCircle2; iconClass: string; label: string; value: string; helper: string; valueClass?: string }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-      <div className="flex items-center gap-5">
-        <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-lg ${iconClass}`}>
-          <Icon size={25} />
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+      <div className="flex items-center gap-3">
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${iconClass}`}>
+          <Icon size={20} />
         </span>
         <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className={`mt-1 text-xl font-bold ${valueClass}`}>{value}</p>
-          <p className="mt-1 text-sm text-slate-500">{helper}</p>
+          <p className="text-xs text-slate-500">{label}</p>
+          <p className={`mt-0.5 text-base font-bold ${valueClass}`}>{value}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{helper}</p>
         </div>
       </div>
     </section>
