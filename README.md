@@ -34,6 +34,8 @@ SUPABASE_PROJECT_DOCUMENTS_BUCKET=project-documents
 
 Then deploy from the repository root. Vercel will install root, frontend, and backend dependencies and run the frontend build.
 
+In Vercel project settings, keep **Root Directory** set to the repository root, not `backend` or `frontend`. If Root Directory is set to `backend`, Vercel will look for `backend/frontend/package.json` and the install step will fail.
+
 ## Highlights
 
 - JWT-ready Express API with role-based middleware
