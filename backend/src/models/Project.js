@@ -3,7 +3,7 @@ import { WORKFLOW_STAGES } from '../constants/workflow.js';
 
 const stageSchema = new mongoose.Schema(
   {
-    name: { type: String, enum: WORKFLOW_STAGES, required: true },
+    name: { type: String, required: true },
     status: { type: String, enum: ['Locked', 'Pending', 'In Progress', 'Submitted', 'Completed'], default: 'Locked' },
     progress: { type: Number, min: 0, max: 100, default: 0 },
     completedAt: Date,
@@ -31,7 +31,7 @@ const projectSchema = new mongoose.Schema(
     teamMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
     status: { type: String, enum: ['Running', 'On Hold', 'Completed', 'Delayed'], default: 'Running' },
-    currentStage: { type: String, enum: WORKFLOW_STAGES, default: 'Prerequisites' },
+    currentStage: { type: String, default: 'Prerequisites' },
     stages: { type: [stageSchema], default: [] },
     design: {
       description: String,
