@@ -26,7 +26,7 @@ export function ProjectsPage() {
       </div>
 
       <section className="space-y-4">
-        {projects.map((project) => (
+        {projects.length ? projects.map((project) => (
           <article key={project.id} className="panel flex items-center justify-between gap-5">
             <div className="flex min-w-0 items-center gap-5">
               <span className={`h-9 w-9 shrink-0 rounded-full ${dotColor[project.status]}`} />
@@ -40,7 +40,12 @@ export function ProjectsPage() {
               <ArrowRight size={16} />
             </Link>
           </article>
-        ))}
+        )) : (
+          <div className="panel text-center">
+            <p className="font-bold">No projects yet</p>
+            <p className="mt-1 text-sm text-slate-500">Create a project and choose the stages that should be followed.</p>
+          </div>
+        )}
       </section>
     </div>
   );

@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { useAppSelector } from './hooks';
 import { AppLayout } from './layouts/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
+import { LoginPage } from './pages/LoginPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { CreateProject } from './pages/projects/CreateProject';
 import { ProjectsPage } from './pages/projects/ProjectsPage';
@@ -17,8 +19,20 @@ import { ProjectLayout } from './pages/projects/workspace/ProjectLayout';
 import { TestingValidation } from './pages/projects/workspace/TestingValidation';
 
 export function App() {
+  const user = useAppSelector((state) => state.auth.user);
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
+      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
       <Route path="/projects/:projectId" element={<ProjectLayout />}>
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<Overview />} />

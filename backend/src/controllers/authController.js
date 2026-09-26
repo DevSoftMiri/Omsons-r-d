@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler';
 import { User } from '../models/User.js';
 
 function signToken(user) {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
 }
 
 export const register = asyncHandler(async (req, res) => {
@@ -13,7 +13,7 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: req.body.email }).select('+password');
-  if (!user || !(await user.comparePassword(req.body.password))) {
+  if (!user || !user.isActive || !(await user.comparePassword(req.body.password || ''))) {
     res.status(401);
     throw new Error('Invalid email or password');
   }

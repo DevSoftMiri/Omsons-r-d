@@ -56,50 +56,10 @@ type StoredProgramming = {
   lastSaved: string;
 };
 
-const defaultNotes = 'Forming parameters finalized after trial run.\nPrinting alignment requires final verification.\nAnnealing cycle based on standard 250ml beaker profile and may be adjusted after pilot production.';
-const projectFiles = ['Beaker_Technical_Drawing.pdf', 'Material_Specification.pdf', 'Beaker_3D_Model.step', 'Requirement_Document.pdf', 'Supplier_Quote.pdf'];
+const defaultNotes = '';
+const projectFiles: string[] = [];
 
-const seedPrograms: Program[] = [
-  {
-    id: 'program-1',
-    name: 'Beaker Forming Program',
-    description: 'Main forming program for 250ml beaker',
-    processMachine: 'Forming Machine',
-    version: 'V3',
-    file: { fileName: 'GLW250_Forming.nc', fileSize: 2.4 * 1024 * 1024, url: '' },
-    parameters: [
-      { id: 'p1', name: 'Forming Temperature', value: '1180', unit: 'C' },
-      { id: 'p2', name: 'Rotation Speed', value: '85', unit: 'RPM' }
-    ],
-    status: 'Ready',
-    updatedAt: '2026-09-12'
-  },
-  {
-    id: 'program-2',
-    name: 'Graduation Printing',
-    description: 'Graduation and marking print program',
-    processMachine: 'Printing Machine',
-    version: 'V2',
-    file: { fileName: 'GLW250_Print.prg', fileSize: 1.8 * 1024 * 1024, url: '' },
-    parameters: [{ id: 'p3', name: 'Ink Passes', value: '2', unit: 'pass' }],
-    status: 'Testing',
-    updatedAt: '2026-09-10'
-  },
-  {
-    id: 'program-3',
-    name: 'Annealing Cycle',
-    description: 'Annealing temperature cycle',
-    processMachine: 'Annealing Lehr',
-    version: 'V1',
-    file: null,
-    parameters: [
-      { id: 'p4', name: 'Heating Time', value: '42', unit: 'sec' },
-      { id: 'p5', name: 'Cooling Time', value: '28', unit: 'sec' }
-    ],
-    status: 'Draft',
-    updatedAt: '2026-09-08'
-  }
-];
+const seedPrograms: Program[] = [];
 
 export function Programming() {
   const { project } = useProjectWorkspace();
@@ -431,7 +391,7 @@ function Meta({ label, value, pill, icon }: { label: string; value: string; pill
 }
 
 function readStoredProgramming(key: string): StoredProgramming {
-  const fallback = { programs: seedPrograms, references: ['Beaker_Technical_Drawing.pdf', 'Material_Specification.pdf', 'Beaker_3D_Model.step'], notes: defaultNotes, lastSaved: new Date().toISOString() };
+  const fallback = { programs: seedPrograms, references: [], notes: defaultNotes, lastSaved: new Date().toISOString() };
   const saved = localStorage.getItem(key);
   if (!saved) return fallback;
   try {

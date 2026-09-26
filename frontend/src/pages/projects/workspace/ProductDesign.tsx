@@ -44,18 +44,10 @@ type StoredDesignData = {
 };
 
 const acceptedDesignTypes = '.pdf,.jpg,.jpeg,.png,.webp,.step,.stp,.stl,.obj';
-const defaultNotes = 'Initial design based on standard 250ml beaker dimensions. Spout design reviewed with manufacturing team. Final 3D model pending approval.';
-const projectAttachments = ['Material_Specification.pdf', 'Supplier_Quote.pdf', 'Requirement_Document.pdf', 'Benchmark_Reference.jpg'];
+const defaultNotes = '';
+const projectAttachments: string[] = [];
 
-const seedDesigns: DesignFile[] = [
-  { id: 'd1', title: 'Beaker 3D Model', fileName: 'Beaker_3D_Model.stp', category: '3D Model', description: 'Primary 3D model', size: 4.2 * 1024 * 1024, createdAt: '2026-09-12', mimeType: 'model/step', url: '' },
-  { id: 'd2', title: 'Beaker Technical Drawing', fileName: 'Beaker_Technical_Drawing.pdf', category: 'Technical Drawing', description: 'Dimensioned drawing', size: 1.8 * 1024 * 1024, createdAt: '2026-09-10', mimeType: 'application/pdf', url: '' },
-  { id: 'd3', title: 'Spout Detail', fileName: 'Spout_Detail.png', category: 'Rendering', description: 'Spout rendering detail', size: 650 * 1024, createdAt: '2026-09-08', mimeType: 'image/png', url: '' },
-  { id: 'd4', title: 'Beaker Rendering', fileName: 'Beaker_Rendering.png', category: 'Rendering', description: 'Product rendering set', size: 2.4 * 1024 * 1024, createdAt: '2026-09-07', mimeType: 'image/png', url: '' },
-  { id: 'd5', title: 'Design Concept', fileName: 'Design_Concept.jpg', category: 'Concept', description: 'Early design concept', size: 1.1 * 1024 * 1024, createdAt: '2026-09-06', mimeType: 'image/jpeg', url: '' },
-  { id: 'd6', title: 'Beaker Wireframe', fileName: 'Beaker_Wireframe.png', category: '3D Model', description: 'Wireframe preview', size: 850 * 1024, createdAt: '2026-09-05', mimeType: 'image/png', url: '' },
-  { id: 'd7', title: 'Exploded View', fileName: 'Exploded_View.pdf', category: 'Technical Drawing', description: 'Exploded drawing view', size: 950 * 1024, createdAt: '2026-09-05', mimeType: 'application/pdf', url: '' }
-];
+const seedDesigns: DesignFile[] = [];
 
 export function ProductDesign() {
   const { project } = useProjectWorkspace();
@@ -410,7 +402,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function readStoredData(key: string): StoredDesignData {
-  const fallback = { designs: seedDesigns, notes: defaultNotes, linked: ['Material_Specification.pdf', 'Supplier_Quote.pdf'], lastSaved: new Date().toISOString() };
+  const fallback = { designs: seedDesigns, notes: defaultNotes, linked: [], lastSaved: new Date().toISOString() };
   const saved = localStorage.getItem(key);
   if (!saved) return fallback;
   try {

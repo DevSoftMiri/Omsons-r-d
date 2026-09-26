@@ -35,44 +35,7 @@ type AttachmentFile = {
 
 const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp';
 
-const seedFiles: AttachmentFile[] = [
-  {
-    id: 'drawing',
-    name: 'Drawing.pdf',
-    description: 'General drawing for the beaker design',
-    type: 'PDF',
-    size: 1.2 * 1024 * 1024,
-    uploadedOn: '2026-09-12T10:24:00',
-    uploadedBy: 'Riya Sharma',
-    initials: 'RS',
-    url: '',
-    mimeType: 'application/pdf'
-  },
-  {
-    id: 'design',
-    name: 'Design.png',
-    description: 'Product design mockup',
-    type: 'PNG',
-    size: 850 * 1024,
-    uploadedOn: '2026-09-10T14:15:00',
-    uploadedBy: 'Anjali Patel',
-    initials: 'AP',
-    url: '',
-    mimeType: 'image/png'
-  },
-  {
-    id: 'tolerance',
-    name: 'Tolerance-sheet.webp',
-    description: 'Tolerance specifications',
-    type: 'WebP',
-    size: 420 * 1024,
-    uploadedOn: '2026-09-08T11:30:00',
-    uploadedBy: 'Vikram Kumar',
-    initials: 'VK',
-    url: '',
-    mimeType: 'image/webp'
-  }
-];
+const seedFiles: AttachmentFile[] = [];
 
 export function Attachments() {
   const { project } = useProjectWorkspace();

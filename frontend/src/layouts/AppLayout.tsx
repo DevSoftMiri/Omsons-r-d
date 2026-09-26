@@ -1,5 +1,7 @@
-import { Bell, FileBadge, FileText, FlaskConical, LayoutDashboard, Settings, Users, Warehouse } from 'lucide-react';
+import { Bell, FileBadge, FileText, FlaskConical, LayoutDashboard, LogOut, Settings, Users, Warehouse } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { logout } from '../store';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -14,6 +16,9 @@ const navItems = [
 const brandImageUrl = 'https://res.cloudinary.com/dzrg0utcm/image/upload/v1784113445/ChatGPT_Image_Jul_15_2026_04_32_56_PM_koo8hz.png';
 
 export function AppLayout() {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+
   return (
     <div className="min-h-screen bg-slate-100 text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white lg:block">
@@ -36,9 +41,20 @@ export function AppLayout() {
             <h1 className="text-2xl font-bold">R&D Project Lifecycle</h1>
             <p className="text-sm text-slate-500">Glassware product development from concept to production readiness</p>
           </div>
-          <button className="icon-button" title="Notifications">
-            <Bell size={18} />
-          </button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-bold text-ink">{user.name}</p>
+                <p className="text-xs font-semibold uppercase text-slate-500">{user.role}</p>
+              </div>
+            )}
+            <button className="icon-button" title="Notifications">
+              <Bell size={18} />
+            </button>
+            <button className="icon-button" title="Logout" onClick={() => dispatch(logout())}>
+              <LogOut size={18} />
+            </button>
+          </div>
         </header>
         <Outlet />
       </main>

@@ -22,7 +22,7 @@ type BomRow = {
 };
 
 const units = ['kg', 'g', 'mg', 'L', 'ml', 'pcs', 'm', 'cm', 'mm', 'roll', 'sheet', 'box'];
-const defaultNotes = 'BOM prepared based on current design specifications and supplier quotations. Costs are indicative and may change based on final supplier selection and order quantity.';
+const defaultNotes = '';
 
 export function BOM() {
   const { project } = useProjectWorkspace();
@@ -411,16 +411,7 @@ function statusClass(status: BomStatus) {
 }
 
 function seedBomRows(items: Array<{ id: string; materialName: string; vendor: string; quantity: number; cost: number; procurementStage: string }>): BomRow[] {
-  const fallback: BomRow[] = [
-    { id: 'bom1', itemName: 'Borosilicate Glass Tube', category: 'Raw Material', specification: 'Borosilicate 3.3', supplier: 'Schott', unit: 'kg', quantityPerUnit: 0.15, unitCost: 450, referenceDocument: 'Spec_Schott.pdf', status: 'Procured' },
-    { id: 'bom2', itemName: 'Graduation Ink', category: 'Component', specification: 'Ceramic Ink (White)', supplier: 'Ferro', unit: 'g', quantityPerUnit: 2, unitCost: 15, referenceDocument: 'Ink_Datasheet.pdf', status: 'Ordered' },
-    { id: 'bom3', itemName: 'Beaker Base', category: 'Component', specification: '250ml Base', supplier: 'Internal', unit: 'pcs', quantityPerUnit: 1, unitCost: 120, referenceDocument: '', status: 'Procured' },
-    { id: 'bom4', itemName: 'Carton Box', category: 'Packaging', specification: 'Standard 1 pc', supplier: 'Pyramid', unit: 'pcs', quantityPerUnit: 1, unitCost: 18, referenceDocument: 'Packaging_Spec.pdf', status: 'Pending' },
-    { id: 'bom5', itemName: 'Bubble Wrap', category: 'Packaging', specification: '5mm', supplier: 'Local Vendor', unit: 'pcs', quantityPerUnit: 0.5, unitCost: 5, referenceDocument: '', status: 'Ordered' },
-    { id: 'bom6', itemName: 'Label Sticker', category: 'Packaging', specification: 'Beaker 250ml', supplier: 'Shree Labels', unit: 'pcs', quantityPerUnit: 1, unitCost: 1.5, referenceDocument: 'Label_Design.pdf', status: 'Procured' },
-    { id: 'bom7', itemName: 'Plastic Pouch', category: 'Packaging', specification: 'Polythene 100G', supplier: 'Local Vendor', unit: 'pcs', quantityPerUnit: 1, unitCost: 0.8, referenceDocument: '', status: 'Pending' },
-    { id: 'bom8', itemName: 'Quality Certificate', category: 'Component', specification: 'ISO 3819', supplier: 'SGS', unit: 'pcs', quantityPerUnit: 1, unitCost: 250, referenceDocument: 'SGS_Certificate.pdf', status: 'Ordered' }
-  ];
+  const fallback: BomRow[] = [];
   if (!items.length) return fallback;
   return items.map((item, index) => ({ id: item.id, itemName: item.materialName, category: index % 3 === 0 ? 'Raw Material' : index % 3 === 1 ? 'Component' : 'Packaging', specification: index % 2 === 0 ? 'R&D specification' : 'Supplier specification', supplier: item.vendor, unit: 'pcs', quantityPerUnit: item.quantity, unitCost: item.cost, referenceDocument: index % 2 === 0 ? `${item.materialName.replace(/\s+/g, '_')}.pdf` : '', status: mapStatus(item.procurementStage) }));
 }

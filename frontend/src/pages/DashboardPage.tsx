@@ -1,5 +1,6 @@
 import { CalendarClock, CheckCircle2, FlaskConical, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { teamMembers } from '../data/seed';
 import { useAppSelector } from '../hooks';
 
 export function DashboardPage() {
@@ -7,8 +8,8 @@ export function DashboardPage() {
   const stats = [
     { label: 'Active Projects', value: projects.filter((item) => item.status === 'Running').length, note: 'Running', icon: FlaskConical },
     { label: 'On Hold', value: projects.filter((item) => item.status === 'On Hold').length, note: 'Projects', icon: CalendarClock },
-    { label: 'Completed', value: projects.filter((item) => item.status === 'Completed').length + 11, note: 'Ready', icon: CheckCircle2 },
-    { label: 'Team Members', value: 18, note: 'Staff', icon: Users }
+    { label: 'Completed', value: projects.filter((item) => item.status === 'Completed').length, note: 'Ready', icon: CheckCircle2 },
+    { label: 'Team Members', value: teamMembers.length, note: 'Staff', icon: Users }
   ];
 
   return (
@@ -32,7 +33,7 @@ export function DashboardPage() {
           <Link to="/projects" className="secondary-button">View All</Link>
         </div>
         <div className="grid gap-3">
-          {projects.map((project) => (
+          {projects.length ? projects.map((project) => (
             <Link key={project.id} to={`/projects/${project.productCode}/overview`} className="rounded-lg border border-slate-200 p-4 transition hover:border-primary hover:bg-mist">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -45,7 +46,7 @@ export function DashboardPage() {
                 <div className="h-2 rounded-full bg-primary" style={{ width: `${project.progress}%` }} />
               </div>
             </Link>
-          ))}
+          )) : <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No projects yet.</p>}
         </div>
       </section>
     </div>

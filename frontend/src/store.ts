@@ -3,15 +3,80 @@ import { initialProjects, teamMembers, workflowStages } from './data/seed';
 import type { Project, StageName } from './types';
 import { canCompleteStage, makeStage, slugifyStageName } from './utils/stages';
 
+export type UserRole = 'admin' | 'staff';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+}
+
+interface AuthState {
+  user: AuthUser | null;
+  token: string | null;
+}
+
 interface ProjectsState {
   projects: Project[];
-  selectedProjectId: string;
+  selectedProjectId: string | null;
 }
+
+const authStorageKey = 'omsons-rnd-auth-session';
+
+interface StoredAuthSession {
+  user: AuthUser;
+  token: string;
+}
+
+function loadStoredSession(): StoredAuthSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedSession = window.localStorage.getItem(authStorageKey);
+    if (!storedSession) return null;
+    const parsedSession = JSON.parse(storedSession) as StoredAuthSession;
+    if (!parsedSession.token || !parsedSession.user?.name || !parsedSession.user.email || !['admin', 'staff'].includes(parsedSession.user.role)) return null;
+    return parsedSession;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredSession(session: StoredAuthSession | null) {
+  if (typeof window === 'undefined') return;
+  if (session) {
+    window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+    window.localStorage.setItem('token', session.token);
+    return;
+  }
+  window.localStorage.removeItem(authStorageKey);
+  window.localStorage.removeItem('omsons-rnd-auth-user');
+  window.localStorage.removeItem('token');
+}
+
+const storedSession = loadStoredSession();
 
 const initialState: ProjectsState = {
   projects: initialProjects,
-  selectedProjectId: initialProjects[0].id
+  selectedProjectId: initialProjects[0]?.id ?? null
 };
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: { user: storedSession?.user ?? null, token: storedSession?.token ?? null } satisfies AuthState,
+  reducers: {
+    login(state, action: PayloadAction<StoredAuthSession>) {
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      saveStoredSession(action.payload);
+    },
+    logout(state) {
+      state.user = null;
+      state.token = null;
+      saveStoredSession(null);
+    }
+  }
+});
 
 const projectsSlice = createSlice({
   name: 'projects',
@@ -20,23 +85,27 @@ const projectsSlice = createSlice({
     selectProject(state, action: PayloadAction<string>) {
       state.selectedProjectId = action.payload;
     },
-    createProject(state, action: PayloadAction<Omit<Project, 'id' | 'productCode' | 'progress' | 'stages' | 'bom' | 'reports' | 'currentStage'> & { customStages?: string[] }>) {
+    createProject(state, action: PayloadAction<Omit<Project, 'id' | 'productCode' | 'progress' | 'stages' | 'bom' | 'reports' | 'currentStage'> & { selectedStages?: StageName[]; customStages?: string[] }>) {
       const productCode = `GLW-${String(state.projects.length + 101).padStart(4, '0')}`;
-      const { customStages: requestedCustomStages, ...projectValues } = action.payload;
-      const baseStages = workflowStages.filter((stage) => stage !== 'Final Stage');
+      const { selectedStages: requestedStages, customStages: requestedCustomStages, ...projectValues } = action.payload;
+      const defaultStages = workflowStages.filter((stage) => stage !== 'Final Stage');
+      const baseStages = (requestedStages?.length ? requestedStages : defaultStages)
+        .filter((stage, index, stages) => stage !== 'Final Stage' && stages.indexOf(stage) === index);
       const customStages = (requestedCustomStages || []).map((name) => name.trim()).filter(Boolean);
       const stageNames = [...baseStages, ...customStages, 'Final Stage'];
+      const projectId = crypto.randomUUID();
       state.projects.unshift({
         ...projectValues,
-        id: crypto.randomUUID(),
+        id: projectId,
         productCode,
         reportTo: projectValues.reportTo || teamMembers[0].name,
         progress: 0,
-        currentStage: 'Prerequisites',
+        currentStage: stageNames[0],
         stages: stageNames.map((name, index) => makeStage(name, index, { isCustom: customStages.includes(name) })),
         bom: [],
         reports: []
       });
+      state.selectedProjectId = projectId;
     },
     completeStage(state, action: PayloadAction<{ projectId: string; stage: StageName }>) {
       const project = state.projects.find((item) => item.id === action.payload.projectId);
@@ -107,10 +176,12 @@ function refreshProjectWorkflow(project: Project) {
   if (project.progress < 100 && project.status === 'Completed') project.status = 'Running';
 }
 
+export const { login, logout } = authSlice.actions;
 export const { selectProject, createProject, completeStage, addCustomStage, updateCustomStage, deleteCustomStage, moveCustomStage } = projectsSlice.actions;
 
 export const store = configureStore({
   reducer: {
+    auth: authSlice.reducer,
     projects: projectsSlice.reducer
   }
 });

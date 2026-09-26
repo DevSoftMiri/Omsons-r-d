@@ -21,18 +21,11 @@ type TestRecord = {
 };
 type StoredValidation = { tests: TestRecord[]; findings: string; nextSteps: string[]; lastSaved: string };
 
-const defaultFindings = 'Product meets dimensional requirements.\nNo visible glass defects in recent trials.\nThermal shock test needs retesting.\nGraduation alignment to be improved.';
-const defaultNextSteps = ['Repeat thermal shock test with modified annealing cycle.', 'Improve printing alignment and revalidate graduation.', 'Conduct extended chemical resistance test.', 'Prepare final test report after successful retest.'];
+const defaultFindings = '';
+const defaultNextSteps: string[] = [];
 const testTypes = ['Trial Run', 'Dimensional Check', 'Performance Test', 'Visual Inspection', 'Others'];
 
-const seedTests: TestRecord[] = [
-  { id: 't1', name: 'Production Trial - Batch 1', type: 'Trial Run', date: '2026-09-12', result: 'Pass', findings: 'Good shape and clarity. Minor air bubbles.', document: 'Trial_Report_B1.pdf', documentSize: 2.4 * 1024 * 1024, parameters: [] },
-  { id: 't2', name: 'Dimensional Check', type: 'Dimensional Check', date: '2026-09-10', result: 'Pass', findings: 'All dimensions within tolerance.', document: 'Dimension_Test.xlsx', documentSize: 1.8 * 1024 * 1024, parameters: [{ id: 'p1', parameter: 'Capacity', target: '250 ml', actual: '251 ml', result: 'Pass' }, { id: 'p2', parameter: 'Height', target: '95 mm', actual: '94.8 mm', result: 'Pass' }] },
-  { id: 't3', name: 'Thermal Shock Test', type: 'Performance Test', date: '2026-09-08', result: 'Retest', findings: 'Cracks observed in 2 out of 10 samples.', document: 'Thermal_Test.pdf', documentSize: 1.2 * 1024 * 1024, parameters: [] },
-  { id: 't4', name: 'Visual Inspection', type: 'Visual Inspection', date: '2026-09-05', result: 'Pass', findings: 'No visible defects. Good surface finish.', document: 'Visual_Report.pdf', documentSize: 950 * 1024, parameters: [] },
-  { id: 't5', name: 'Chemical Resistance Test', type: 'Performance Test', date: '2026-09-02', result: 'Pass', findings: 'No corrosion or reaction observed.', document: 'Chemical_Test.pdf', documentSize: 1.6 * 1024 * 1024, parameters: [] },
-  { id: 't6', name: 'Graduation Accuracy Test', type: 'Others', date: '2026-08-30', result: 'Fail', findings: 'Graduation misalignment observed.', document: 'Graduation_Test.pdf', documentSize: 1.1 * 1024 * 1024, parameters: [] }
-];
+const seedTests: TestRecord[] = [];
 
 export function TestingValidation() {
   const { project } = useProjectWorkspace();

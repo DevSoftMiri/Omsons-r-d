@@ -1,12 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
-import { teamMembers } from '../../data/seed';
+import { teamMembers, workflowStages } from '../../data/seed';
 import { useAppDispatch } from '../../hooks';
 import { createProject } from '../../store';
+import type { StageName } from '../../types';
+
+const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
 
 const projectSchema = z.object({
   name: z.string().min(3),
@@ -30,6 +33,7 @@ export function CreateProject() {
   const navigate = useNavigate();
   const [customStageName, setCustomStageName] = useState('');
   const [customStages, setCustomStages] = useState<string[]>([]);
+  const [selectedStages, setSelectedStages] = useState<StageName[]>(configurableStages);
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -49,12 +53,33 @@ export function CreateProject() {
     dispatch(
       createProject({
         ...values,
+        selectedStages,
         customStages,
         reportTo: values.reportTo || teamMembers[0].name,
         teamMembers: teamMembers.filter((member) => values.teamMemberIds.includes(member.id))
       })
     );
     navigate('/projects');
+  }
+
+  function toggleStage(stage: StageName) {
+    setSelectedStages((current) => {
+      if (current.includes(stage)) return current.filter((item) => item !== stage);
+      const next = [...current, stage];
+      return next.sort((a, b) => configurableStages.indexOf(a) - configurableStages.indexOf(b));
+    });
+  }
+
+  function moveCustomStage(stage: string, direction: 'up' | 'down') {
+    setCustomStages((current) => {
+      const index = current.indexOf(stage);
+      const target = direction === 'up' ? index - 1 : index + 1;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
   }
 
   function addCustomStage() {
@@ -115,6 +140,18 @@ export function CreateProject() {
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
+          <p className="mb-2 text-sm font-semibold">Project Stages</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {configurableStages.map((stage) => (
+              <label key={stage} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={selectedStages.includes(stage)} onChange={() => toggleStage(stage)} />
+                {stage}
+              </label>
+            ))}
+          </div>
+          {!selectedStages.length ? <p className="mt-2 text-xs font-semibold text-rose-600">Select at least one stage before Final Stage.</p> : null}
+        </div>
+        <div className="rounded-lg border border-slate-200 p-3">
           <p className="mb-2 text-sm font-semibold">Custom Stages</p>
           <div className="flex gap-2">
             <input className="field" value={customStageName} placeholder="Add custom stage before Final Stage" onChange={(event) => setCustomStageName(event.target.value)} onKeyDown={(event) => {
@@ -126,10 +163,18 @@ export function CreateProject() {
             <button className="secondary-button h-11 shrink-0" type="button" onClick={addCustomStage}><Plus size={16} />Add</button>
           </div>
           {customStages.length ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {customStages.map((stage) => (
-                <span key={stage} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-primary">
+            <div className="mt-3 grid gap-2">
+              {customStages.map((stage, index) => (
+                <span key={stage} className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-primary">
                   {stage}
+                  <span className="ml-auto flex items-center gap-1">
+                    <button type="button" disabled={index === 0} onClick={() => moveCustomStage(stage, 'up')} aria-label={`Move ${stage} up`} className="disabled:opacity-40">
+                      <ArrowUp size={14} />
+                    </button>
+                    <button type="button" disabled={index === customStages.length - 1} onClick={() => moveCustomStage(stage, 'down')} aria-label={`Move ${stage} down`} className="disabled:opacity-40">
+                      <ArrowDown size={14} />
+                    </button>
+                  </span>
                   <button type="button" onClick={() => setCustomStages((current) => current.filter((item) => item !== stage))} aria-label={`Remove ${stage}`}>
                     <Trash2 size={14} />
                   </button>
@@ -138,7 +183,7 @@ export function CreateProject() {
             </div>
           ) : <p className="mt-2 text-xs text-slate-500">Optional. These stages will appear before Final Stage.</p>}
         </div>
-        <button className="primary-button justify-center" type="submit">
+        <button className="primary-button justify-center disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={!selectedStages.length}>
           <Plus size={18} />
           Create Project
         </button>
