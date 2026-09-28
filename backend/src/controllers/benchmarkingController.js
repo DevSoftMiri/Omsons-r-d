@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import asyncHandler from 'express-async-handler';
 import { Benchmarking } from '../models/Benchmarking.js';
 import { Project } from '../models/Project.js';
-import { WORKFLOW_STAGES } from '../constants/workflow.js';
 
 function makeId(prefix) {
   return `${prefix}_${new mongoose.Types.ObjectId().toString()}`;
@@ -45,6 +44,20 @@ function hasMeaningfulData(benchmarking) {
   return benchmarking.tables.some((table) =>
     table.rows.some((row) => [...row.cells.values()].some((value) => String(value || '').trim()))
   );
+}
+
+function refreshStageLocks(project) {
+  project.stages.forEach((stage, index) => {
+    if (stage.status === 'Completed') {
+      stage.progress = 100;
+      return;
+    }
+    const previousComplete = index === 0 || project.stages.slice(0, index).every((candidate) => candidate.status === 'Completed');
+    stage.status = previousComplete ? 'Pending' : 'Locked';
+    stage.progress = 0;
+  });
+  project.currentStage = project.stages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage';
+  if (project.stages.every((stage) => stage.status === 'Completed')) project.status = 'Completed';
 }
 
 function serializeCsv(table) {
@@ -177,16 +190,27 @@ export const completeBenchmarking = asyncHandler(async (req, res) => {
   benchmarking.reviewStatus = 'completed';
   benchmarking.completedAt = new Date();
 
-  const stageIndex = WORKFLOW_STAGES.indexOf('Benchmarking');
+  const stageIndex = project.stages.findIndex((stage) => stage.name.toLowerCase() === 'benchmarking');
+  if (stageIndex < 0) {
+    res.status(404);
+    throw new Error('Benchmarking stage is not configured for this project');
+  }
+
+  const previousComplete = stageIndex === 0 || project.stages.slice(0, stageIndex).every((stage) => stage.status === 'Completed');
+  const canOverride = req.user?.role === 'Admin' && req.body?.adminOverride;
+  if (!previousComplete && !canOverride) {
+    res.status(409);
+    throw new Error('Previous stage must be completed first');
+  }
+
   project.stages[stageIndex] = {
     ...project.stages[stageIndex],
-    name: 'Benchmarking',
     status: 'Completed',
     progress: 100,
     completedAt: new Date(),
     approvedBy: req.user?._id
   };
-  project.currentStage = project.stages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage';
+  refreshStageLocks(project);
 
   await benchmarking.save();
   await project.save();

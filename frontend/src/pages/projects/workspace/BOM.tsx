@@ -1,9 +1,11 @@
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, CalendarDays, Check, ChevronRight, Download, Edit2, FileText, Filter, PackagePlus, Paperclip, Plus, ReceiptText, Search, ShoppingCart, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import { useProjectWorkspace } from './context';
 
 type BomStatus = 'Pending' | 'Ordered' | 'Procured';
@@ -27,7 +29,7 @@ const defaultNotes = '';
 export function BOM() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
-  const importRef = useRef<HTMLInputElement | null>(null);
+  const { showToast } = useToast();
   const storageKey = `bom:${project.productCode}`;
   const [rows, setRows] = useState<BomRow[]>(() => readStoredBom(storageKey, project.bom).rows);
   const [activeCategory, setActiveCategory] = useState('All Items');
@@ -40,6 +42,7 @@ export function BOM() {
   const [notes, setNotes] = useState(() => readStoredBom(storageKey, project.bom).notes);
   const [lastSaved, setLastSaved] = useState(() => readStoredBom(storageKey, project.bom).lastSaved);
   const [saveState, setSaveState] = useState<'Saved' | 'Saving...'>('Saved');
+  const [referenceFiles, setReferenceFiles] = useState<ProjectAttachment[]>([]);
 
   useEffect(() => {
     setSaveState('Saving...');
@@ -51,6 +54,20 @@ export function BOM() {
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [notes, rows, storageKey]);
+
+  useEffect(() => {
+    let active = true;
+    fetchProjectAttachments(project.productCode, 'BOM')
+      .then((attachments) => {
+        if (active) setReferenceFiles(attachments);
+      })
+      .catch(() => {
+        if (active) setReferenceFiles([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [project.productCode]);
 
   const categories = useMemo(() => {
     const counts = rows.reduce<Record<string, number>>((acc, row) => {
@@ -92,10 +109,37 @@ export function BOM() {
     setEditingRow(null);
   }
 
-  function removeRow(rowId: string) {
-    setRows((current) => current.filter((row) => row.id !== rowId));
-    setSelected((current) => current.filter((id) => id !== rowId));
+  async function removeRow(rowToRemove: BomRow) {
+    setRows((current) => current.filter((row) => row.id !== rowToRemove.id));
+    setSelected((current) => current.filter((id) => id !== rowToRemove.id));
     setDeleteRow(null);
+    const matchingAttachment = referenceFiles.find((file) => file.name === rowToRemove.referenceDocument);
+    if (!matchingAttachment) return;
+    try {
+      await deleteProjectAttachment(project.productCode, 'BOM', matchingAttachment._id);
+      setReferenceFiles((current) => current.filter((file) => file._id !== matchingAttachment._id));
+    } catch (error) {
+      showToast({
+        tone: 'error',
+        title: 'Reference file not deleted',
+        message: error instanceof Error ? error.message : 'The BOM item was removed, but its reference file could not be deleted.'
+      });
+    }
+  }
+
+  async function deleteReferenceDocument(file: ProjectAttachment) {
+    try {
+      await deleteProjectAttachment(project.productCode, 'BOM', file._id);
+      setReferenceFiles((current) => current.filter((attachment) => attachment._id !== file._id));
+      setRows((current) => current.map((row) => row.referenceDocument === file.name ? { ...row, referenceDocument: '' } : row));
+      showToast({ tone: 'success', title: 'Reference deleted', message: `${file.name} was removed from this BOM.` });
+    } catch (error) {
+      showToast({
+        tone: 'error',
+        title: 'Delete failed',
+        message: error instanceof Error ? error.message : 'Reference document could not be deleted.'
+      });
+    }
   }
 
   function removeSelected() {
@@ -171,8 +215,8 @@ export function BOM() {
           <p className="mt-1.5 max-w-4xl text-sm text-slate-600">Manage all raw materials, components, packaging, costs, suppliers, and references required to manufacture this product.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input ref={importRef} className="hidden" type="file" accept=".csv,text/csv" onChange={importCsv} />
-          <button className="secondary-button h-10 gap-2" onClick={() => importRef.current?.click()}><Upload size={16} />Import CSV</button>
+          <input id="bom-csv-import" className="sr-only" type="file" accept=".csv,text/csv" onChange={importCsv} />
+          <label className="secondary-button h-10 cursor-pointer gap-2" htmlFor="bom-csv-import"><Upload size={16} />Import CSV</label>
           <button className="secondary-button h-10 gap-2" onClick={exportCsv}><Download size={16} />Export to Excel</button>
           <button className="secondary-button h-10 gap-2" onClick={resetBom}>Reset</button>
           <button className="primary-button" onClick={() => { setEditingRow(null); setShowForm(true); }}><Plus size={18} />Add Item</button>
@@ -183,7 +227,7 @@ export function BOM() {
         <SummaryCard icon={<Box size={28} />} tone="blue" label="Total Items" value={rows.length.toString()} note="Active items" />
         <SummaryCard icon={<ReceiptText size={28} />} tone="green" label="Total Estimated Cost" value={formatCurrency(estimatedCost)} note={`${pricedRows.length} of ${rows.length} items priced`} />
         <SummaryCard icon={<FileText size={28} />} tone="blue" label="Items with Reference" value={`${withReference} / ${rows.length}`} note="Have supplier/reference" />
-        <SummaryCard icon={<ShoppingCart size={28} />} tone="orange" label="Procurement Status" value={`${statusCounts.Procured}      ${statusCounts.Ordered}      ${statusCounts.Pending}`} note="Procured     Ordered     Pending" />
+        <ProcurementStatusCard counts={statusCounts} />
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white shadow-soft">
@@ -271,7 +315,7 @@ export function BOM() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.8fr)]">
-        <ReferenceDocuments rows={rows} />
+        <ReferenceDocuments files={referenceFiles} rows={rows} onDelete={deleteReferenceDocument} />
         <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3"><FileText className="text-primary" size={22} /><h3 className="font-bold">BOM Notes <span className="font-normal text-slate-500">(Optional)</span></h3></div>
@@ -292,8 +336,17 @@ export function BOM() {
         </div>
       </section>
 
-      {showForm ? <BomItemForm row={editingRow} onClose={() => setShowForm(false)} onSave={upsertRow} /> : null}
-      {deleteRow ? <DeleteDialog row={deleteRow} onCancel={() => setDeleteRow(null)} onDelete={() => removeRow(deleteRow.id)} /> : null}
+      {showForm ? (
+        <BomItemForm
+          projectId={project.productCode}
+          row={editingRow}
+          onClose={() => setShowForm(false)}
+          onReferenceUploaded={(attachment) => setReferenceFiles((current) => [attachment, ...current])}
+          onSave={upsertRow}
+          showToast={showToast}
+        />
+      ) : null}
+      {deleteRow ? <DeleteDialog row={deleteRow} onCancel={() => setDeleteRow(null)} onDelete={() => removeRow(deleteRow)} /> : null}
     </div>
   );
 }
@@ -328,13 +381,74 @@ function ProjectSummary({ currentStage }: { currentStage: string }) {
   );
 }
 
-function BomItemForm({ row, onClose, onSave }: { row: BomRow | null; onClose: () => void; onSave: (row: BomRow) => void }) {
+function BomItemForm({
+  projectId,
+  row,
+  onClose,
+  onReferenceUploaded,
+  onSave,
+  showToast
+}: {
+  projectId: string;
+  row: BomRow | null;
+  onClose: () => void;
+  onReferenceUploaded: (attachment: ProjectAttachment) => void;
+  onSave: (row: BomRow) => void;
+  showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void;
+}) {
   const [form, setForm] = useState<BomRow>(row || { id: `bom_${Date.now()}`, itemName: '', category: 'Raw Material', specification: '', supplier: '', unit: 'pcs', quantityPerUnit: 1, unitCost: null, referenceDocument: '', status: 'Pending' });
+  const [uploadingReference, setUploadingReference] = useState(false);
   const calculated = form.unitCost === null ? null : form.quantityPerUnit * form.unitCost;
+  const uploadInputId = `bom-reference-upload-${form.id}`;
+
+  async function uploadReferenceDocument(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingReference(true);
+    try {
+      const attachment = await uploadProjectAttachment(projectId, 'BOM', file);
+      setForm((current) => ({ ...current, referenceDocument: attachment.name }));
+      onReferenceUploaded(attachment);
+      showToast({ tone: 'success', title: 'Reference uploaded', message: `${attachment.name} was stored in Supabase.` });
+    } catch (error) {
+      showToast({
+        tone: 'error',
+        title: 'Upload failed',
+        message: error instanceof Error ? error.message : 'Reference document could not be uploaded.'
+      });
+    } finally {
+      setUploadingReference(false);
+      event.target.value = '';
+    }
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!form.itemName.trim() || !form.category.trim() || !form.unit.trim() || form.quantityPerUnit <= 0) return;
-    onSave(form);
+    const missingFields = [
+      !form.itemName.trim() ? 'Item Name' : '',
+      !form.category.trim() ? 'Category' : '',
+      !form.unit.trim() ? 'Unit' : '',
+      !Number.isFinite(form.quantityPerUnit) || form.quantityPerUnit <= 0 ? 'Quantity per Unit' : ''
+    ].filter(Boolean);
+
+    if (missingFields.length) {
+      showToast({
+        tone: 'error',
+        title: 'Add required BOM value',
+        message: `Please add ${missingFields.join(', ')} before saving this item.`
+      });
+      return;
+    }
+
+    onSave({
+      ...form,
+      itemName: form.itemName.trim(),
+      category: form.category.trim(),
+      unit: form.unit.trim(),
+      specification: form.specification.trim(),
+      supplier: form.supplier.trim(),
+      referenceDocument: form.referenceDocument.trim()
+    });
   }
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
@@ -349,7 +463,16 @@ function BomItemForm({ row, onClose, onSave }: { row: BomRow | null; onClose: ()
           <Field label="Quantity per Unit *"><input className="field" type="number" min="0" step="0.001" value={form.quantityPerUnit} onChange={(event) => setForm({ ...form, quantityPerUnit: Number(event.target.value) })} /></Field>
           <Field label="Unit Cost"><input className="field" type="number" min="0" step="0.01" value={form.unitCost ?? ''} onChange={(event) => setForm({ ...form, unitCost: event.target.value === '' ? null : Number(event.target.value) })} /></Field>
           <Field label="Calculated Cost"><input className="field bg-slate-50 font-bold" readOnly value={calculated === null ? '-' : formatCurrency(calculated)} /></Field>
-          <Field label="Reference Document"><input className="field" placeholder="Material_Specification.pdf" value={form.referenceDocument} onChange={(event) => setForm({ ...form, referenceDocument: event.target.value })} /></Field>
+          <Field label="Reference Document">
+            <div className="flex items-center gap-3">
+              <label className={`secondary-button h-9 shrink-0 cursor-pointer gap-2 text-primary ${uploadingReference ? 'pointer-events-none opacity-60' : ''}`} htmlFor={uploadInputId}>
+                <Upload size={15} />
+                {uploadingReference ? 'Uploading...' : 'Upload'}
+              </label>
+              <input id={uploadInputId} className="sr-only" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={uploadReferenceDocument} />
+              {form.referenceDocument ? <span className="min-w-0 truncate text-sm font-semibold text-slate-600">{form.referenceDocument}</span> : null}
+            </div>
+          </Field>
           <Field label="Status"><select className="field" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as BomStatus })}><option>Pending</option><option>Ordered</option><option>Procured</option></select></Field>
         </div>
         <div className="mt-5 flex justify-end gap-3"><button type="button" className="secondary-button h-11" onClick={onClose}>Cancel</button><button className="primary-button">{row ? 'Save Item' : 'Add Item'}</button></div>
@@ -374,13 +497,64 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   return <div className="grid min-h-80 place-items-center p-6 text-center"><div><PackagePlus className="mx-auto text-slate-400" size={58} /><h3 className="mt-4 text-xl font-bold">No BOM items added yet.</h3><p className="mt-2 max-w-xl text-slate-500">Start building the list of raw materials, components and packaging required to manufacture this product.</p><button className="primary-button mt-5" onClick={onAdd}><Plus size={18} />Add First Item</button></div></div>;
 }
 
-function ReferenceDocuments({ rows }: { rows: BomRow[] }) {
-  const documents = referenceDocuments(rows);
+function ReferenceDocuments({
+  rows,
+  files,
+  onDelete
+}: {
+  rows: BomRow[];
+  files: ProjectAttachment[];
+  onDelete: (file: ProjectAttachment) => void;
+}) {
+  const rowDocuments = referenceDocuments(rows);
+  const rowDocumentNames = new Set(rowDocuments);
+  const visibleFiles = files.filter((file, index, list) =>
+    rowDocumentNames.has(file.name) && list.findIndex((candidate) => candidate.name === file.name) === index
+  );
+  const uploadedNames = new Set(visibleFiles.map((file) => file.name));
+  const placeholderDocuments = rowDocuments.filter((document) => !uploadedNames.has(document));
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><Paperclip className="text-primary" size={22} /><h3 className="font-bold">Reference Documents</h3></div><span className="text-sm text-slate-500">{documents.length} files</span></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Paperclip className="text-primary" size={22} />
+          <h3 className="font-bold">Reference Documents</h3>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-500">{visibleFiles.length + placeholderDocuments.length} files</span>
+        </div>
+      </div>
       <div className="grid gap-3 md:grid-cols-3">
-        {documents.slice(0, 3).map((document) => <button key={document} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-left transition hover:bg-slate-50" onClick={() => openReference(document)}><span className="grid h-10 w-10 place-items-center rounded-lg bg-rose-100 text-rose-600"><FileText size={20} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{document}</p><p className="text-xs text-slate-500">Reference file</p></div><Download className="text-primary" size={17} /></button>)}
+        {visibleFiles.map((file) => (
+          <div key={file._id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-left transition hover:bg-slate-50">
+            <span className="grid h-10 w-10 place-items-center rounded-lg bg-rose-100 text-rose-600"><FileText size={20} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold">{file.name}</p>
+              <p className="text-xs text-slate-500">{formatBytes(file.fileSize || 0)} stored in Supabase</p>
+            </div>
+            <a className="text-primary" href={file.url || file.fileUrl} rel="noreferrer" target="_blank" title="Open reference">
+              <Download size={17} />
+            </a>
+            <button className="text-rose-600" title="Delete reference" onClick={() => onDelete(file)}>
+              <Trash2 size={17} />
+            </button>
+          </div>
+        ))}
+        {placeholderDocuments.map((document) => (
+          <button key={document} className="flex items-center gap-3 rounded-lg border border-dashed border-slate-200 p-3 text-left transition hover:bg-slate-50" onClick={() => openReference(document)}>
+            <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-500"><FileText size={20} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold">{document}</p>
+              <p className="text-xs text-slate-500">Referenced by BOM row</p>
+            </div>
+            <Download className="text-primary" size={17} />
+          </button>
+        ))}
+        {!visibleFiles.length && !placeholderDocuments.length ? (
+          <div className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+            No reference documents uploaded yet.
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -393,6 +567,27 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function SummaryCard({ icon, tone, label, value, note }: { icon: ReactNode; tone: 'blue' | 'green' | 'orange'; label: string; value: string; note: string }) {
   const toneClass = tone === 'green' ? 'bg-emerald-100 text-emerald-600' : tone === 'orange' ? 'bg-orange-100 text-orange-500' : 'bg-blue-100 text-primary';
   return <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-soft"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${toneClass}`}>{icon}</span><div><p className="text-xs text-slate-500">{label}</p><p className="mt-0.5 whitespace-pre text-xl font-bold">{value}</p><p className="text-xs text-slate-500">{note}</p></div></div>;
+}
+
+function ProcurementStatusCard({ counts }: { counts: Record<BomStatus, number> }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-orange-100 text-orange-500">
+        <ShoppingCart size={28} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-slate-500">Procurement Status</p>
+        <div className="mt-1 grid grid-cols-3 gap-2">
+          {(['Procured', 'Ordered', 'Pending'] as BomStatus[]).map((status) => (
+            <div key={status} className="min-w-0">
+              <p className="text-base font-bold leading-5 text-ink">{counts[status]}</p>
+              <p className="truncate text-xs text-slate-500">{status}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Meta({ label, value, pill, icon }: { label: string; value: string; pill?: boolean; icon?: ReactNode }) {
@@ -522,6 +717,12 @@ function openReference(documentName: string) {
 
 function formatCurrency(value: number) {
   return `Rs. ${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatBytes(value: number) {
+  if (!value) return '0 KB';
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatDate(value: string) {

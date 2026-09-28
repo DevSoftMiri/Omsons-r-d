@@ -1,6 +1,9 @@
 import { ArrowRight, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { fetchProjects } from '../../services/projectService';
+import { setProjects } from '../../store';
 
 const dotColor = {
   Running: 'bg-primary',
@@ -10,7 +13,30 @@ const dotColor = {
 };
 
 export function ProjectsPage() {
+  const dispatch = useAppDispatch();
   const projects = useAppSelector((state) => state.projects.projects);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetchProjects()
+      .then((items) => {
+        if (!active) return;
+        dispatch(setProjects(items));
+        setError('');
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load projects');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [dispatch]);
 
   return (
     <div className="p-5 lg:p-8">
@@ -26,7 +52,9 @@ export function ProjectsPage() {
       </div>
 
       <section className="space-y-4">
-        {projects.length ? projects.map((project) => (
+        {loading ? <div className="panel text-center text-sm text-slate-500">Loading projects...</div> : null}
+        {error ? <div className="panel text-center text-sm font-semibold text-rose-600">{error}</div> : null}
+        {!loading && !error && projects.length ? projects.map((project) => (
           <article key={project.id} className="panel flex items-center justify-between gap-5">
             <div className="flex min-w-0 items-center gap-5">
               <span className={`h-9 w-9 shrink-0 rounded-full ${dotColor[project.status]}`} />
@@ -40,12 +68,13 @@ export function ProjectsPage() {
               <ArrowRight size={16} />
             </Link>
           </article>
-        )) : (
+        )) : null}
+        {!loading && !error && !projects.length ? (
           <div className="panel text-center">
             <p className="font-bold">No projects yet</p>
             <p className="mt-1 text-sm text-slate-500">Create a project and choose the stages that should be followed.</p>
           </div>
-        )}
+        ) : null}
       </section>
     </div>
   );

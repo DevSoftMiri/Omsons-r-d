@@ -63,6 +63,12 @@ projectSchema.pre('validate', function applyWorkflowDefaults(next) {
       status: index === 0 ? 'Pending' : 'Locked',
       progress: 0
     }));
+  } else if (!this.stages.some((stage) => stage.name === 'Final Stage')) {
+    this.stages.push({
+      name: 'Final Stage',
+      status: this.stages.every((stage) => stage.status === 'Completed') ? 'Pending' : 'Locked',
+      progress: 0
+    });
   }
 
   if (!this.programmingChecklist?.length) {

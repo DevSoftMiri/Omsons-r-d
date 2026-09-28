@@ -75,6 +75,28 @@ function writeLocalPayload(projectId: string, payload: PrerequisitePayload) {
   return payload;
 }
 
+function saveLocalUpload(projectId: string, type: string, file: File) {
+  const payload = createLocalPayload(projectId);
+  const certificate: UploadedCertificate = {
+    _id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    type,
+    fileName: file.name,
+    mimeType: file.type,
+    fileSize: file.size,
+    fileUrl: URL.createObjectURL(file),
+    status: 'Uploaded',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  const documents = payload.documents.some((document) => document.type === type)
+    ? payload.documents.map((document) => document.type === type
+      ? { ...document, status: 'Uploaded' as const, certificate }
+      : document)
+    : [...payload.documents, { type, required: true, status: 'Uploaded' as const, certificate }];
+  writeLocalPayload(projectId, buildPayload(documents));
+  return certificate;
+}
+
 function buildPayload(documents: PrerequisiteDocument[]): PrerequisitePayload {
   return {
     documents,
@@ -101,30 +123,13 @@ export async function fetchPrerequisites(projectId: string) {
   const response = await fetch(`${API_BASE}/projects/${projectId}/prerequisites`, {
     headers: authHeaders()
   });
+  if (response.status === 404) return createLocalPayload(projectId);
   return parseResponse<PrerequisitePayload>(response);
 }
 
 export async function uploadPrerequisite(projectId: string, type: string, file: File) {
   if (!hasBackendAuth()) {
-    const payload = createLocalPayload(projectId);
-    const certificate: UploadedCertificate = {
-      _id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      type,
-      fileName: file.name,
-      mimeType: file.type,
-      fileSize: file.size,
-      fileUrl: URL.createObjectURL(file),
-      status: 'Uploaded',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    const documents = payload.documents.some((document) => document.type === type)
-      ? payload.documents.map((document) => document.type === type
-        ? { ...document, status: 'Uploaded' as const, certificate }
-        : document)
-      : [...payload.documents, { type, required: true, status: 'Uploaded' as const, certificate }];
-    writeLocalPayload(projectId, buildPayload(documents));
-    return certificate;
+    return saveLocalUpload(projectId, type, file);
   }
 
   const formData = new FormData();
@@ -134,7 +139,13 @@ export async function uploadPrerequisite(projectId: string, type: string, file: 
     headers: authHeaders(),
     body: formData
   });
-  return parseResponse<UploadedCertificate>(response);
+  if (response.ok) return response.json() as Promise<UploadedCertificate>;
+
+  const error = await response.json().catch(() => ({ message: 'Request failed' }));
+  if (response.status === 404 || error.message === 'Project not found') {
+    return saveLocalUpload(projectId, type, file);
+  }
+  throw new Error(error.message || 'Upload failed');
 }
 
 export async function reviewPrerequisite(projectId: string, certificateId: string, status: 'Approved' | 'Rejected') {

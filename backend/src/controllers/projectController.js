@@ -38,6 +38,25 @@ function makeStages(stageNames) {
   }));
 }
 
+function findStageIndex(project, stageName) {
+  return project.stages.findIndex((stage) => stage.name.toLowerCase() === String(stageName).toLowerCase());
+}
+
+function refreshStageLocks(project) {
+  project.stages.forEach((stage, index) => {
+    if (stage.status === 'Completed') {
+      stage.progress = 100;
+      return;
+    }
+    const previousComplete = index === 0 || project.stages.slice(0, index).every((candidate) => candidate.status === 'Completed');
+    stage.status = previousComplete ? 'Pending' : 'Locked';
+    stage.progress = 0;
+  });
+  project.currentStage = project.stages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage';
+  if (project.stages.every((stage) => stage.status === 'Completed')) project.status = 'Completed';
+  else if (project.status === 'Completed') project.status = 'Running';
+}
+
 async function resolveReportTo(value, fallbackUser) {
   if (!value) return fallbackUser?._id;
   if (String(value).match(/^[0-9a-fA-F]{24}$/)) return value;
@@ -132,7 +151,12 @@ export const updateStage = asyncHandler(async (req, res) => {
     throw new Error('Project not found');
   }
 
-  const stageIndex = WORKFLOW_STAGES.indexOf(req.params.stage);
+  const stageIndex = findStageIndex(project, req.params.stage);
+  if (stageIndex < 0) {
+    res.status(404);
+    throw new Error('Stage not found in this project');
+  }
+
   const previousComplete = stageIndex === 0 || project.stages[stageIndex - 1]?.status === 'Completed';
   const canOverride = req.user.role === 'Admin' && req.body.adminOverride;
 
@@ -144,13 +168,12 @@ export const updateStage = asyncHandler(async (req, res) => {
   project.stages[stageIndex] = {
     ...project.stages[stageIndex],
     ...req.body,
-    name: req.params.stage,
+    name: project.stages[stageIndex].name,
     approvedBy: req.body.status === 'Completed' ? req.user._id : project.stages[stageIndex].approvedBy,
     completedAt: req.body.status === 'Completed' ? new Date() : project.stages[stageIndex].completedAt
   };
 
-  project.currentStage = project.stages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage';
-  if (project.stages.every((stage) => stage.status === 'Completed')) project.status = 'Completed';
+  refreshStageLocks(project);
   await project.save();
   res.json(project);
 });

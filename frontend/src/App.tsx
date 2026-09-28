@@ -16,6 +16,7 @@ import { Prerequisites } from './pages/projects/workspace/Prerequisites';
 import { ProductDesign } from './pages/projects/workspace/ProductDesign';
 import { Programming } from './pages/projects/workspace/Programming';
 import { ProjectLayout } from './pages/projects/workspace/ProjectLayout';
+import { Reporting } from './pages/projects/workspace/Reporting';
 import { TestingValidation } from './pages/projects/workspace/TestingValidation';
 
 export function App() {
@@ -43,7 +44,7 @@ export function App() {
         <Route path="product-design" element={<ProductDesign />} />
         <Route path="programming" element={<Programming />} />
         <Route path="testing-validation" element={<TestingValidation />} />
-        <Route path="reporting" element={<Navigate to="../testing-validation" replace />} />
+        <Route path="reporting" element={<Reporting />} />
         <Route path="custom-stage/:stageSlug" element={<CustomStage />} />
         <Route path="final-stage" element={<FinalStage />} />
       </Route>

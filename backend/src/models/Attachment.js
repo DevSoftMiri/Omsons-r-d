@@ -6,7 +6,10 @@ const attachmentSchema = new mongoose.Schema(
     stage: String,
     name: String,
     mimeType: String,
+    fileSize: Number,
+    storagePath: String,
     url: String,
+    fileUrl: String,
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }

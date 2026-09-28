@@ -8,6 +8,7 @@ import {
   importBenchmarkingTable,
   updateBenchmarkingTable
 } from '../controllers/benchmarkingController.js';
+import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
 import { createProject, getProject, listProjects, updateStage } from '../controllers/projectController.js';
 import {
   deletePrerequisite,
@@ -28,6 +29,9 @@ router.delete('/:id/benchmarking/tables/:tableId', protect, deleteBenchmarkingTa
 router.post('/:id/benchmarking/tables/:tableId/import', protect, importBenchmarkingTable);
 router.get('/:id/benchmarking/tables/:tableId/export', protect, exportBenchmarkingTable);
 router.patch('/:id/benchmarking/complete', protect, completeBenchmarking);
+router.get('/:id/attachments', protect, listAttachments);
+router.post('/:id/attachments/upload', protect, prerequisiteUpload.single('file'), uploadAttachment);
+router.delete('/:id/attachments/:attachmentId', protect, deleteAttachment);
 router.get('/:id/prerequisites', protect, listPrerequisites);
 router.post('/:id/prerequisites/:type/upload', protect, prerequisiteUpload.single('file'), uploadPrerequisite);
 router.patch('/:id/prerequisites/:certificateId/review', protect, authorize('Admin'), reviewPrerequisite);

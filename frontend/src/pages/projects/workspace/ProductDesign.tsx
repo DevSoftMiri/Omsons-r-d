@@ -8,6 +8,8 @@ import {
   Eye,
   FileText,
   Filter,
+  Maximize2,
+  Minimize2,
   Info,
   Link as LinkIcon,
   MoreVertical,
@@ -259,7 +261,14 @@ function PreviewArt({ design }: { design: DesignFile }) {
     return <img className="h-full w-full object-cover" src={design.url} alt={design.title} />;
   }
   if (design.mimeType === 'application/pdf') {
-    return <div className="grid h-full place-items-center bg-white"><TechnicalDrawingArt /></div>;
+    if (design.url) {
+      return (
+        <div className="h-full w-full overflow-hidden bg-white">
+          <iframe className="h-[210%] w-full origin-top scale-[0.52] border-0 pointer-events-none" src={`${design.url}#toolbar=0&navpanes=0&scrollbar=0`} title={`${design.title} preview`} />
+        </div>
+      );
+    }
+    return <div className="grid h-full place-items-center bg-white"><DocumentPreviewArt fileName={design.fileName} /></div>;
   }
   if (design.category === '3D Model') {
     return <div className="grid h-full place-items-center bg-slate-100"><CadArt /></div>;
@@ -313,19 +322,83 @@ function UploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (fi
 }
 
 function PreviewModal({ design, onClose }: { design: DesignFile; onClose: () => void }) {
+  const isImage = design.url && design.mimeType.startsWith('image/');
+  const isPdf = design.url && design.mimeType === 'application/pdf';
+  const fileType = design.mimeType === 'application/pdf' ? 'PDF document' : design.mimeType.startsWith('image/') ? 'Image preview' : design.category;
+  const [fullscreen, setFullscreen] = useState(false);
+  const viewerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (document.fullscreenElement) return;
+      onClose();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setFullscreen(document.fullscreenElement === viewerRef.current);
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  async function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await viewerRef.current?.requestFullscreen();
+  }
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
-      <section className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div><h3 className="text-lg font-bold">{design.title}</h3><p className="text-sm text-slate-500">{design.fileName}</p></div>
-          <button className="icon-button h-9 w-9" onClick={onClose}><X size={16} /></button>
+    <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/80 backdrop-blur-sm ${fullscreen ? 'p-0' : 'p-3'}`}>
+      <section ref={viewerRef} className={`flex flex-col overflow-hidden border border-slate-700/40 bg-slate-950 shadow-2xl ${fullscreen ? 'h-screen max-h-screen w-screen max-w-none rounded-none' : 'max-h-[94vh] w-full max-w-6xl rounded-lg'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-900 px-4 py-3 text-white">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${categoryClass(design.category)}`}>{design.category}</span>
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-slate-200">{fileType}</span>
+            </div>
+            <h3 className="mt-2 truncate text-lg font-bold">{design.title}</h3>
+            <p className="truncate text-xs text-slate-300">{design.fileName} • {formatDate(design.createdAt)} • {formatBytes(design.size)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="secondary-button h-9 border-white/15 bg-white/10 text-white hover:bg-white/15" onClick={toggleFullscreen} title={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}>
+              {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            </button>
+            <a className={`secondary-button h-9 border-white/15 bg-white/10 text-white hover:bg-white/15 ${design.url ? '' : 'pointer-events-none opacity-50'}`} href={design.url || undefined} download={design.fileName}>
+              <Download size={15} />
+              Download
+            </a>
+            <button className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15" onClick={onClose} title="Close preview">
+              <X size={16} />
+            </button>
+          </div>
         </div>
-        <div className="grid min-h-[58vh] place-items-center bg-slate-100 p-4">
-          {design.url && design.mimeType.startsWith('image/') ? <img className="max-h-[68vh] rounded-lg bg-white object-contain shadow-soft" src={design.url} alt={design.title} /> : <div className="grid h-[52vh] w-full place-items-center rounded-lg bg-white"><PreviewArt design={design} /></div>}
+        <div className={`grid flex-1 place-items-center bg-[radial-gradient(circle_at_top,#1e293b,#020617_58%)] ${fullscreen ? 'min-h-0 p-2' : 'min-h-[64vh] p-4'}`}>
+          {isImage ? (
+            <div className="grid h-full w-full place-items-center">
+              <img className={`max-w-full rounded-lg bg-white object-contain shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'max-h-[calc(100vh-8.5rem)]' : 'max-h-[74vh]'}`} src={design.url} alt={design.title} />
+            </div>
+          ) : isPdf ? (
+            <div className={`w-full overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'h-[calc(100vh-8.5rem)] max-w-none' : 'h-[74vh] max-w-5xl'}`}>
+              <iframe className="h-full w-full border-0" src={`${design.url}#toolbar=1&navpanes=0`} title={design.title} />
+            </div>
+          ) : (
+            <div className={`grid w-full place-items-center rounded-lg bg-white shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'h-[calc(100vh-8.5rem)] max-w-none' : 'h-[58vh] max-w-4xl'}`}><PreviewArt design={design} /></div>
+          )}
         </div>
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${categoryClass(design.category)}`}>{design.category}</span>
-          <a className={`primary-button h-10 ${design.url ? '' : 'pointer-events-none opacity-50'}`} href={design.url || undefined} download={design.fileName}><Download size={16} />Download</a>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300">
+          <p className="truncate">{design.description || 'No description added.'}</p>
+          <p className="font-semibold text-slate-400">Product design preview</p>
         </div>
       </section>
     </div>
@@ -462,6 +535,27 @@ function BeakerVisual() {
 
 function TechnicalDrawingArt() {
   return <svg className="h-full w-full" viewBox="0 0 320 180" fill="none"><rect width="320" height="180" fill="#fff" /><path d="M68 24h72v120H68zM196 32a55 55 0 110 110 55 55 0 010-110z" stroke="#334155" strokeWidth="2" /><path d="M82 44h44M82 70h44M82 96h44M82 122h44M34 24h22M34 144h22M152 24h22M152 144h22M196 18v18M196 142v18M142 87h18M232 87h18" stroke="#94a3b8" strokeWidth="1.5" /><path d="M60 20h88M60 148h88M194 28h4M194 152h4" stroke="#cbd5e1" /></svg>;
+}
+
+function DocumentPreviewArt({ fileName }: { fileName: string }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-white p-5">
+      <div className="w-28 rounded border border-slate-300 bg-white p-3 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="h-2 w-8 rounded bg-rose-200" />
+          <FileText size={18} className="text-rose-500" />
+        </div>
+        <div className="space-y-2">
+          <span className="block h-1.5 rounded bg-slate-300" />
+          <span className="block h-1.5 rounded bg-slate-200" />
+          <span className="block h-1.5 rounded bg-slate-300" />
+          <span className="block h-1.5 rounded bg-slate-200" />
+          <span className="block h-1.5 w-2/3 rounded bg-slate-300" />
+        </div>
+        <p className="mt-3 truncate text-[10px] font-bold text-slate-500">{fileName}</p>
+      </div>
+    </div>
+  );
 }
 
 function CadArt() {

@@ -12,43 +12,115 @@ body {
 }
 
 .workspace-compact {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .workspace-compact .text-3xl {
-  font-size: 1.35rem;
-  line-height: 1.8rem;
-}
-
-.workspace-compact .text-2xl {
-  font-size: 1.12rem;
+  font-size: 1.18rem;
   line-height: 1.55rem;
 }
 
-.workspace-compact .text-xl {
+.workspace-compact .text-2xl {
   font-size: 1rem;
   line-height: 1.35rem;
 }
 
+.workspace-compact .text-xl {
+  font-size: 0.92rem;
+  line-height: 1.25rem;
+}
+
 .workspace-compact .text-lg {
-  font-size: 1rem;
-  line-height: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.25rem;
+}
+
+.workspace-compact .text-base,
+.workspace-compact .text-\[15px\] {
+  font-size: 0.78rem;
+  line-height: 1.2rem;
+}
+
+.workspace-compact .text-sm {
+  font-size: 0.72rem;
+  line-height: 1.05rem;
+}
+
+.workspace-compact .text-xs {
+  font-size: 0.66rem;
+  line-height: 0.95rem;
 }
 
 .workspace-compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
-  margin-top: calc(0.6rem * calc(1 - var(--tw-space-y-reverse)));
-  margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
+  margin-top: calc(0.45rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.45rem * var(--tw-space-y-reverse));
+}
+
+.workspace-compact .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.45rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.45rem * var(--tw-space-y-reverse));
 }
 
 .workspace-compact .shadow-soft {
-  box-shadow: 0 10px 26px rgba(23, 32, 51, 0.06);
+  box-shadow: 0 8px 20px rgba(23, 32, 51, 0.05);
+}
+
+.workspace-compact .rounded-lg {
+  border-radius: 0.38rem;
 }
 
 .workspace-compact table th,
 .workspace-compact table td {
-  padding-top: 0.45rem;
-  padding-bottom: 0.45rem;
+  padding-top: 0.34rem;
+  padding-bottom: 0.34rem;
+}
+
+.project-sidebar {
+  --sidebar-row-height: min(2.45rem, max(1.35rem, calc((100vh - 9.5rem) / var(--sidebar-items))));
+  --sidebar-gap: min(0.5rem, max(0.12rem, calc((100vh - 40rem) / 80)));
+  --sidebar-font-size: min(0.875rem, max(0.62rem, calc(var(--sidebar-row-height) * 0.38)));
+}
+
+.project-sidebar-back {
+  min-height: var(--sidebar-row-height);
+  margin-bottom: var(--sidebar-gap);
+  font-size: var(--sidebar-font-size);
+  line-height: 1.15;
+}
+
+.project-sidebar-card {
+  margin-bottom: calc(var(--sidebar-gap) * 2);
+  padding: min(1rem, max(0.45rem, calc(var(--sidebar-row-height) * 0.38)));
+}
+
+.project-sidebar-code {
+  font-size: var(--sidebar-font-size);
+  line-height: 1.15;
+}
+
+.project-sidebar-category {
+  font-size: min(1.125rem, max(0.72rem, calc(var(--sidebar-row-height) * 0.5)));
+  line-height: 1.25;
+}
+
+.project-sidebar-nav {
+  gap: var(--sidebar-gap);
+}
+
+.project-sidebar-link {
+  min-height: var(--sidebar-row-height);
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--sidebar-font-size);
+  line-height: 1.1;
+}
+
+.project-sidebar-dot {
+  width: min(0.625rem, max(0.35rem, calc(var(--sidebar-row-height) * 0.25)));
+  height: min(0.625rem, max(0.35rem, calc(var(--sidebar-row-height) * 0.25)));
+  flex: 0 0 auto;
 }
 
 @layer components {
@@ -107,22 +179,28 @@ body {
 
 @layer components {
   .workspace-compact .primary-button {
-    @apply h-8 px-3 text-xs;
+    @apply h-7 px-2.5;
+    font-size: 0.66rem;
+    line-height: 0.95rem;
   }
 
   .workspace-compact .secondary-button {
-    @apply h-8 px-2.5 text-xs;
+    @apply h-7 px-2.5;
+    font-size: 0.66rem;
+    line-height: 0.95rem;
   }
 
   .workspace-compact .icon-button {
-    @apply h-8 w-8;
+    @apply h-7 w-7;
   }
 
   .workspace-compact .field {
-    @apply px-3 py-2 text-xs;
+    @apply px-2.5 py-1.5;
+    font-size: 0.66rem;
+    line-height: 0.95rem;
   }
 
   .workspace-compact .panel {
-    @apply p-3;
+    @apply p-2.5;
   }
 }

@@ -7,6 +7,7 @@ export const coreStageRoutes: Record<CoreStageName, string> = {
   BOM: 'bom',
   'Product Design': 'product-design',
   Programming: 'programming',
+  Reporting: 'reporting',
   'Testing & Validation': 'testing-validation',
   'Final Stage': 'final-stage'
 };

@@ -34,6 +34,7 @@ const nextActionText: Record<CoreStageName, string[]> = {
   BOM: ['Review material costs', 'Update procurement stages', 'Confirm vendor readiness'],
   'Product Design': ['Upload CAD drawing', 'Review version history', 'Mark design complete'],
   Programming: ['Validate machine parameters', 'Complete PLC logic checklist', 'Run final programming validation'],
+  Reporting: ['Submit daily work report', 'Review logged hours', 'Mark reporting complete'],
   'Testing & Validation': ['Record validation test', 'Attach test report', 'Mark testing complete'],
   'Final Stage': ['Confirm testing status', 'Review production readiness', 'Mark project complete']
 };

@@ -1,5 +1,5 @@
 import type { ChangeEvent, DragEvent, ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   Check,
@@ -18,6 +18,7 @@ import {
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import { useProjectWorkspace } from './context';
 
 type AttachmentFile = {
@@ -40,13 +41,26 @@ const seedFiles: AttachmentFile[] = [];
 export function Attachments() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState(seedFiles);
   const [query, setQuery] = useState('');
   const [sortNewestFirst, setSortNewestFirst] = useState(true);
   const [previewFile, setPreviewFile] = useState<AttachmentFile | null>(null);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetchProjectAttachments(project.productCode, 'Attachments')
+      .then((attachments) => {
+        if (active) setFiles(attachments.map(toAttachmentFile));
+      })
+      .catch((error) => {
+        if (active) setMessage(error instanceof Error ? error.message : 'Unable to load attachments');
+      });
+    return () => {
+      active = false;
+    };
+  }, [project.productCode]);
 
   const visibleFiles = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -58,29 +72,22 @@ export function Attachments() {
       });
   }, [files, query, sortNewestFirst]);
 
-  function addFiles(selectedFiles: FileList | File[]) {
-    const nextFiles = Array.from(selectedFiles)
-      .filter((file) => acceptedFileTypes.split(',').includes(file.type))
-      .map((file) => ({
-        id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        name: file.name,
-        description: 'Uploaded project attachment',
-        type: getFileType(file),
-        size: file.size,
-        uploadedOn: new Date().toISOString(),
-        uploadedBy: 'Current User',
-        initials: 'CU',
-        url: URL.createObjectURL(file),
-        mimeType: file.type
-      }));
+  async function addFiles(selectedFiles: FileList | File[]) {
+    const validFiles = Array.from(selectedFiles).filter((file) => acceptedFileTypes.split(',').includes(file.type));
 
-    if (!nextFiles.length) {
+    if (!validFiles.length) {
       setMessage('Please upload PDF, JPG, PNG, or WebP files.');
       return;
     }
 
-    setFiles((current) => [...nextFiles, ...current]);
-    setMessage(`${nextFiles.length} file${nextFiles.length > 1 ? 's' : ''} uploaded.`);
+    try {
+      const uploaded = await Promise.all(validFiles.map((file) => uploadProjectAttachment(project.productCode, 'Attachments', file)));
+      const nextFiles = uploaded.map(toAttachmentFile);
+      setFiles((current) => [...nextFiles, ...current]);
+      setMessage(`${nextFiles.length} file${nextFiles.length > 1 ? 's' : ''} uploaded.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Upload failed');
+    }
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -94,8 +101,13 @@ export function Attachments() {
     if (event.dataTransfer.files.length) addFiles(event.dataTransfer.files);
   }
 
-  function deleteFile(fileId: string) {
-    setFiles((current) => current.filter((file) => file.id !== fileId));
+  async function deleteFile(fileId: string) {
+    try {
+      await deleteProjectAttachment(project.productCode, 'Attachments', fileId);
+      setFiles((current) => current.filter((file) => file.id !== fileId));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Delete failed');
+    }
     if (previewFile?.id === fileId) setPreviewFile(null);
   }
 
@@ -151,12 +163,12 @@ export function Attachments() {
               <UploadCloud className="mx-auto text-primary" size={36} />
               <p className="mt-3 font-semibold">
                 Drag and drop files here, or{' '}
-                <button className="font-bold text-primary" onClick={() => inputRef.current?.click()}>
+                <label className="cursor-pointer font-bold text-primary" htmlFor="attachments-upload">
                   click to upload
-                </button>
+                </label>
               </p>
               <p className="mt-1.5 text-xs text-slate-500">Supported formats: PDF, JPG, PNG, WebP | Max file size: 10MB per file</p>
-              <input ref={inputRef} className="hidden" type="file" accept={acceptedFileTypes} multiple onChange={handleInputChange} />
+              <input id="attachments-upload" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={handleInputChange} />
             </div>
           </div>
           <div className="border-slate-200 lg:border-l lg:pl-5">
@@ -183,8 +195,8 @@ export function Attachments() {
           <h3 className="text-lg font-bold">Uploaded Files ({visibleFiles.length})</h3>
           <div className="flex flex-wrap gap-3">
             <label className="relative block w-72 max-w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input className="field pl-10" placeholder="Search files..." value={query} onChange={(event) => setQuery(event.target.value)} />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+              <input className="field h-9 !pl-10" placeholder="Search files..." value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
             <button className="secondary-button h-10 gap-2" onClick={() => setSortNewestFirst((current) => !current)}>
               <ChevronRight className={sortNewestFirst ? 'rotate-90' : '-rotate-90'} size={17} />
@@ -339,6 +351,29 @@ function BeakerVisual() {
 function getFileType(file: File) {
   if (file.type === 'application/pdf') return 'PDF';
   const extension = file.name.split('.').pop();
+  return extension ? extension.toUpperCase() : 'FILE';
+}
+
+function toAttachmentFile(attachment: ProjectAttachment): AttachmentFile {
+  const name = attachment.name || 'Attachment';
+  const mimeType = attachment.mimeType || 'application/octet-stream';
+  return {
+    id: attachment._id,
+    name,
+    description: attachment.stage === 'Attachments' ? 'Uploaded project attachment' : `${attachment.stage} attachment`,
+    type: getAttachmentType(name, mimeType),
+    size: attachment.fileSize || 0,
+    uploadedOn: attachment.createdAt || attachment.updatedAt || new Date().toISOString(),
+    uploadedBy: 'Current User',
+    initials: 'CU',
+    url: attachment.url || attachment.fileUrl || '',
+    mimeType
+  };
+}
+
+function getAttachmentType(fileName: string, mimeType: string) {
+  if (mimeType === 'application/pdf') return 'PDF';
+  const extension = fileName.split('.').pop();
   return extension ? extension.toUpperCase() : 'FILE';
 }
 

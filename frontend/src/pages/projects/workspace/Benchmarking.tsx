@@ -15,6 +15,7 @@ import {
   importBenchmarkingCsv,
   updateBenchmarkingTable
 } from '../../../services/benchmarkingService';
+import { updateProjectStage } from '../../../services/projectService';
 import { useProjectWorkspace } from './context';
 
 const emptyWorkbook: BenchmarkingWorkbook = {
@@ -144,11 +145,21 @@ export function Benchmarking() {
 
   async function completeStageClick() {
     try {
+      await syncCompletedPreviousStages();
       await completeBenchmarking(project.productCode);
-      completeStage('Benchmarking');
+      await completeStage('Benchmarking');
       setSaveStatus('saved');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to complete benchmarking');
+    }
+  }
+
+  async function syncCompletedPreviousStages() {
+    const benchmarkingIndex = project.stages.findIndex((stage) => stage.name === 'Benchmarking');
+    if (benchmarkingIndex <= 0) return;
+    const completedPreviousStages = project.stages.slice(0, benchmarkingIndex).filter((stage) => stage.status === 'Completed');
+    for (const stage of completedPreviousStages) {
+      await updateProjectStage(project.id, stage.name, 'Completed');
     }
   }
 

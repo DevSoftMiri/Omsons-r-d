@@ -1,10 +1,19 @@
 import { CalendarClock, CheckCircle2, FlaskConical, Users } from 'lucide-react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { teamMembers } from '../data/seed';
-import { useAppSelector } from '../hooks';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { fetchProjects } from '../services/projectService';
+import { setProjects } from '../store';
 
 export function DashboardPage() {
+  const dispatch = useAppDispatch();
   const projects = useAppSelector((state) => state.projects.projects);
+  useEffect(() => {
+    fetchProjects()
+      .then((items) => dispatch(setProjects(items)))
+      .catch(() => undefined);
+  }, [dispatch]);
   const stats = [
     { label: 'Active Projects', value: projects.filter((item) => item.status === 'Running').length, note: 'Running', icon: FlaskConical },
     { label: 'On Hold', value: projects.filter((item) => item.status === 'On Hold').length, note: 'Projects', icon: CalendarClock },

@@ -93,7 +93,9 @@ export function Programming() {
     return programs.filter((program) => !normalized || [program.name, program.description, program.processMachine, program.version, program.file?.fileName || '', program.status].some((value) => value.toLowerCase().includes(normalized)));
   }, [programs, query]);
 
-  const canComplete = programs.length > 0 && programs.every((program) => program.name && program.version && program.status) && programs.some((program) => program.status === 'Ready');
+  const canComplete = programs.length > 0
+    && programs.every((program) => program.name && program.version && program.status)
+    && programs.some((program) => program.status === 'Ready' || program.file);
 
   function saveProgram(program: Program) {
     const next = { ...program, updatedAt: new Date().toISOString() };
@@ -138,8 +140,8 @@ export function Programming() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-bold">Programs ({programs.length})</h3>
           <label className="relative block w-80 max-w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input className="field pl-10" placeholder="Search programs..." value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+            <input className="field h-9 !pl-10" placeholder="Search programs..." value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
         </div>
 
@@ -170,7 +172,7 @@ export function Programming() {
                     <td className="px-3 py-3">{program.version}</td>
                     <td className="px-3 py-3">
                       {program.file ? (
-                        <button className="inline-flex items-start gap-2 text-left text-primary">
+                        <button className="inline-flex items-start gap-2 text-left text-primary" onClick={() => openProgramFile(program.file)}>
                           <FileText size={19} />
                           <span><span className="block font-bold">{program.file.fileName}</span><span className="text-xs text-slate-500">{formatBytes(program.file.fileSize)}</span></span>
                         </button>
@@ -245,7 +247,7 @@ export function Programming() {
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">At least one program must be marked Ready before completing this stage.</p> : null}
+          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid program file or mark a program Ready before completing this stage.</p> : null}
           <button className="primary-button h-10 min-w-64 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Programming')}>
             <Check size={18} />
             Mark Programming Complete
@@ -296,17 +298,21 @@ function ProgramDrawer({ mode, program, onClose, onEdit, onSave }: { mode: 'add'
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40">
-      <form className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl" onSubmit={submit}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
+      <form className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl" onSubmit={submit}>
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h3 className="text-xl font-bold">{mode === 'add' ? 'Add Program' : mode === 'edit' ? 'Edit Program' : 'Program Details'}</h3>
           <button type="button" className="icon-button h-9 w-9" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="flex-1 space-y-4 overflow-auto p-5">
-          <Field label="Program Name *"><input className="field" disabled={readOnly} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-          <Field label="Process / Machine"><input className="field" disabled={readOnly} value={form.processMachine} onChange={(event) => setForm({ ...form, processMachine: event.target.value })} /></Field>
-          <Field label="Version *"><input className="field" disabled={readOnly} value={form.version} onChange={(event) => setForm({ ...form, version: event.target.value })} /></Field>
-          <Field label="Description (Optional)"><textarea className="field min-h-20 resize-none" disabled={readOnly} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Program Name *"><input className="field" disabled={readOnly} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+            <Field label="Process / Machine"><input className="field" disabled={readOnly} value={form.processMachine} onChange={(event) => setForm({ ...form, processMachine: event.target.value })} /></Field>
+            <Field label="Version *"><input className="field" disabled={readOnly} value={form.version} onChange={(event) => setForm({ ...form, version: event.target.value })} /></Field>
+            <Field label="Status *"><select className="field" disabled={readOnly} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ProgramStatus })}><option>Draft</option><option>Testing</option><option>Ready</option></select></Field>
+          </div>
+
+          <Field label="Description (Optional)"><textarea className="field min-h-24 resize-none" disabled={readOnly} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
 
           <section>
             <p className="mb-2 text-sm font-bold text-slate-600">Program File (Optional)</p>
@@ -320,7 +326,7 @@ function ProgramDrawer({ mode, program, onClose, onEdit, onSave }: { mode: 'add'
                 {!readOnly ? <label className="secondary-button h-9 cursor-pointer"><input className="hidden" type="file" onChange={setFile} />Replace</label> : null}
               </div>
             ) : !readOnly ? (
-              <label className="grid min-h-20 cursor-pointer place-items-center rounded-lg border border-dashed border-blue-300 text-center text-primary">
+              <label className="grid min-h-24 cursor-pointer place-items-center rounded-lg border border-dashed border-blue-300 bg-blue-50/30 text-center text-primary transition hover:bg-blue-50">
                 <input className="hidden" type="file" onChange={setFile} />
                 <span className="inline-flex items-center gap-2 font-bold"><Upload size={17} />Upload Program File</span>
               </label>
@@ -344,7 +350,6 @@ function ProgramDrawer({ mode, program, onClose, onEdit, onSave }: { mode: 'add'
             </div>
           </section>
 
-          <Field label="Status *"><select className="field" disabled={readOnly} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ProgramStatus })}><option>Draft</option><option>Testing</option><option>Ready</option></select></Field>
         </div>
         <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
           <button type="button" className="secondary-button h-10 min-w-28 justify-center" onClick={onClose}>Cancel</button>
@@ -418,6 +423,11 @@ function formatDate(value: string) {
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function openProgramFile(file: ProgramFile | null) {
+  if (!file?.url) return;
+  window.open(file.url, '_blank', 'noopener,noreferrer');
 }
 
 function BeakerVisual() {

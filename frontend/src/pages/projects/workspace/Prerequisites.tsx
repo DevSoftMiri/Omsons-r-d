@@ -1,5 +1,5 @@
 import type { ChangeEvent, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -59,7 +59,6 @@ const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp';
 export function Prerequisites() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [payload, setPayload] = useState<PrerequisitePayload>(() => buildLocalPayload());
   const [customDocuments, setCustomDocuments] = useState<PrerequisiteDocument[]>([]);
   const [newDocumentName, setNewDocumentName] = useState('');
@@ -225,14 +224,10 @@ export function Prerequisites() {
                     description={definition?.description || ''}
                     document={document}
                     index={index}
-                    inputRef={(node) => {
-                      inputRefs.current[document.type] = node;
-                    }}
                     loading={loading}
                     onDelete={() => handleDelete(document)}
                     onReview={(status) => handleReview(document, status)}
                     onUpload={(event) => handleUpload(document.type, event)}
-                    onUploadClick={() => inputRefs.current[document.type]?.click()}
                   />
                 );
               })}
@@ -301,9 +296,7 @@ function DocumentRow({
   index,
   loading,
   busy,
-  inputRef,
   onUpload,
-  onUploadClick,
   onReview,
   onDelete
 }: {
@@ -312,14 +305,13 @@ function DocumentRow({
   index: number;
   loading: boolean;
   busy: boolean;
-  inputRef: (node: HTMLInputElement | null) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
-  onUploadClick: () => void;
   onReview: (status: 'Approved' | 'Rejected') => void;
   onDelete: () => void;
 }) {
   const fileUrl = document.certificate?.publicUrl || document.certificate?.fileUrl;
   const isImage = document.certificate?.mimeType?.startsWith('image/');
+  const inputId = `prerequisite-${document.type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   return (
     <tr className="align-middle">
@@ -356,17 +348,17 @@ function DocumentRow({
       </td>
       <td className="rounded-r-lg border-y border-r border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
-          <input ref={inputRef} className="hidden" type="file" accept={acceptedFileTypes} disabled={busy || loading} onChange={onUpload} />
+          <input id={inputId} className="sr-only" type="file" accept={acceptedFileTypes} disabled={busy || loading} onChange={onUpload} />
           {fileUrl ? (
             <a className="secondary-button min-w-28 justify-center text-primary" href={fileUrl} rel="noreferrer" target="_blank">
               <Eye size={17} />
               View
             </a>
           ) : (
-            <button className="secondary-button min-w-28 justify-center text-primary" disabled={busy || loading} onClick={onUploadClick}>
+            <label className={`secondary-button min-w-28 justify-center text-primary ${busy || loading ? 'pointer-events-none cursor-not-allowed opacity-60' : 'cursor-pointer'}`} htmlFor={inputId}>
               <Upload size={17} />
               Upload
-            </button>
+            </label>
           )}
           {document.certificate ? (
             <div className="group relative">
@@ -374,10 +366,10 @@ function DocumentRow({
                 <MoreVertical size={18} />
               </button>
               <div className="invisible absolute right-0 top-11 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
-                <button className="menu-action" disabled={busy} onClick={onUploadClick}>
+                <label className={`menu-action ${busy ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`} htmlFor={inputId}>
                   <Upload size={15} />
                   Replace
-                </button>
+                </label>
                 <button className="menu-action" disabled={busy} onClick={() => onReview('Approved')}>
                   <CheckCircle2 size={15} />
                   Approve

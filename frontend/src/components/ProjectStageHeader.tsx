@@ -19,41 +19,41 @@ export function ProjectStageHeader({ project, currentStage, statusOverride }: { 
   const reportTo = project.reportTo || 'Ravi';
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-soft">
-      <div className="flex flex-col gap-3 md:flex-row md:items-stretch">
-        <div className="grid h-20 w-full shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 md:w-32">
+    <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-soft">
+      <div className="flex flex-col gap-2.5 md:flex-row md:items-stretch">
+        <div className="grid h-16 w-full shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 md:w-24">
           <ProductVisual category={project.category} />
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold leading-tight text-ink">{project.name}</h2>
-            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${statusStyles[project.status]}`}>
-              <span className="h-2 w-2 rounded-full bg-current" />
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${statusStyles[project.status]}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {statusOverride || project.status}
             </span>
           </div>
 
-          <div className="mt-2.5 grid gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-1.5 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
             <HeaderFact label="Product Code" value={project.productCode} />
             <HeaderFact label="Category" value="Laboratory Glassware" />
             <HeaderFact label="Current Stage" value={currentStage} />
             <HeaderFact label="Priority" value={project.priority} pillClass={priorityStyles[project.priority]} />
-            <div className="border-slate-200 xl:border-l xl:pl-5">
+            <div className="border-slate-200 xl:border-l xl:pl-3">
               <p className="text-xs font-semibold text-slate-500">Report To</p>
-              <div className="mt-2 flex items-center gap-3">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-primary">{initials(reportTo)}</span>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-primary">{initials(reportTo)}</span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">{reportTo}</p>
                   <p className="text-xs text-slate-500">Product Manager</p>
                 </div>
               </div>
             </div>
-            <div className="border-slate-200 xl:border-l xl:pl-5">
+            <div className="border-slate-200 xl:border-l xl:pl-3">
               <p className="text-xs font-semibold text-slate-500">Target Date</p>
-              <div className="mt-2 flex items-start gap-3">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-50 text-primary">
-                  <CalendarDays size={15} />
+              <div className="mt-1 flex items-start gap-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-blue-50 text-primary">
+                  <CalendarDays size={13} />
                 </span>
                 <div>
                   <p className="text-sm font-bold">{formatDate(project.targetDate)}</p>
@@ -70,10 +70,10 @@ export function ProjectStageHeader({ project, currentStage, statusOverride }: { 
 
 function HeaderFact({ label, value, pillClass }: { label: string; value: string; pillClass?: string }) {
   return (
-    <div className="border-slate-200 xl:border-l xl:pl-5 first:xl:border-l-0 first:xl:pl-0">
+    <div className="border-slate-200 xl:border-l xl:pl-3 first:xl:border-l-0 first:xl:pl-0">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <div className="mt-2 text-sm font-bold leading-6">
-        {pillClass ? <span className={`inline-flex rounded-full px-4 py-1.5 ${pillClass}`}>{value}</span> : value}
+      <div className="mt-1 text-sm font-bold leading-5">
+        {pillClass ? <span className={`inline-flex rounded-full px-3 py-1 ${pillClass}`}>{value}</span> : value}
       </div>
     </div>
   );
@@ -82,7 +82,7 @@ function HeaderFact({ label, value, pillClass }: { label: string; value: string;
 function ProductVisual({ category }: { category: string }) {
   const isFlask = category.toLowerCase().includes('flask');
   return (
-    <svg aria-hidden="true" className="h-16 w-16" viewBox="0 0 120 120" fill="none">
+    <svg aria-hidden="true" className="h-12 w-12" viewBox="0 0 120 120" fill="none">
       {isFlask ? (
         <>
           <path d="M41 20h38" stroke="#1f2937" strokeWidth="3" strokeLinecap="round" />

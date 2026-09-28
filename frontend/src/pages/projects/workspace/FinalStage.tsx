@@ -11,7 +11,6 @@ import {
   FileText,
   MoreVertical,
   Plus,
-  Trash2,
   Upload,
   X,
 } from 'lucide-react';
@@ -252,13 +251,7 @@ export function FinalStage() {
             />
           </Field>
           <div className="mt-3">
-            <Field label="Remaining Issues">
-              <textarea
-                className="field min-h-16 resize-none bg-emerald-50"
-                value={issues}
-                onChange={(event) => setIssues(event.target.value)}
-              />
-            </Field>
+            <RemainingIssues value={issues} onChange={setIssues} />
           </div>
           <div className="mt-3">
             <p className="mb-2 font-bold">Final Decision</p>
@@ -885,6 +878,54 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </label>
   );
+}
+
+function RemainingIssues({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const visibleItems = value ? value.split('\n').map(parseIssue) : [{ label: '', done: false }];
+
+  function serialize(items: { label: string; done: boolean }[]) {
+    return items.map((item) => `${item.done ? '[x] ' : ''}${item.label}`).join('\n');
+  }
+
+  function updateItem(index: number, nextValue: string) {
+    const next = [...visibleItems];
+    next[index] = { ...next[index], label: nextValue };
+    onChange(serialize(next));
+  }
+
+  function toggleItem(index: number) {
+    const next = [...visibleItems];
+    next[index] = { ...next[index], done: !next[index].done };
+    onChange(serialize(next));
+  }
+
+  return (
+    <section>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-slate-600">Remaining Issues</p>
+        <button type="button" className="secondary-button h-8 gap-2" onClick={() => onChange(serialize([...visibleItems, { label: '', done: false }]))}>
+          <Plus size={14} />
+          Add Issue
+        </button>
+      </div>
+      <div className="grid gap-2 rounded-lg border border-emerald-100 bg-emerald-50 p-2">
+        {visibleItems.map((item, index) => (
+          <div key={`${index}-${visibleItems.length}`} className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2">
+            <input type="checkbox" checked={item.done} onChange={() => toggleItem(index)} />
+            <input className={`field bg-white transition ${item.done ? 'text-slate-400 line-through opacity-60' : ''}`} placeholder="Add remaining issue" value={item.label} onChange={(event) => updateItem(index, event.target.value)} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function parseIssue(value: string) {
+  const done = value.trimStart().startsWith('[x]');
+  return {
+    done,
+    label: done ? value.replace(/^\s*\[x\]\s*/i, '') : value
+  };
 }
 function Meta({
   label,

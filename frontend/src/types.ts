@@ -5,6 +5,7 @@ export type CoreStageName =
   | 'BOM'
   | 'Product Design'
   | 'Programming'
+  | 'Reporting'
   | 'Testing & Validation'
   | 'Final Stage';
 
