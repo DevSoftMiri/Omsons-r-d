@@ -4,6 +4,11 @@ import { AppLayout } from './layouts/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { CertificatesPage } from './pages/CertificatesPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { TeamMembersPage } from './pages/TeamMembersPage';
+import { VendorsPage } from './pages/VendorsPage';
 import { CreateProject } from './pages/projects/CreateProject';
 import { ProjectsPage } from './pages/projects/ProjectsPage';
 import { Attachments } from './pages/projects/workspace/Attachments';
@@ -54,9 +59,11 @@ export function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/create" element={<CreateProject />} />
-        <Route path="team" element={<PlaceholderPage title="Team Members" />} />
-        <Route path="vendors" element={<PlaceholderPage title="Vendors" />} />
-        <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+        <Route path="team" element={<TeamMembersPage />} />
+        <Route path="vendors" element={<VendorsPage />} />
+        <Route path="certificates" element={<CertificatesPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { teamMembers, workflowStages } from '../../data/seed';
 import { useAppDispatch } from '../../hooks';
 import { upsertProject } from '../../store';
 import { createProject as createProjectApi } from '../../services/projectService';
+import { readActiveWorkflowStages } from '../../services/adminModuleStorage';
 import type { StageName } from '../../types';
 
 const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
@@ -33,7 +34,8 @@ export function CreateProject() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const [customStageName, setCustomStageName] = useState('');
-  const [orderedStages, setOrderedStages] = useState<StageName[]>(configurableStages);
+  const [orderedStages, setOrderedStages] = useState<StageName[]>(() => readActiveWorkflowStages().length ? readActiveWorkflowStages() : configurableStages);
+  const [draggedStage, setDraggedStage] = useState<StageName | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const form = useForm<ProjectFormValues>({
@@ -84,11 +86,17 @@ export function CreateProject() {
     });
   }
 
-  function moveStage(stage: StageName, direction: 'up' | 'down') {
+  function removeStage(stage: StageName) {
+    if (stage === 'Final Stage') return;
+    setOrderedStages((current) => current.filter((item) => item !== stage));
+  }
+
+  function moveStage(stage: StageName, targetStage: StageName) {
+    if (stage === targetStage || stage === 'Final Stage' || targetStage === 'Final Stage') return;
     setOrderedStages((current) => {
       const index = current.indexOf(stage);
-      const target = direction === 'up' ? index - 1 : index + 1;
-      if (index < 0 || target < 0 || target >= current.length) return current;
+      const target = current.indexOf(targetStage);
+      if (index < 0 || target < 0) return current;
       const next = [...current];
       const [item] = next.splice(index, 1);
       next.splice(target, 0, item);
@@ -182,27 +190,45 @@ export function CreateProject() {
         <div className="rounded-lg border border-slate-200 p-3">
           <p className="mb-2 text-sm font-semibold">Stage Order</p>
           <div className="grid gap-2">
-            {[...orderedStages, 'Final Stage'].map((stage, index, stages) => {
+            {[...orderedStages, 'Final Stage'].map((stage, index) => {
               const isFinalStage = stage === 'Final Stage';
-              const isCustomStage = !configurableStages.includes(stage) && !isFinalStage;
               return (
-                <span key={`${stage}-${index}`} className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-primary">
+                <div
+                  key={`${stage}-${index}`}
+                  draggable={!isFinalStage}
+                  onDragStart={(event) => {
+                    if (isFinalStage) return;
+                    setDraggedStage(stage);
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', stage);
+                  }}
+                  onDragOver={(event) => {
+                    if (!isFinalStage && draggedStage && draggedStage !== stage) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const movingStage = draggedStage || event.dataTransfer.getData('text/plain');
+                    if (movingStage) moveStage(movingStage as StageName, stage);
+                    setDraggedStage(null);
+                  }}
+                  onDragEnd={() => setDraggedStage(null)}
+                  className={`flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-primary transition ${isFinalStage ? 'cursor-default opacity-70' : 'cursor-grab active:cursor-grabbing'} ${draggedStage === stage ? 'scale-[0.99] opacity-50' : ''}`}
+                >
+                  <GripVertical size={16} className={isFinalStage ? 'text-blue-300' : 'text-blue-500'} />
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-xs text-slate-600">{index + 1}</span>
                   {stage}
                   <span className="ml-auto flex items-center gap-1">
-                    <button type="button" disabled={index === 0 || isFinalStage} onClick={() => moveStage(stage, 'up')} aria-label={`Move ${stage} up`} className="disabled:opacity-40">
-                      <ArrowUp size={14} />
-                    </button>
-                    <button type="button" disabled={index >= stages.length - 2 || isFinalStage} onClick={() => moveStage(stage, 'down')} aria-label={`Move ${stage} down`} className="disabled:opacity-40">
-                      <ArrowDown size={14} />
-                    </button>
+                    <span className="text-xs font-semibold text-blue-400">{isFinalStage ? 'Fixed' : 'Drag to reorder'}</span>
                   </span>
-                  {isCustomStage ? (
-                    <button type="button" onClick={() => setOrderedStages((current) => current.filter((item) => item !== stage))} aria-label={`Remove ${stage}`}>
+                  {!isFinalStage ? (
+                    <button type="button" onClick={() => removeStage(stage)} aria-label={`Remove ${stage}`} className="grid h-7 w-7 place-items-center rounded-md text-blue-600 hover:bg-white hover:text-rose-600">
                       <Trash2 size={14} />
                     </button>
                   ) : null}
-                </span>
+                </div>
               );
             })}
           </div>
