@@ -16,8 +16,14 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
+import { useAppDispatch } from '../../../hooks';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { updateProjectStatus } from '../../../services/projectService';
+import { upsertProject } from '../../../store';
 import type { Stage } from '../../../types';
+import { downloadFile, NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
+import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { getStageRoute } from '../../../utils/stages';
 import { useProjectWorkspace } from './context';
 
@@ -48,7 +54,9 @@ const seedDocuments: FinalDocument[] = [];
 
 export function FinalStage() {
   const { project } = useProjectWorkspace();
+  const dispatch = useAppDispatch();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const storageKey = `final-stage:${project.productCode}`;
   const initial = readStored(storageKey);
   const [summary, setSummary] = useState(initial.summary);
@@ -139,7 +147,7 @@ export function FinalStage() {
     setShowDocument(false);
   }
 
-  function approveProduct(data: {
+  async function approveProduct(data: {
     decision: Decision;
     date: string;
     approvedBy: string;
@@ -151,18 +159,31 @@ export function FinalStage() {
     setComments(data.comments);
     if (data.decision === 'approve' && blockers.length === 0) {
       setApproved(true);
-      completeStage('Final Stage');
+      await completeStage('Final Stage');
     } else if (data.decision === 'further-development') {
       setIssues(
         data.comments ||
           'Further development is required before production approval.',
       );
+      dispatch(upsertProject(await updateProjectStatus(project.id, 'Delayed')));
     } else if (data.decision === 'on-hold') {
       setIssues(
         data.comments || 'Project is on hold pending final management review.',
       );
+      dispatch(upsertProject(await updateProjectStatus(project.id, 'On Hold')));
     }
     setShowApproval(false);
+  }
+
+  function openApprovalDrawer() {
+    const missing = [
+      blockers.length ? `Completed stages (${blockers.map((stage) => stage.name).join(', ')})` : '',
+      !summary.trim() ? 'Overall Summary' : '',
+      !decision ? 'Final Decision' : '',
+      saveState !== 'Saved' ? 'Saved changes' : ''
+    ].filter(Boolean);
+    if (showMissingFieldsToast(showToast, missing)) return;
+    setShowApproval(true);
   }
 
   return (
@@ -304,14 +325,18 @@ export function FinalStage() {
                   <td className="px-3 py-3">
                     <div className="flex justify-center gap-2">
                       <button
-                        className="icon-button h-8 w-8 text-primary"
-                        onClick={() => openDocument(doc)}
+                        className="icon-button h-8 w-8 text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={!resolveFileUrl(doc)}
+                        title={resolveFileUrl(doc) ? 'View document' : NO_FILE_AVAILABLE}
+                        onClick={() => openFile(doc)}
                       >
                         <Eye size={15} />
                       </button>
                       <button
-                        className="icon-button h-8 w-8 text-primary"
-                        onClick={() => downloadDocument(doc)}
+                        className="icon-button h-8 w-8 text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={!resolveFileUrl(doc)}
+                        title={resolveFileUrl(doc) ? 'Download document' : NO_FILE_AVAILABLE}
+                        onClick={() => downloadFile(doc, doc.fileName)}
                       >
                         <Download size={15} />
                       </button>
@@ -359,9 +384,9 @@ export function FinalStage() {
                     : 'Complete final evaluation before approval.'}
               </p>
               <button
-                className="primary-button h-10 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={!canApprove}
-                onClick={() => setShowApproval(true)}
+                className={`primary-button h-10 min-w-56 justify-center ${!canApprove ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`}
+                aria-disabled={!canApprove}
+                onClick={openApprovalDrawer}
               >
                 <Check size={18} />
                 Approve Product
@@ -376,12 +401,14 @@ export function FinalStage() {
           decision={decision}
           onClose={() => setShowApproval(false)}
           onApprove={approveProduct}
+          showToast={showToast}
         />
       ) : null}
       {showDocument ? (
         <DocumentModal
           onClose={() => setShowDocument(false)}
           onUpload={addDocument}
+          showToast={showToast}
         />
       ) : null}
       {deleteDocument ? (
@@ -457,6 +484,7 @@ function ApprovalDrawer({
   decision,
   onClose,
   onApprove,
+  showToast,
 }: {
   decision: Decision;
   onClose: () => void;
@@ -466,6 +494,7 @@ function ApprovalDrawer({
     approvedBy: string;
     comments: string;
   }) => void;
+  showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void;
 }) {
   const [form, setForm] = useState({
     decision,
@@ -485,6 +514,13 @@ function ApprovalDrawer({
         className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
         onSubmit={(event) => {
           event.preventDefault();
+          const missing = getMissingFields([
+            { label: 'Final Decision', value: form.decision },
+            { label: 'Approval Date', value: form.date },
+            { label: 'Approved By', value: form.approvedBy },
+            { label: 'Reason / Comments', valid: form.decision === 'approve' || Boolean(form.comments.trim()) }
+          ]);
+          if (showMissingFieldsToast(showToast, missing)) return;
           onApprove(form);
         }}
       >
@@ -592,10 +628,7 @@ function ApprovalDrawer({
           >
             Cancel
           </button>
-          <button
-            className="primary-button h-10 min-w-36 justify-center"
-            disabled={form.decision !== 'approve' && !form.comments.trim()}
-          >
+          <button className="primary-button h-10 min-w-36 justify-center">
             {actionText}
           </button>
         </div>
@@ -643,14 +676,17 @@ function DecisionOption({
 function DocumentModal({
   onClose,
   onUpload,
+  showToast,
 }: {
   onClose: () => void;
   onUpload: (file: File, description: string) => void;
+  showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState('');
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (showMissingFieldsToast(showToast, file ? [] : ['Document File'])) return;
     if (file) onUpload(file, description);
   }
   return (
@@ -698,7 +734,7 @@ function DocumentModal({
           >
             Cancel
           </button>
-          <button className="primary-button h-10" disabled={!file}>
+          <button className={`primary-button h-10 ${!file ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!file}>
             Upload Document
           </button>
         </div>
@@ -973,31 +1009,6 @@ function readStored(key: string): FinalStageData {
   } catch {
     return fallback;
   }
-}
-function openDocument(document: FinalDocument) {
-  const url =
-    document.url ||
-    URL.createObjectURL(
-      new Blob([`${document.fileName}\n\n${document.description}`], {
-        type: 'text/plain',
-      }),
-    );
-  window.open(url, '_blank', 'noopener,noreferrer');
-  if (!document.url) window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
-function downloadDocument(document: FinalDocument) {
-  const url =
-    document.url ||
-    URL.createObjectURL(
-      new Blob([`${document.fileName}\n\n${document.description}`], {
-        type: 'text/plain',
-      }),
-    );
-  const link = window.document.createElement('a');
-  link.href = url;
-  link.download = document.fileName;
-  link.click();
-  if (!document.url) URL.revokeObjectURL(url);
 }
 function getStageDate(_stage: Stage, index: number) {
   const base = new Date('2026-09-01T00:00:00');

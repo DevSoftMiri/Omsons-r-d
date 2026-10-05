@@ -7,10 +7,8 @@ import {
   Download,
   Eye,
   FileText,
-  Filter,
   Maximize2,
   Minimize2,
-  Info,
   Link as LinkIcon,
   MoreVertical,
   Plus,
@@ -21,7 +19,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { downloadFile, NO_FILE_AVAILABLE, resolveFileUrl } from '../../../utils/fileActions';
+import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 type DesignCategory = '3D Model' | 'Technical Drawing' | 'Rendering' | 'Concept' | 'Other';
@@ -54,6 +55,7 @@ const seedDesigns: DesignFile[] = [];
 export function ProductDesign() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const storageKey = `product-design:${project.productCode}`;
   const initial = readStoredData(storageKey);
@@ -119,6 +121,11 @@ export function ProductDesign() {
     setDeleteFile(null);
   }
 
+  function handleCompleteStage() {
+    if (showMissingFieldsToast(showToast, canComplete ? [] : ['Technical Drawing or 3D Model'])) return;
+    completeStage('Product Design');
+  }
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-2.5 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
@@ -129,10 +136,7 @@ export function ProductDesign() {
           <h2 className="text-xl font-bold">Product Design</h2>
           <p className="mt-1 max-w-4xl text-sm text-slate-600">Upload and manage design files such as 3D models, technical drawings, renderings and design concepts.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="secondary-button h-9 gap-2"><Info size={15} />How to use</button>
-          <button className="primary-button h-9" onClick={() => setShowUpload(true)}><Plus size={17} />Upload Design File</button>
-        </div>
+        <button className="primary-button h-9" onClick={() => setShowUpload(true)}><Plus size={17} />Upload Design File</button>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-soft">
@@ -153,7 +157,6 @@ export function ProductDesign() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input className="field !pl-10" placeholder="Search files..." value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
-            <button className="secondary-button h-9 gap-2"><Filter size={15} />Filter</button>
           </div>
         </div>
 
@@ -204,7 +207,7 @@ export function ProductDesign() {
         <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-soft">
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3"><FileText className="text-primary" size={18} /><h3 className="font-bold">Design Notes <span className="font-normal text-slate-500">(Optional)</span></h3></div>
-            <span className="text-sm font-bold text-primary">Edit</span>
+            <span className="text-xs font-semibold text-slate-400">Auto-saved</span>
           </div>
           <textarea className="field min-h-16 resize-none" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
@@ -217,7 +220,7 @@ export function ProductDesign() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Upload at least one technical drawing or 3D model to complete Product Design.</p> : null}
-          <button className="primary-button h-9 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Product Design')}>
+          <button className={`primary-button h-9 min-w-56 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Product Design Complete
           </button>
@@ -225,7 +228,7 @@ export function ProductDesign() {
       </section>
 
       <input ref={uploadRef} className="hidden" type="file" accept={acceptedDesignTypes} />
-      {showUpload ? <UploadModal onClose={() => setShowUpload(false)} onUpload={(file, category, title, description) => { addDesign(file, category, title, description); setShowUpload(false); }} /> : null}
+      {showUpload ? <UploadModal onClose={() => setShowUpload(false)} onUpload={(file, category, title, description) => { addDesign(file, category, title, description); setShowUpload(false); }} showToast={showToast} /> : null}
       {preview ? <PreviewModal design={preview} onClose={() => setPreview(null)} /> : null}
       {deleteFile ? <DeleteDialog design={deleteFile} onCancel={() => setDeleteFile(null)} onDelete={() => removeDesign(deleteFile.id)} /> : null}
       {showLinkModal ? <LinkAttachmentModal linked={linked} onClose={() => setShowLinkModal(false)} onSave={(items) => { setLinked(items); setShowLinkModal(false); }} /> : null}
@@ -247,8 +250,8 @@ function DesignCard({ design, onPreview, onDelete }: { design: DesignFile; onPre
           <p className="mt-1 text-xs text-slate-500">{formatDate(design.createdAt)} - {formatBytes(design.size)}</p>
         </div>
         <div className="flex gap-2">
-          <button className="icon-button h-8 w-8 text-primary" onClick={onPreview} title="Preview"><Eye size={14} /></button>
-          <a className={`icon-button h-8 w-8 text-primary ${design.url ? '' : 'pointer-events-none opacity-50'}`} href={design.url || undefined} download={design.fileName} title="Download"><Download size={14} /></a>
+          <button className="icon-button h-8 w-8 text-primary disabled:cursor-not-allowed disabled:opacity-50" disabled={!resolveFileUrl(design)} onClick={onPreview} title={resolveFileUrl(design) ? 'Preview' : NO_FILE_AVAILABLE}><Eye size={14} /></button>
+          <button className="icon-button h-8 w-8 text-primary disabled:cursor-not-allowed disabled:opacity-50" disabled={!resolveFileUrl(design)} onClick={() => downloadFile(design, design.fileName)} title={resolveFileUrl(design) ? 'Download' : NO_FILE_AVAILABLE}><Download size={14} /></button>
           <button className="icon-button h-8 w-8 text-rose-600" onClick={onDelete} title="Delete"><Trash2 size={14} /></button>
         </div>
       </div>
@@ -279,7 +282,7 @@ function PreviewArt({ design }: { design: DesignFile }) {
   return <div className="grid h-full place-items-center bg-white"><ConceptArt /></div>;
 }
 
-function UploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (file: File, category: DesignCategory, title: string, description: string) => void }) {
+function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; onUpload: (file: File, category: DesignCategory, title: string, description: string) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState<DesignCategory>('Technical Drawing');
   const [title, setTitle] = useState('');
@@ -287,6 +290,11 @@ function UploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (fi
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    const missing = getMissingFields([
+      { label: 'Design File', valid: Boolean(file) },
+      { label: 'Design Type', value: category }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     if (!file) return;
     onUpload(file, category, title, description);
   }
@@ -314,7 +322,7 @@ function UploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (fi
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" className="secondary-button h-10" onClick={onClose}>Cancel</button>
-          <button className="primary-button h-10" disabled={!file}>Upload Design</button>
+          <button className={`primary-button h-10 ${!file ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!file}>Upload Design</button>
         </div>
       </form>
     </div>
@@ -322,8 +330,9 @@ function UploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (fi
 }
 
 function PreviewModal({ design, onClose }: { design: DesignFile; onClose: () => void }) {
-  const isImage = design.url && design.mimeType.startsWith('image/');
-  const isPdf = design.url && design.mimeType === 'application/pdf';
+  const url = resolveFileUrl(design);
+  const isImage = url && design.mimeType.startsWith('image/');
+  const isPdf = url && design.mimeType === 'application/pdf';
   const fileType = design.mimeType === 'application/pdf' ? 'PDF document' : design.mimeType.startsWith('image/') ? 'Image preview' : design.category;
   const [fullscreen, setFullscreen] = useState(false);
   const viewerRef = useRef<HTMLElement | null>(null);
@@ -374,10 +383,10 @@ function PreviewModal({ design, onClose }: { design: DesignFile; onClose: () => 
               {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
             </button>
-            <a className={`secondary-button h-9 border-white/15 bg-white/10 text-white hover:bg-white/15 ${design.url ? '' : 'pointer-events-none opacity-50'}`} href={design.url || undefined} download={design.fileName}>
+            <button className="secondary-button h-9 border-white/15 bg-white/10 text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50" disabled={!url} title={url ? 'Download' : NO_FILE_AVAILABLE} onClick={() => downloadFile(design, design.fileName)}>
               <Download size={15} />
               Download
-            </a>
+            </button>
             <button className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15" onClick={onClose} title="Close preview">
               <X size={16} />
             </button>
@@ -386,11 +395,11 @@ function PreviewModal({ design, onClose }: { design: DesignFile; onClose: () => 
         <div className={`grid flex-1 place-items-center bg-[radial-gradient(circle_at_top,#1e293b,#020617_58%)] ${fullscreen ? 'min-h-0 p-2' : 'min-h-[64vh] p-4'}`}>
           {isImage ? (
             <div className="grid h-full w-full place-items-center">
-              <img className={`max-w-full rounded-lg bg-white object-contain shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'max-h-[calc(100vh-8.5rem)]' : 'max-h-[74vh]'}`} src={design.url} alt={design.title} />
+              <img className={`max-w-full rounded-lg bg-white object-contain shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'max-h-[calc(100vh-8.5rem)]' : 'max-h-[74vh]'}`} src={url} alt={design.title} />
             </div>
           ) : isPdf ? (
             <div className={`w-full overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'h-[calc(100vh-8.5rem)] max-w-none' : 'h-[74vh] max-w-5xl'}`}>
-              <iframe className="h-full w-full border-0" src={`${design.url}#toolbar=1&navpanes=0`} title={design.title} />
+              <iframe className="h-full w-full border-0" src={`${url}#toolbar=1&navpanes=0`} title={design.title} />
             </div>
           ) : (
             <div className={`grid w-full place-items-center rounded-lg bg-white shadow-2xl ring-1 ring-white/10 ${fullscreen ? 'h-[calc(100vh-8.5rem)] max-w-none' : 'h-[58vh] max-w-4xl'}`}><PreviewArt design={design} /></div>

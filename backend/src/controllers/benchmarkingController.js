@@ -42,7 +42,7 @@ async function getOrCreateBenchmarking(projectId) {
 
 function hasMeaningfulData(benchmarking) {
   return benchmarking.tables.some((table) =>
-    table.rows.some((row) => [...row.cells.values()].some((value) => String(value || '').trim()))
+    table.rows.some((row) => Object.values(row.cells instanceof Map ? Object.fromEntries(row.cells) : row.cells || {}).some((value) => String(value || '').trim()))
   );
 }
 
@@ -203,13 +203,10 @@ export const completeBenchmarking = asyncHandler(async (req, res) => {
     throw new Error('Previous stage must be completed first');
   }
 
-  project.stages[stageIndex] = {
-    ...project.stages[stageIndex],
-    status: 'Completed',
-    progress: 100,
-    completedAt: new Date(),
-    approvedBy: req.user?._id
-  };
+  project.stages[stageIndex].status = 'Completed';
+  project.stages[stageIndex].progress = 100;
+  project.stages[stageIndex].completedAt = new Date();
+  project.stages[stageIndex].approvedBy = req.user?._id;
   refreshStageLocks(project);
 
   await benchmarking.save();

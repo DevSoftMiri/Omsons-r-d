@@ -1,4 +1,4 @@
-import type { Project, Stage, TeamMember } from '../types';
+import type { Project, Stage } from '../types';
 
 export const workflowStages: Stage['name'][] = [
   'Prerequisites',
@@ -10,13 +10,6 @@ export const workflowStages: Stage['name'][] = [
   'Reporting',
   'Testing & Validation',
   'Final Stage'
-];
-
-export const teamMembers: TeamMember[] = [
-  { id: 'u1', name: 'Ravi', role: 'Admin' },
-  { id: 'u2', name: 'Ajay', role: 'Staff' },
-  { id: 'u3', name: 'Rahul', role: 'Staff' },
-  { id: 'u4', name: 'Shubham', role: 'Staff' }
 ];
 
 export const initialProjects: Project[] = [];

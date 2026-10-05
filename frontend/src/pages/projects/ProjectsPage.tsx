@@ -3,22 +3,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../../components/PageTopBar';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchProjects } from '../../services/projectService';
-import { setProjects } from '../../store';
-import type { Project, ProjectStatus } from '../../types';
-
-const cardStages = [
-  { label: 'Overview', names: ['Prerequisites'] },
-  { label: 'Prerequisites', names: ['Prerequisites'] },
-  { label: 'Benchmarking', names: ['Benchmarking', 'Attachments', 'BOM'] },
-  { label: 'Design', names: ['Product Design'] },
-  { label: 'Programming', names: ['Programming', 'Reporting'] },
-  { label: 'Testing', names: ['Testing & Validation'] },
-  { label: 'Final', names: ['Final Stage'] }
-];
+import { fetchProjects, updateProjectStatus } from '../../services/projectService';
+import { setProjects, upsertProject } from '../../store';
+import { getStageRoute } from '../../utils/stages';
+import type { Project, ProjectStatus, Stage } from '../../types';
 
 const statusOptions = ['All Status', 'Running', 'On Hold', 'Completed', 'Delayed'] as const;
-const stageOptions = ['All Stages', 'Product Design', 'Programming', 'Testing & Validation', 'Final Stage'] as const;
+const baseStageOptions = ['All Stages'] as const;
+const sortOptions = ['Latest Created', 'Start Date', 'Target Date', 'Progress', 'Priority', 'Status'] as const;
 
 function statusLabel(status: ProjectStatus) {
   if (status === 'Delayed') return 'At Risk';
@@ -26,12 +18,17 @@ function statusLabel(status: ProjectStatus) {
   return status;
 }
 
-function stageState(project: Project, index: number) {
-  const activeIndex = cardStages.findIndex((stage) => stage.names.includes(project.currentStage));
-  const progressIndex = activeIndex >= 0 ? activeIndex : Math.min(Math.floor(project.progress / 15), cardStages.length - 1);
-  if (project.progress >= 100 || index < progressIndex) return 'complete';
-  if (index === progressIndex) return 'active';
+function stageState(stage: Stage) {
+  if (stage.status === 'Completed') return 'complete';
+  if (stage.status === 'In Progress' || stage.status === 'Pending' || stage.status === 'Submitted') return 'active';
   return 'pending';
+}
+
+function stageLabel(name: string) {
+  if (name === 'Product Design') return 'Design';
+  if (name === 'Testing & Validation') return 'Testing';
+  if (name === 'Final Stage') return 'Final';
+  return name;
 }
 
 function displayDate(value: string) {
@@ -44,14 +41,19 @@ function initials(name: string) {
   return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
+const priorityOrder: Record<Project['priority'], number> = { High: 3, Medium: 2, Low: 1 };
+
 export function ProjectsPage() {
   const dispatch = useAppDispatch();
   const projects = useAppSelector((state) => state.projects.projects);
+  const user = useAppSelector((state) => state.auth.user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [stageFilter, setStageFilter] = useState<(typeof stageOptions)[number]>('All Stages');
+  const [stageFilter, setStageFilter] = useState('All Stages');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
+  const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]>('Latest Created');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     let active = true;
@@ -73,19 +75,32 @@ export function ProjectsPage() {
     };
   }, [dispatch]);
 
+  const stageOptions = useMemo(() => {
+    const names = projects.flatMap((project) => project.stages.map((stage) => stage.name));
+    return [...baseStageOptions, ...Array.from(new Set(names))];
+  }, [projects]);
+
   const visibleProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return projects.filter((project) => {
+    const filtered = projects.filter((project) => {
       const matchesSearch = !normalizedQuery || `${project.productCode} ${project.name} ${project.currentStage}`.toLowerCase().includes(normalizedQuery);
       const matchesStage = stageFilter === 'All Stages' || project.currentStage === stageFilter;
       const matchesStatus = statusFilter === 'All Status' || project.status === statusFilter;
       return matchesSearch && matchesStage && matchesStatus;
     });
-  }, [projects, query, stageFilter, statusFilter]);
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'Start Date') return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      if (sortBy === 'Target Date') return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
+      if (sortBy === 'Progress') return b.progress - a.progress;
+      if (sortBy === 'Priority') return priorityOrder[b.priority] - priorityOrder[a.priority];
+      if (sortBy === 'Status') return a.status.localeCompare(b.status);
+      return b.productCode.localeCompare(a.productCode);
+    });
+  }, [projects, query, sortBy, stageFilter, statusFilter]);
 
   return (
     <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
-      <PageTopBar title="Projects" subtitle="All product R&D projects" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel="Create Project" actionHref="/projects/create" />
+      <PageTopBar title="Projects" subtitle="All product R&D projects" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel={user?.role === 'admin' ? 'Create Project' : undefined} actionHref={user?.role === 'admin' ? '/projects/create' : undefined} />
 
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
@@ -105,15 +120,12 @@ export function ProjectsPage() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-base font-medium text-[#42557d]">Sort by:</span>
-          <button className="inline-flex h-11 items-center gap-8 rounded-lg border border-[#d8e2f2] bg-white px-4 text-base font-semibold text-[#18315e] shadow-sm">
-            Latest Created
-            <ChevronDown size={19} />
-          </button>
+          <SelectLike value={sortBy} options={sortOptions} onChange={setSortBy} />
           <div className="flex rounded-lg bg-white p-1 shadow-sm">
-            <button className="grid h-10 w-10 place-items-center rounded-md bg-[#0066ff] text-white" title="Grid view">
+            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'grid' ? 'bg-[#0066ff] text-white' : 'text-[#345078]'}`} title="Grid view" onClick={() => setViewMode('grid')}>
               <Grid2X2 size={19} />
             </button>
-            <button className="grid h-10 w-10 place-items-center rounded-md text-[#345078]" title="List view">
+            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'list' ? 'bg-[#0066ff] text-white' : 'text-[#345078]'}`} title="List view" onClick={() => setViewMode('list')}>
               <List size={20} />
             </button>
           </div>
@@ -124,9 +136,9 @@ export function ProjectsPage() {
       {error ? <div className="panel text-center text-sm font-semibold text-rose-600">{error}</div> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className={`grid gap-4 ${viewMode === 'grid' ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
           {visibleProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard key={project.id} project={project} compact={viewMode === 'list'} />
           ))}
           {!visibleProjects.length ? (
             <div className="panel col-span-full text-center">
@@ -157,13 +169,13 @@ function SelectLike<T extends string>({ value, options, onChange }: { value: T; 
   );
 }
 
-function ProjectCard({ project }: { project: Project }) {
-  const lead = project.teamMembers[0]?.name;
-  const staff = project.teamMembers.slice(1, 4);
-  const extraCount = Math.max(project.teamMembers.length - 4, 0);
+function ProjectCard({ project, compact = false }: { project: Project; compact?: boolean }) {
+  const staff = project.teamMembers.slice(0, 4);
+  const extraCount = Math.max(project.teamMembers.length - staff.length, 0);
+  const hasStaff = staff.length > 0;
 
   return (
-    <article className="rounded-lg border border-[#dde6f2] bg-white p-4 shadow-[0_14px_42px_rgba(21,40,80,0.07)]">
+    <article className={`rounded-lg border border-[#dde6f2] bg-white p-4 shadow-[0_14px_42px_rgba(21,40,80,0.07)] ${compact ? 'max-w-none' : ''}`}>
       <div className="flex items-start gap-5">
         <ProductThumb project={project} />
         <div className="min-w-0 flex-1">
@@ -174,9 +186,7 @@ function ProjectCard({ project }: { project: Project }) {
             </div>
             <div className="flex items-start gap-3">
               <span className={`project-card-status ${project.status.toLowerCase().replace(' ', '-')}`}>{statusLabel(project.status)}</span>
-              <button className="grid h-8 w-6 place-items-center text-[#21406d]" title="Project actions">
-                <MoreVertical size={20} />
-              </button>
+              <ProjectCardActions project={project} />
             </div>
           </div>
 
@@ -195,26 +205,26 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </div>
 
-      <div className="mt-5 flex overflow-hidden">
-        {cardStages.map((stage, index) => {
-          const state = stageState(project, index);
+      <div className="mt-5 grid gap-y-4" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(project.stages.length, 1), 9)}, minmax(0, 1fr))` }}>
+        {project.stages.map((stage, index) => {
+          const state = stageState(stage);
           return (
-            <div key={stage.label} className="project-stage-step">
+            <div key={stage.id} className="project-stage-step">
               <div className={`project-stage-dot ${state}`}>{state === 'complete' ? '✓' : state === 'active' ? <span /> : null}</div>
-              {index < cardStages.length - 1 && <div className={`project-stage-line ${state === 'complete' ? 'complete' : ''}`} />}
-              <p className={`project-stage-label ${state === 'active' ? 'active' : ''}`}>{stage.label}</p>
+              {index < project.stages.length - 1 && <div className={`project-stage-line ${state === 'complete' ? 'complete' : ''}`} />}
+              <p className={`project-stage-label ${state === 'active' ? 'active' : ''}`} title={stage.name}>{stageLabel(stage.name)}</p>
             </div>
           );
         })}
       </div>
 
       <div className="mt-4 border-t border-[#e0e7f0] pt-3">
-        <div className="grid gap-4 md:grid-cols-3">
-          <CardPerson label="Project Lead" name={lead} />
-          <div>
+        <div className={`grid gap-4 ${hasStaff ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          <CardPerson label="Reporting To" name={project.reportTo} helper={project.reportToDesignation || 'Admin'} />
+          {hasStaff ? <div>
             <p className="text-sm font-medium text-[#53688d]">Assigned Staff</p>
             <div className="mt-2 flex items-center">
-              {staff.map((member, index) => (
+              {staff.map((member) => (
                 <span key={member.id} className="-ml-1 first:ml-0 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[#dbeafe] text-[10px] font-bold text-[#153c78]" title={member.name}>
                   {initials(member.name)}
                 </span>
@@ -222,8 +232,8 @@ function ProjectCard({ project }: { project: Project }) {
               {extraCount ? <span className="-ml-1 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[#eef2f7] text-xs font-bold text-[#52637f]">+{extraCount}</span> : null}
               {!staff.length ? <span className="text-sm font-semibold text-[#7a8aa8]">--</span> : null}
             </div>
-          </div>
-          <CardPerson label="Reporting To" name={project.reportTo} />
+          </div> : null}
+          <CardPerson label="Category" name={project.category} />
         </div>
 
         <div className="mt-4 grid items-end gap-4 md:grid-cols-[1fr_1fr_1fr_auto]">
@@ -246,14 +256,41 @@ function ProjectCard({ project }: { project: Project }) {
   );
 }
 
-function CardPerson({ label, name }: { label: string; name?: string }) {
+function ProjectCardActions({ project }: { project: Project }) {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  async function setStatus(status: Project['status']) {
+    dispatch(upsertProject(await updateProjectStatus(project.id, status)));
+  }
+
+  return (
+    <div className="group relative">
+      <button className="grid h-8 w-6 place-items-center text-[#21406d]" title="Project actions">
+        <MoreVertical size={20} />
+      </button>
+      <div className="invisible absolute right-0 top-8 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
+        <Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open</Link>
+        <Link className="menu-action" to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`}>View Current Stage</Link>
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
+        <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Code</button>
+      </div>
+    </div>
+  );
+}
+
+function CardPerson({ label, name, helper }: { label: string; name?: string; helper?: string }) {
   return (
     <div>
       <p className="text-sm font-medium text-[#53688d]">{label}</p>
       {name ? (
         <div className="mt-2 flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-[#fde7d7] text-[10px] font-bold text-[#6b2b12]">{initials(name)}</span>
-          <span className="text-sm font-semibold text-[#20385f]">{name}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-[#20385f]">{name}</span>
+            {helper ? <span className="block truncate text-xs font-medium text-[#64748b]">{helper}</span> : null}
+          </span>
         </div>
       ) : <p className="mt-2 text-sm font-semibold text-[#7a8aa8]">--</p>}
     </div>

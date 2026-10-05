@@ -16,6 +16,9 @@ export interface CertificateRecord {
   expiryDate: string;
   notes: string;
   documentName: string;
+  documentUrl?: string;
+  fileUrl?: string;
+  publicUrl?: string;
   createdAt: string;
 }
 

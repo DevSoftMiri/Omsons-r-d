@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { PageTopBar } from '../components/PageTopBar';
 import { useToast } from '../components/ToastProvider';
 import { readSettings, saveSettings, type AppSettings, type WorkflowSetting } from '../services/adminModuleStorage';
+import { showMissingFieldsToast } from '../utils/requiredFields';
 
 const sections = ['General', 'Project Workflow', 'Roles & Permissions', 'Project Defaults', 'Notifications', 'Documents'];
 const permissionRows = ['View Projects', 'Create Projects', 'Edit Projects', 'Delete Projects', 'Manage Team', 'Manage Vendors', 'Manage Certificates', 'Generate Reports', 'Manage Settings'];
@@ -33,6 +34,15 @@ export function SettingsPage() {
     showToast({ tone: 'success', title: 'Settings saved' });
   }
 
+  function resetUnsavedChanges() {
+    setSettings(readSettings());
+    setPermissions(defaultPermissions());
+    setNewRole('');
+    setNewStageName('');
+    setEditingStageId(null);
+    showToast({ tone: 'success', title: 'Unsaved changes cleared' });
+  }
+
   function updateSettings(next: AppSettings) {
     setSettings(next);
   }
@@ -50,7 +60,7 @@ export function SettingsPage() {
 
   function addStage() {
     const name = newStageName.trim();
-    if (!name) return;
+    if (showMissingFieldsToast(showToast, name ? [] : ['Stage Name'])) return;
     const finalIndex = settings.workflow.findIndex((stage) => stage.name === 'Final Stage');
     const workflow = [...settings.workflow];
     workflow.splice(finalIndex < 0 ? workflow.length : finalIndex, 0, { id: crypto.randomUUID(), name, description: `${name} stage tasks and approvals.`, active: true, required: false });
@@ -60,6 +70,13 @@ export function SettingsPage() {
 
   function patchStage(stageId: string, patch: Partial<WorkflowSetting>) {
     updateSettings({ ...settings, workflow: settings.workflow.map((stage) => stage.id === stageId ? { ...stage, ...patch } : stage) });
+  }
+
+  function createRole() {
+    const role = newRole.trim();
+    if (showMissingFieldsToast(showToast, role ? [] : ['Role Name'])) return;
+    setPermissions({ ...permissions, [role]: Object.fromEntries(permissionRows.map((row) => [row, false])) as Record<string, boolean> });
+    setNewRole('');
   }
 
   return (
@@ -73,7 +90,7 @@ export function SettingsPage() {
 
         <main className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
           {active === 'General' ? (
-            <Panel title="General Settings" onSave={() => persist()}>
+            <Panel title="General Settings" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Company Name"><input className="field" value={settings.general.companyName} onChange={(event) => updateSettings({ ...settings, general: { ...settings.general, companyName: event.target.value } })} /></Field>
                 <Field label="Company Logo"><input className="field" type="file" /></Field>
@@ -87,7 +104,7 @@ export function SettingsPage() {
           ) : null}
 
           {active === 'Project Workflow' ? (
-            <Panel title="Project Workflow" onSave={() => persist()}>
+            <Panel title="Project Workflow" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <div className="mb-4 flex gap-2">
                 <input className="field" value={newStageName} onChange={(event) => setNewStageName(event.target.value)} placeholder="Add new stage" />
                 <button className="secondary-button h-11 shrink-0" onClick={addStage}><Plus size={16} />Add Stage</button>
@@ -119,10 +136,10 @@ export function SettingsPage() {
           ) : null}
 
           {active === 'Roles & Permissions' ? (
-            <Panel title="Roles & Permissions" onSave={() => { window.localStorage.setItem('omsons-permissions', JSON.stringify(permissions)); persist(); }}>
+            <Panel title="Roles & Permissions" onSave={() => { window.localStorage.setItem('omsons-permissions', JSON.stringify(permissions)); persist(); }} onCancel={resetUnsavedChanges}>
               <div className="mb-4 flex gap-2">
                 <input className="field" value={newRole} onChange={(event) => setNewRole(event.target.value)} placeholder="Role Name" />
-                <button className="secondary-button h-11 shrink-0" onClick={() => { if (!newRole.trim()) return; setPermissions({ ...permissions, [newRole.trim()]: Object.fromEntries(permissionRows.map((row) => [row, false])) as Record<string, boolean> }); setNewRole(''); }}><Plus size={16} />Create Role</button>
+                <button className="secondary-button h-11 shrink-0" onClick={createRole}><Plus size={16} />Create Role</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-[720px] w-full text-left">
@@ -135,7 +152,7 @@ export function SettingsPage() {
           ) : null}
 
           {active === 'Project Defaults' ? (
-            <Panel title="Project Defaults" onSave={() => persist()}>
+            <Panel title="Project Defaults" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Default Project Status"><select className="field" value={settings.defaults.status} onChange={(event) => updateSettings({ ...settings, defaults: { ...settings.defaults, status: event.target.value } })}>{['Planning', 'Active', 'On Hold', 'Completed', 'Cancelled', 'Running'].map((item) => <option key={item}>{item}</option>)}</select></Field>
                 <Field label="Default Priority"><select className="field" value={settings.defaults.priority} onChange={(event) => updateSettings({ ...settings, defaults: { ...settings.defaults, priority: event.target.value } })}>{['Low', 'Medium', 'High', 'Critical'].map((item) => <option key={item}>{item}</option>)}</select></Field>
@@ -146,7 +163,7 @@ export function SettingsPage() {
           ) : null}
 
           {active === 'Notifications' ? (
-            <Panel title="Notifications" onSave={() => persist()}>
+            <Panel title="Notifications" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <div className="grid gap-3 md:grid-cols-2">{notificationLabels.map(([key, label]) => <SettingToggle key={key} label={label} checked={Boolean(settings.notifications[key])} onChange={(checked) => updateSettings({ ...settings, notifications: { ...settings.notifications, [key]: checked } })} />)}</div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <Field label="Deadline reminder days before"><input type="number" className="field" value={settings.notifications.deadlineReminderDays} onChange={(event) => updateSettings({ ...settings, notifications: { ...settings.notifications, deadlineReminderDays: Number(event.target.value) } })} /></Field>
@@ -156,7 +173,7 @@ export function SettingsPage() {
           ) : null}
 
           {active === 'Documents' ? (
-            <Panel title="Document Settings" onSave={() => persist()}>
+            <Panel title="Document Settings" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <Field label="Maximum Upload Size (MB)"><input type="number" className="field max-w-xs" value={settings.documents.maxUploadSize} onChange={(event) => updateSettings({ ...settings, documents: { ...settings.documents, maxUploadSize: Number(event.target.value) } })} /></Field>
               <div className="mt-4 grid gap-2 md:grid-cols-3">{documentTypes.map((type) => <label key={type} className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm font-bold text-[#20385f]"><input type="checkbox" checked={settings.documents.allowedTypes.includes(type)} onChange={(event) => updateSettings({ ...settings, documents: { ...settings.documents, allowedTypes: event.target.checked ? [...settings.documents.allowedTypes, type] : settings.documents.allowedTypes.filter((item) => item !== type) } })} />{type}</label>)}</div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -172,8 +189,8 @@ export function SettingsPage() {
   );
 }
 
-function Panel({ title, children, onSave }: { title: string; children: React.ReactNode; onSave: () => void }) {
-  return <section><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-[#06143d]">{title}</h2><div className="flex gap-2"><button className="secondary-button h-10" onClick={() => window.location.reload()}>Cancel</button><button className="primary-button h-10" onClick={onSave}><Save size={16} />Save Changes</button></div></div>{children}</section>;
+function Panel({ title, children, onSave, onCancel }: { title: string; children: React.ReactNode; onSave: () => void; onCancel: () => void }) {
+  return <section><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-[#06143d]">{title}</h2><div className="flex gap-2"><button className="secondary-button h-10" onClick={onCancel}>Cancel</button><button className="primary-button h-10" onClick={onSave}><Save size={16} />Save Changes</button></div></div>{children}</section>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

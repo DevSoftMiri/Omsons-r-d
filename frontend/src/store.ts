@@ -1,5 +1,5 @@
 import { configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { initialProjects, teamMembers, workflowStages } from './data/seed';
+import { initialProjects, workflowStages } from './data/seed';
 import type { Project, StageName } from './types';
 import { canCompleteStage, makeStage, slugifyStageName } from './utils/stages';
 
@@ -108,7 +108,7 @@ const projectsSlice = createSlice({
         ...projectValues,
         id: projectId,
         productCode,
-        reportTo: projectValues.reportTo || teamMembers[0].name,
+        reportTo: projectValues.reportTo || '',
         progress: 0,
         currentStage: stageNames[0],
         stages: stageNames.map((name, index) => makeStage(name, index, { isCustom: customStages.includes(name) })),

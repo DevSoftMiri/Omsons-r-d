@@ -3,11 +3,7 @@ import mongoose from 'mongoose';
 const certificateSchema = new mongoose.Schema(
   {
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
-    type: {
-      type: String,
-      enum: ['ISO Certificate', 'Calibration Certificate', 'Material Test Report', 'Requirement Document', 'Drawing Approval'],
-      required: true
-    },
+    type: { type: String, required: true, trim: true },
     fileName: String,
     mimeType: String,
     fileSize: Number,

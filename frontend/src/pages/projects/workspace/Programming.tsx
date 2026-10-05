@@ -19,7 +19,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
+import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 type ProgramStatus = 'Draft' | 'Testing' | 'Ready';
@@ -64,6 +67,7 @@ const seedPrograms: Program[] = [];
 export function Programming() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const storageKey = `programming:${project.productCode}`;
   const initial = readStoredProgramming(storageKey);
   const [programs, setPrograms] = useState(initial.programs);
@@ -120,6 +124,18 @@ export function Programming() {
     setDeleteProgram(null);
   }
 
+  function handleCompleteStage() {
+    const missing = [
+      !programs.length ? 'At least one program' : '',
+      programs.some((program) => !program.name.trim()) ? 'Program Name' : '',
+      programs.some((program) => !program.version.trim()) ? 'Version' : '',
+      programs.some((program) => !program.status) ? 'Status' : '',
+      !programs.some((program) => program.status === 'Ready' || program.file) ? 'Ready program or program file' : ''
+    ].filter(Boolean);
+    if (showMissingFieldsToast(showToast, missing)) return;
+    completeStage('Programming');
+  }
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
@@ -172,7 +188,7 @@ export function Programming() {
                     <td className="px-3 py-3">{program.version}</td>
                     <td className="px-3 py-3">
                       {program.file ? (
-                        <button className="inline-flex items-start gap-2 text-left text-primary" onClick={() => openProgramFile(program.file)}>
+                        <button className="inline-flex items-start gap-2 text-left text-primary disabled:cursor-not-allowed disabled:text-slate-400" disabled={!resolveFileUrl(program.file)} title={resolveFileUrl(program.file) ? 'Open program file' : NO_FILE_AVAILABLE} onClick={() => openFile(program.file)}>
                           <FileText size={19} />
                           <span><span className="block font-bold">{program.file.fileName}</span><span className="text-xs text-slate-500">{formatBytes(program.file.fileSize)}</span></span>
                         </button>
@@ -225,8 +241,8 @@ export function Programming() {
                   <p className="truncate font-bold">{file}</p>
                   <p className="text-xs text-slate-500">Linked project file</p>
                 </div>
-                <button className="icon-button h-8 w-8 text-primary"><ExternalLink size={15} /></button>
-                <button className="icon-button h-8 w-8" onClick={() => setReferences((current) => current.filter((item) => item !== file))}><MoreVertical size={15} /></button>
+                <button className="icon-button h-8 w-8 text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled title={NO_FILE_AVAILABLE}><ExternalLink size={15} /></button>
+                <button className="icon-button h-8 w-8 text-rose-600" title="Remove linked file" onClick={() => setReferences((current) => current.filter((item) => item !== file))}><Trash2 size={15} /></button>
               </div>
             ))}
           </div>
@@ -235,7 +251,7 @@ export function Programming() {
         <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3"><FileText className="text-primary" size={20} /><h3 className="font-bold">Programming Notes <span className="font-normal text-slate-500">(Optional)</span></h3></div>
-            <span className="text-sm font-bold text-primary">Edit</span>
+            <span className="text-xs font-semibold text-slate-400">Auto-saved</span>
           </div>
           <textarea className="field min-h-40 resize-none" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
@@ -248,21 +264,21 @@ export function Programming() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid program file or mark a program Ready before completing this stage.</p> : null}
-          <button className="primary-button h-10 min-w-64 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Programming')}>
+          <button className={`primary-button h-10 min-w-64 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Programming Complete
           </button>
         </div>
       </section>
 
-      {drawerMode ? <ProgramDrawer mode={drawerMode} program={activeProgram} onClose={() => setDrawerMode(null)} onEdit={() => setDrawerMode('edit')} onSave={saveProgram} /> : null}
+      {drawerMode ? <ProgramDrawer mode={drawerMode} program={activeProgram} onClose={() => setDrawerMode(null)} onEdit={() => setDrawerMode('edit')} onSave={saveProgram} showToast={showToast} /> : null}
       {deleteProgram ? <DeleteDialog program={deleteProgram} onCancel={() => setDeleteProgram(null)} onDelete={() => removeProgram(deleteProgram.id)} /> : null}
       {showReferences ? <ReferenceModal linked={references} onClose={() => setShowReferences(false)} onSave={(items) => { setReferences(items); setShowReferences(false); }} /> : null}
     </div>
   );
 }
 
-function ProgramDrawer({ mode, program, onClose, onEdit, onSave }: { mode: 'add' | 'edit' | 'view'; program: Program | null; onClose: () => void; onEdit: () => void; onSave: (program: Program) => void }) {
+function ProgramDrawer({ mode, program, onClose, onEdit, onSave, showToast }: { mode: 'add' | 'edit' | 'view'; program: Program | null; onClose: () => void; onEdit: () => void; onSave: (program: Program) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
   const readOnly = mode === 'view';
   const [form, setForm] = useState<Program>(program || {
     id: `program_${Date.now()}`,
@@ -279,7 +295,12 @@ function ProgramDrawer({ mode, program, onClose, onEdit, onSave }: { mode: 'add'
   function submit(event: FormEvent) {
     event.preventDefault();
     if (readOnly) return;
-    if (!form.name.trim() || !form.version.trim()) return;
+    const missing = getMissingFields([
+      { label: 'Program Name', value: form.name },
+      { label: 'Version', value: form.version },
+      { label: 'Status', value: form.status }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     onSave(form);
   }
 
@@ -423,11 +444,6 @@ function formatDate(value: string) {
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function openProgramFile(file: ProgramFile | null) {
-  if (!file?.url) return;
-  window.open(file.url, '_blank', 'noopener,noreferrer');
 }
 
 function BeakerVisual() {

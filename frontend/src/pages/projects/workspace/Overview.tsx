@@ -11,13 +11,22 @@ import {
   IndianRupee,
   Layers3,
   ListChecks,
+  Plus,
+  X,
   ShoppingCart,
   Users,
   Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { BomItem, Project, Stage, CoreStageName } from '../../../types';
 import { getStageRoute } from '../../../utils/stages';
+import { useAppDispatch, useAppSelector } from '../../../hooks';
+import { addProjectStage, addProjectTeamMember, fetchProjectTeamCandidates, removeProjectTeamMember, updateProjectReportTo, updateProjectStatus } from '../../../services/projectService';
+import { fetchStaffAccounts, type StaffAccount } from '../../../services/authService';
+import { upsertProject } from '../../../store';
+import { useToast } from '../../../components/ToastProvider';
+import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 const statusStyles: Record<Project['status'], string> = {
@@ -43,6 +52,17 @@ const customStageActions = ['Update custom checklist', 'Add stage notes', 'Mark 
 
 export function Overview() {
   const { project } = useProjectWorkspace();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const { showToast } = useToast();
+  const [dialog, setDialog] = useState<'member' | 'stage' | null>(null);
+  const [candidates, setCandidates] = useState<Array<{ _id: string; name: string; designation?: string; email: string }>>([]);
+  const [adminAccounts, setAdminAccounts] = useState<StaffAccount[]>([]);
+  const [selectedMember, setSelectedMember] = useState('');
+  const [stageName, setStageName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [error, setError] = useState('');
   const completedStages = project.stages.filter((stage) => stage.status === 'Completed').length;
   const currentStage = project.stages.find((stage) => stage.name === project.currentStage);
   const bomTotal = getBomTotal(project);
@@ -50,6 +70,66 @@ export function Overview() {
   const deadline = getDeadlineStatus(project.targetDate);
   const latestReport = getLatestReport(project);
   const reportOwner = project.reportTo || 'Unassigned';
+  const reportOwnerRole = project.reportToDesignation || 'Admin';
+  const canManageTeam = user?.role === 'admin';
+
+  useEffect(() => {
+    fetchStaffAccounts()
+      .then((accounts) => setAdminAccounts(accounts.filter((account) => account.role === 'Admin' && account.isActive)))
+      .catch(() => undefined);
+  }, []);
+
+  async function changeProjectStatus(status: Project['status']) {
+    if (status === project.status) return;
+    setSavingStatus(true);
+    try {
+      dispatch(upsertProject(await updateProjectStatus(project.id, status)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update project status');
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  async function submitDialog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const missing = dialog === 'member'
+      ? (selectedMember ? [] : ['Team Member'])
+      : (stageName.trim() ? [] : ['Stage Name']);
+    if (showMissingFieldsToast(showToast, missing)) return;
+    setSaving(true);
+    setError('');
+    try {
+      const updated = dialog === 'member' ? await addProjectTeamMember(project.id, selectedMember) : await addProjectStage(project.id, stageName);
+      dispatch(upsertProject(updated));
+      setDialog(null);
+      setSelectedMember('');
+      setStageName('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save changes');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeMember(userId: string) {
+    try {
+      dispatch(upsertProject(await removeProjectTeamMember(project.id, userId)));
+      showToast({ tone: 'success', title: 'Team member removed' });
+    } catch (err) {
+      showToast({ tone: 'error', title: 'Remove failed', message: err instanceof Error ? err.message : 'Unable to remove team member' });
+    }
+  }
+
+  async function changeReportTo(userId: string) {
+    if (!userId || userId === project.reportToId) return;
+    try {
+      dispatch(upsertProject(await updateProjectReportTo(project.id, userId)));
+      showToast({ tone: 'success', title: 'Reporting owner updated' });
+    } catch (err) {
+      showToast({ tone: 'error', title: 'Update failed', message: err instanceof Error ? err.message : 'Unable to update reporting owner' });
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4">
@@ -62,15 +142,27 @@ export function Overview() {
           <div className="min-w-0 flex-1 py-1">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-3xl font-bold leading-tight">{project.name}</h2>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${statusStyles[project.status]}`}>
-                <span className="h-2 w-2 rounded-full bg-current" />
-                {project.status}
-              </span>
+              {canManageTeam ? (
+                <label className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${statusStyles[project.status]}`}>
+                  <span className="h-2 w-2 rounded-full bg-current" />
+                  <select className="bg-transparent font-bold outline-none" value={project.status} disabled={savingStatus} onChange={(event) => changeProjectStatus(event.target.value as Project['status'])} title="Change project status">
+                    <option>Running</option>
+                    <option>On Hold</option>
+                    <option>Delayed</option>
+                    <option>Completed</option>
+                  </select>
+                </label>
+              ) : (
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${statusStyles[project.status]}`}>
+                  <span className="h-2 w-2 rounded-full bg-current" />
+                  {project.status}
+                </span>
+              )}
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-3 2xl:grid-cols-6">
               <ProductFact label="Product Code" value={project.productCode} />
-              <ProductFact label="Category" value="Laboratory Glassware" />
+              <ProductFact label="Category" value={project.category} />
               <ProductFact label="Current Stage" value={project.currentStage} />
               <ProductFact label="Priority" value={project.priority} pill={project.priority === 'High' ? 'danger' : 'neutral'} />
               <div className="border-slate-200 md:border-l md:pl-5">
@@ -79,7 +171,7 @@ export function Overview() {
                   <Avatar name={reportOwner} tone="blue" />
                   <div>
                     <p className="text-sm font-bold">{reportOwner}</p>
-                    <p className="text-xs text-slate-500">Product Manager</p>
+                    <p className="text-xs text-slate-500">{reportOwnerRole}</p>
                   </div>
                 </div>
               </div>
@@ -110,19 +202,22 @@ export function Overview() {
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h3 className="text-lg font-bold">Project Stage Timeline</h3>
-          <Link to={`../${getStageRoute(project.currentStage, project)}`} relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
-            View All Stages
-            <ArrowRight size={16} />
-          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {canManageTeam ? <button className="secondary-button h-9 text-primary" onClick={() => { setError(''); setDialog('stage'); }}><Plus size={16} />Add Stage</button> : null}
+            <Link to={`../${getStageRoute(project.currentStage, project)}`} relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
+              View All Stages
+              <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+        <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
           {project.stages.map((stage, index) => (
             <TimelineStage key={stage.name} stage={stage} index={index} />
           ))}
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className={`grid gap-4 ${canManageTeam ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <div className="rounded-lg bg-blue-50 p-4">
             <div className="flex items-center gap-3">
@@ -153,7 +248,7 @@ export function Overview() {
           </Link>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+        {canManageTeam ? <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users size={20} className="text-primary" />
@@ -162,16 +257,22 @@ export function Overview() {
             <span className="text-sm text-slate-500">{project.teamMembers.length} Members</span>
           </div>
           <div className="space-y-4">
-            <TeamRow name={reportOwner} role="Product Manager" badge="Report To" tone="blue" />
+            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-primary">Report To</p>
+              <select className="field h-10" value={project.reportToId || ''} onChange={(event) => changeReportTo(event.target.value)}>
+                <option value="">{reportOwner}</option>
+                {adminAccounts.map((admin) => <option key={admin._id} value={admin._id}>{admin.name} - {admin.designation || 'Admin'}</option>)}
+              </select>
+            </div>
             {project.teamMembers.map((member) => (
-              <TeamRow key={member.id} name={member.name} role={member.role} badge="Member" />
+              <TeamRow key={member.id} name={member.name} role={member.designation || member.role} badge="Member" onRemove={() => removeMember(member.id)} />
             ))}
           </div>
-          <button className="secondary-button mt-5 w-full justify-center border-dashed text-primary">
+            <button className="secondary-button mt-5 w-full justify-center border-dashed text-primary" onClick={async () => { setError(''); setDialog('member'); try { setCandidates(await fetchProjectTeamCandidates(project.id)); } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load team members'); } }}>
             <Users size={16} />
             Add Team Member
           </button>
-        </section>
+        </section> : null}
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
           <div className="mb-5 flex items-center gap-2">
@@ -270,8 +371,16 @@ export function Overview() {
           <p className="text-sm leading-6 text-slate-600">{project.description}</p>
         </section>
       </div>
+
+      {dialog ? <OverviewDialog title={dialog === 'member' ? 'Add Team Member' : 'Add Project Stage'} error={error} saving={saving} onClose={() => setDialog(null)} onSubmit={submitDialog}>
+        {dialog === 'member' ? <select className="field" value={selectedMember} onChange={(event) => setSelectedMember(event.target.value)} required><option value="">Select a team member</option>{candidates.filter((candidate) => !project.teamMembers.some((member) => member.id === candidate._id)).map((candidate) => <option key={candidate._id} value={candidate._id}>{candidate.name} - {candidate.designation || 'Staff'}</option>)}</select> : <input className="field" value={stageName} onChange={(event) => setStageName(event.target.value)} placeholder="Stage name" required />}
+      </OverviewDialog> : null}
     </div>
   );
+}
+
+function OverviewDialog({ title, error, saving, onClose, onSubmit, children }: { title: string; error: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; children: ReactNode }) {
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form noValidate className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl" onSubmit={onSubmit}><div className="flex items-center justify-between"><h3 className="text-lg font-bold">{title}</h3><button type="button" className="icon-button h-8 w-8" onClick={onClose}><X size={16} /></button></div><div className="mt-5">{children}</div>{error ? <p className="mt-2 text-sm font-semibold text-rose-600">{error}</p> : null}<div className="mt-5 flex justify-end gap-3"><button type="button" className="secondary-button h-10" onClick={onClose}>Cancel</button><button className="primary-button h-10" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></div></form></div>;
 }
 
 function ProductFact({ label, value, pill }: { label: string; value: string; pill?: 'danger' | 'neutral' }) {
@@ -347,12 +456,9 @@ function TimelineStage({ stage, index }: { stage: Stage; index: number }) {
   const active = stage.status === 'In Progress';
   const badgeClass = complete ? 'bg-emerald-100 text-emerald-700' : active ? 'bg-blue-100 text-primary' : 'bg-slate-100 text-slate-600';
   const dotClass = complete ? 'bg-emerald-600 text-white' : active ? 'bg-primary text-white' : 'bg-slate-200 text-slate-600';
-  const lineClass = complete ? 'bg-emerald-600' : active ? 'bg-primary' : 'bg-slate-300';
-
   return (
     <Link to={`../${getStageRoute(stage)}`} relative="path" className="group text-center">
       <div className="relative flex items-center justify-center">
-        {index > 0 ? <span className={`absolute right-1/2 top-1/2 hidden h-0.5 w-full -translate-y-1/2 2xl:block ${lineClass}`} /> : null}
         <span className={`relative z-10 grid h-8 w-8 place-items-center rounded-full text-sm font-bold ${dotClass}`}>
           {complete ? <Check size={17} /> : index + 1}
         </span>
@@ -363,7 +469,7 @@ function TimelineStage({ stage, index }: { stage: Stage; index: number }) {
   );
 }
 
-function TeamRow({ name, role, badge, tone = 'slate' }: { name: string; role: string; badge: string; tone?: 'blue' | 'slate' }) {
+function TeamRow({ name, role, badge, tone = 'slate', onRemove }: { name: string; role: string; badge: string; tone?: 'blue' | 'slate'; onRemove?: () => void }) {
   return (
     <div className="flex items-center gap-3">
       <Avatar name={name} tone={tone} />
@@ -372,6 +478,7 @@ function TeamRow({ name, role, badge, tone = 'slate' }: { name: string; role: st
         <p className="truncate text-sm text-slate-500">{role}</p>
       </div>
       <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone === 'blue' ? 'bg-blue-100 text-primary' : 'bg-slate-100 text-slate-600'}`}>{badge}</span>
+      {onRemove ? <button className="text-rose-600" title="Remove from project" onClick={onRemove}><X size={16} /></button> : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { AddTableModal } from '../../../components/benchmarking/AddTableModal';
 import { BenchmarkingTable } from '../../../components/benchmarking/BenchmarkingTable';
 import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import type { BenchmarkingTableData, BenchmarkingWorkbook, SelectedCell } from '../../../components/benchmarking/types';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import {
@@ -16,6 +17,7 @@ import {
   updateBenchmarkingTable
 } from '../../../services/benchmarkingService';
 import { updateProjectStage } from '../../../services/projectService';
+import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 const emptyWorkbook: BenchmarkingWorkbook = {
@@ -26,6 +28,7 @@ const emptyWorkbook: BenchmarkingWorkbook = {
 export function Benchmarking() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const [workbook, setWorkbook] = useState<BenchmarkingWorkbook>(emptyWorkbook);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -144,6 +147,12 @@ export function Benchmarking() {
   }
 
   async function completeStageClick() {
+    const missing = [
+      !workbook.tables.length ? 'At least one benchmarking table' : '',
+      !hasMeaningfulData ? 'Benchmarking data' : '',
+      saveStatus !== 'saved' ? 'Saved changes' : ''
+    ].filter(Boolean);
+    if (showMissingFieldsToast(showToast, missing)) return;
     try {
       await syncCompletedPreviousStages();
       await completeBenchmarking(project.productCode);
@@ -224,7 +233,7 @@ export function Benchmarking() {
               {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'failed' ? 'Save failed' : saveStatus === 'saved' ? 'Saved' : 'Draft'}
             </span>
           </div>
-          <button className="primary-button min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={completeStageClick}>
+          <button className={`primary-button min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={completeStageClick}>
             <Check size={18} />
             Mark Benchmarking Complete
           </button>

@@ -6,6 +6,8 @@ import { useAppDispatch, useAppSelector } from '../hooks';
 import { certificateStatus, certificateTypes, readCertificates, saveCertificates, type CertificateRecord } from '../services/adminModuleStorage';
 import { fetchProjects } from '../services/projectService';
 import { setProjects } from '../store';
+import { downloadFile, NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../utils/fileActions';
+import { showMissingFieldsToast } from '../utils/requiredFields';
 
 const emptyCertificate: Omit<CertificateRecord, 'id' | 'createdAt'> = {
   name: '',
@@ -18,7 +20,8 @@ const emptyCertificate: Omit<CertificateRecord, 'id' | 'createdAt'> = {
   issueDate: '',
   expiryDate: '',
   notes: '',
-  documentName: ''
+  documentName: '',
+  documentUrl: ''
 };
 
 export function CertificatesPage() {
@@ -80,7 +83,8 @@ export function CertificatesPage() {
       issueDate: certificate.issueDate,
       expiryDate: certificate.expiryDate,
       notes: certificate.notes,
-      documentName: certificate.documentName
+      documentName: certificate.documentName,
+      documentUrl: resolveFileUrl(certificate)
     });
     setEditingId(certificate.id);
     setErrors({});
@@ -93,6 +97,16 @@ export function CertificatesPage() {
       if (!String(form[field as keyof typeof form] || '').trim()) next[field] = 'Required';
     });
     setErrors(next);
+    showMissingFieldsToast(showToast, Object.keys(next).map((field) => ({
+      name: 'Certificate Name',
+      number: 'Certificate Number',
+      type: 'Certificate Type',
+      projectId: 'Associated Project',
+      authority: 'Issuing Authority',
+      issueDate: 'Issue Date',
+      expiryDate: 'Expiry Date',
+      documentName: 'Upload Certificate Document'
+    }[field] || field)));
     return !Object.keys(next).length;
   }
 
@@ -151,9 +165,9 @@ export function CertificatesPage() {
                     <td className="px-4 py-4 text-sm text-[#53688d]">{certificate.expiryDate}</td>
                     <td className="px-4 py-4"><StatusBadge status={status} /></td>
                     <td className="px-4 py-4"><div className="flex gap-1">
-                      <button className="icon-button h-8 w-8" title="View Certificate" onClick={() => openCertificate(certificate, 'view')}><Eye size={15} /></button>
+                      <button className="icon-button h-8 w-8 disabled:cursor-not-allowed disabled:opacity-40" title={resolveFileUrl(certificate) ? 'Open Document' : NO_FILE_AVAILABLE} disabled={!resolveFileUrl(certificate)} onClick={() => openFile(certificate)}><Eye size={15} /></button>
                       <button className="icon-button h-8 w-8" title="Edit" onClick={() => openCertificate(certificate, 'edit')}><Pencil size={15} /></button>
-                      <button className="icon-button h-8 w-8" title="Download Document" onClick={() => showToast({ tone: 'success', title: 'Document ready', message: certificate.documentName })}><Download size={15} /></button>
+                      <button className="icon-button h-8 w-8 disabled:cursor-not-allowed disabled:opacity-40" title={resolveFileUrl(certificate) ? 'Download Document' : NO_FILE_AVAILABLE} disabled={!resolveFileUrl(certificate)} onClick={() => downloadFile(certificate, certificate.documentName)}><Download size={15} /></button>
                       <button className="icon-button h-8 w-8 text-rose-600" title="Delete" onClick={() => setDeleteId(certificate.id)}><Trash2 size={15} /></button>
                     </div></td>
                   </tr>
@@ -184,7 +198,7 @@ export function CertificatesPage() {
                 <CertField label="Issue Date" error={errors.issueDate}><input disabled={drawerMode === 'view'} type="date" className="field" value={form.issueDate} onChange={(event) => setForm({ ...form, issueDate: event.target.value })} /></CertField>
                 <CertField label="Expiry Date" error={errors.expiryDate}><input disabled={drawerMode === 'view'} type="date" className="field" value={form.expiryDate} onChange={(event) => setForm({ ...form, expiryDate: event.target.value })} /></CertField>
               </div>
-              <CertField label="Upload Certificate Document" error={errors.documentName}><input disabled={drawerMode === 'view'} type="file" className="field" onChange={(event) => setForm({ ...form, documentName: event.target.files?.[0]?.name || form.documentName })} />{form.documentName ? <p className="mt-1 text-xs font-semibold text-[#53688d]">{form.documentName}</p> : null}</CertField>
+              <CertField label="Upload Certificate Document" error={errors.documentName}><input disabled={drawerMode === 'view'} type="file" className="field" onChange={(event) => { const file = event.target.files?.[0]; setForm({ ...form, documentName: file?.name || form.documentName, documentUrl: file ? URL.createObjectURL(file) : form.documentUrl }); }} />{form.documentName ? <p className="mt-1 text-xs font-semibold text-[#53688d]">{form.documentName}</p> : null}</CertField>
               <CertField label="Description / Notes"><textarea disabled={drawerMode === 'view'} className="field min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></CertField>
               <div><span className="mb-1.5 block text-sm font-bold text-slate-600">Status</span><StatusBadge status={certificateStatus(form.expiryDate)} /></div>
             </div>

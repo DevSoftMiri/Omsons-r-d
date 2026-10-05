@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { Check, ChevronRight, FileText, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 type ReportEntry = {
@@ -26,6 +28,7 @@ const emptyReport = {
 export function Reporting() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const storageKey = `reporting:${project.productCode}`;
   const [reports, setReports] = useState<ReportEntry[]>(() => readReports(storageKey));
   const [form, setForm] = useState(emptyReport);
@@ -37,7 +40,13 @@ export function Reporting() {
 
   function submitReport(event: FormEvent) {
     event.preventDefault();
-    if (!form.workDone.trim()) {
+    const missing = getMissingFields([
+      { label: 'Date', value: form.date },
+      { label: 'Work Done', value: form.workDone },
+      { label: 'Hours', valid: Number.isFinite(form.hours) && form.hours > 0 },
+      { label: 'Submitted By', value: form.submittedBy }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) {
       setMessage('Add work done before saving the report.');
       return;
     }
@@ -48,6 +57,11 @@ export function Reporting() {
     ]);
     setForm(emptyReport);
     setMessage('Report saved.');
+  }
+
+  function handleCompleteStage() {
+    if (showMissingFieldsToast(showToast, reports.length ? [] : ['At least one report'])) return;
+    completeStage('Reporting');
   }
 
   return (
@@ -135,7 +149,7 @@ export function Reporting() {
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <p className="text-sm text-slate-500">{reports.length ? 'Reports are ready for stage completion.' : 'Add at least one report to complete this stage.'}</p>
-        <button className="primary-button h-10 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!reports.length} onClick={() => completeStage('Reporting')}>
+        <button className={`primary-button h-10 min-w-56 justify-center ${!reports.length ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!reports.length} onClick={handleCompleteStage}>
           <Check size={18} />
           Mark Reporting Complete
         </button>

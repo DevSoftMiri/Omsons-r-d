@@ -17,6 +17,9 @@ export interface TeamMember {
   id: string;
   name: string;
   role: string;
+  email?: string;
+  designation?: string;
+  isActive?: boolean;
 }
 
 export interface Stage {
@@ -58,6 +61,9 @@ export interface Project {
   startDate: string;
   targetDate: string;
   reportTo: string;
+  reportToId?: string;
+  reportToEmail?: string;
+  reportToDesignation?: string;
   teamMembers: TeamMember[];
   priority: Priority;
   status: ProjectStatus;

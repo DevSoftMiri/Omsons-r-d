@@ -1,9 +1,12 @@
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Check, ChevronRight, Download, Edit2, Eye, FileText, Filter, MoreVertical, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronRight, Download, Edit2, Eye, FileText, MoreVertical, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
+import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 type TestResult = 'Pass' | 'Fail' | 'Retest';
@@ -31,6 +34,7 @@ const seedTests: TestRecord[] = [];
 export function TestingValidation() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const storageKey = `testing-validation:${project.productCode}`;
   const initial = readStored(storageKey);
   const [tests, setTests] = useState(initial.tests);
@@ -72,6 +76,16 @@ export function TestingValidation() {
     setDrawer(null);
   }
 
+  function handleCompleteStage() {
+    const missing = [
+      !tests.length ? 'At least one test' : '',
+      !tests.some((test) => test.result === 'Pass' || test.document) ? 'Passing test evidence' : '',
+      tests.some((test) => test.result === 'Fail') ? 'Resolve failed tests' : ''
+    ].filter(Boolean);
+    if (showMissingFieldsToast(showToast, missing)) return;
+    completeStage('Testing & Validation');
+  }
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
@@ -92,41 +106,40 @@ export function TestingValidation() {
           </div>
           <div className="flex gap-2">
             <label className="relative block w-72 max-w-full"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} /><input className="field h-9 !pl-10" placeholder="Search tests..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-            <button className="secondary-button h-10 gap-2"><Filter size={16} />Filter</button>
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] text-left">
             <thead><tr className="bg-slate-50 text-xs text-slate-500"><th className="px-3 py-2.5">#</th><th className="px-3 py-2.5">Test Name</th><th className="px-3 py-2.5">Test Type</th><th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">Result</th><th className="px-3 py-2.5">Key Findings</th><th className="px-3 py-2.5">Documents</th><th className="px-3 py-2.5 text-center">Actions</th></tr></thead>
-            <tbody>{visibleTests.map((test, index) => <tr key={test.id} className="border-b border-slate-200"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3"><p className="font-bold">{test.name}</p><p className="text-xs text-slate-500">{test.findings}</p></td><td className="px-3 py-3"><TypeBadge type={test.type} /></td><td className="px-3 py-3">{formatDate(test.date)}</td><td className="px-3 py-3"><ResultBadge result={test.result} /></td><td className="px-3 py-3 max-w-[220px]">{test.findings}</td><td className="px-3 py-3">{test.document ? <button className="inline-flex items-start gap-2 text-left text-primary" onClick={() => openTestDocument(test)}><FileText size={19} /><span><span className="block font-bold">{test.document}</span><span className="text-xs text-slate-500">{formatBytes(test.documentSize)}</span></span></button> : '-'}</td><td className="px-3 py-3"><div className="flex justify-center gap-2"><button className="icon-button h-9 w-9 text-primary" onClick={() => openTestDocument(test)}><Eye size={16} /></button><button className="icon-button h-9 w-9 text-primary" onClick={() => setDrawer(test)}><Edit2 size={16} /></button><button className="icon-button h-9 w-9" onClick={() => setDeleteTest(test)}><MoreVertical size={16} /></button></div></td></tr>)}</tbody>
+            <tbody>{visibleTests.map((test, index) => <tr key={test.id} className="border-b border-slate-200"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3"><p className="font-bold">{test.name}</p><p className="text-xs text-slate-500">{test.findings}</p></td><td className="px-3 py-3"><TypeBadge type={test.type} /></td><td className="px-3 py-3">{formatDate(test.date)}</td><td className="px-3 py-3"><ResultBadge result={test.result} /></td><td className="px-3 py-3 max-w-[220px]">{test.findings}</td><td className="px-3 py-3">{test.document ? <button className="inline-flex items-start gap-2 text-left text-primary disabled:cursor-not-allowed disabled:text-slate-400" disabled={!resolveFileUrl(test)} title={resolveFileUrl(test) ? 'Open document' : NO_FILE_AVAILABLE} onClick={() => openFile(test)}><FileText size={19} /><span><span className="block font-bold">{test.document}</span><span className="text-xs text-slate-500">{formatBytes(test.documentSize)}</span></span></button> : '-'}</td><td className="px-3 py-3"><div className="flex justify-center gap-2"><button className="icon-button h-9 w-9 text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(test)} title={resolveFileUrl(test) ? 'View document' : NO_FILE_AVAILABLE} onClick={() => openFile(test)}><Eye size={16} /></button><button className="icon-button h-9 w-9 text-primary" onClick={() => setDrawer(test)}><Edit2 size={16} /></button><button className="icon-button h-9 w-9" onClick={() => setDeleteTest(test)}><MoreVertical size={16} /></button></div></td></tr>)}</tbody>
           </table>
         </div>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
-        <div className="mb-3 flex items-center justify-between"><h3 className="text-lg font-bold">Recent Test Reports</h3><span className="text-sm font-bold text-primary">View All</span></div>
-        <div className="grid gap-3 md:grid-cols-4">{tests.filter((test) => test.document).slice(0, 4).map((test) => <button key={test.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 text-left" onClick={() => openTestDocument(test)}><span className="grid h-10 w-10 place-items-center rounded-lg bg-rose-100 text-rose-600"><FileText size={20} /></span><div className="min-w-0"><p className="truncate font-bold">{test.document}</p><p className="text-xs text-slate-500">{formatDate(test.date)} - {formatBytes(test.documentSize)}</p></div><Download className="ml-auto text-primary" size={17} /></button>)}</div>
+        <div className="mb-3 flex items-center justify-between"><h3 className="text-lg font-bold">Recent Test Reports</h3><span className="text-sm font-semibold text-slate-400">{tests.filter((test) => test.document).length} files</span></div>
+        <div className="grid gap-3 md:grid-cols-4">{tests.filter((test) => test.document).slice(0, 4).map((test) => <button key={test.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-2.5 text-left disabled:cursor-not-allowed disabled:opacity-60" disabled={!resolveFileUrl(test)} title={resolveFileUrl(test) ? 'Open report' : NO_FILE_AVAILABLE} onClick={() => openFile(test)}><span className="grid h-10 w-10 place-items-center rounded-lg bg-rose-100 text-rose-600"><FileText size={20} /></span><div className="min-w-0"><p className="truncate font-bold">{test.document}</p><p className="text-xs text-slate-500">{resolveFileUrl(test) ? `${formatDate(test.date)} - ${formatBytes(test.documentSize)}` : NO_FILE_AVAILABLE}</p></div><Download className="ml-auto text-primary" size={17} /></button>)}</div>
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft"><div className="mb-2 flex justify-between"><h3 className="font-bold">Key Findings <span className="font-normal text-slate-500">(Optional)</span></h3><span className="text-sm font-bold text-primary">Edit</span></div><textarea className="field min-h-28 resize-none" value={findings} onChange={(event) => setFindings(event.target.value)} /></div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft"><div className="mb-2 flex justify-between"><h3 className="font-bold">Next Steps <span className="font-normal text-slate-500">(Optional)</span></h3><span className="text-sm font-bold text-primary">Edit</span></div><div className="grid gap-2">{nextSteps.map((step, index) => <label key={step} className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" defaultChecked={index === 1} onChange={() => undefined} />{step}</label>)}</div></div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft"><div className="mb-2 flex justify-between"><h3 className="font-bold">Key Findings <span className="font-normal text-slate-500">(Optional)</span></h3><span className="text-xs font-semibold text-slate-400">Auto-saved</span></div><textarea className="field min-h-28 resize-none" value={findings} onChange={(event) => setFindings(event.target.value)} /></div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft"><div className="mb-2 flex justify-between"><h3 className="font-bold">Next Steps <span className="font-normal text-slate-500">(Optional)</span></h3><span className="text-xs font-semibold text-slate-400">Auto-saved</span></div><div className="grid gap-2">{nextSteps.map((step, index) => <label key={step} className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" defaultChecked={index === 1} onChange={() => undefined} />{step}</label>)}</div></div>
       </section>
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500"><span>Last saved: {formatDateTime(lastSaved)}</span><span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span></div>
-        <div className="text-right">{!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add passing test evidence and resolve failed tests before completing this stage.</p> : null}<button className="primary-button h-10 min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('Testing & Validation')}><Check size={18} />Mark Testing & Validation Complete</button></div>
+        <div className="text-right">{!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add passing test evidence and resolve failed tests before completing this stage.</p> : null}<button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark Testing & Validation Complete</button></div>
       </section>
 
-      {drawer ? <TestDrawer test={drawer === 'new' ? null : drawer} onClose={() => setDrawer(null)} onSave={saveTest} /> : null}
+      {drawer ? <TestDrawer test={drawer === 'new' ? null : drawer} onClose={() => setDrawer(null)} onSave={saveTest} showToast={showToast} /> : null}
       {deleteTest ? <DeleteDialog test={deleteTest} onCancel={() => setDeleteTest(null)} onDelete={() => { setTests((current) => current.filter((item) => item.id !== deleteTest.id)); setDeleteTest(null); }} /> : null}
     </div>
   );
 }
 
-function TestDrawer({ test, onClose, onSave }: { test: TestRecord | null; onClose: () => void; onSave: (test: TestRecord) => void }) {
+function TestDrawer({ test, onClose, onSave, showToast }: { test: TestRecord | null; onClose: () => void; onSave: (test: TestRecord) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
   const [form, setForm] = useState<TestRecord>(test || { id: `test_${Date.now()}`, name: '', type: 'Dimensional Check', date: new Date().toISOString().slice(0, 10), result: 'Pass', findings: '', document: '', documentSize: 0, parameters: [] });
-  function submit(event: FormEvent) { event.preventDefault(); if (!form.name.trim()) return; onSave(form); }
+  function submit(event: FormEvent) { event.preventDefault(); const missing = getMissingFields([{ label: 'Test Name', value: form.name }, { label: 'Test Type', value: form.type }, { label: 'Date', value: form.date }, { label: 'Result', value: form.result }]); if (showMissingFieldsToast(showToast, missing)) return; onSave(form); }
   function setDocument(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -146,8 +159,4 @@ function readStored(key: string): StoredValidation { const fallback = { tests: s
 function formatBytes(value: number) { if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`; return `${(value / (1024 * 1024)).toFixed(1)} MB`; }
 function formatDate(value: string) { return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function formatDateTime(value: string) { return new Date(value).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-function openTestDocument(test: TestRecord) {
-  if (!test.documentUrl) return;
-  window.open(test.documentUrl, '_blank', 'noopener,noreferrer');
-}
 function BeakerVisual() { return <svg aria-hidden="true" className="h-16 w-16" viewBox="0 0 120 120" fill="none"><path d="M32 21h56" stroke="#1f2937" strokeWidth="3" strokeLinecap="round" /><path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" fill="#f8fafc" /><path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" stroke="#334155" strokeWidth="2.5" strokeLinejoin="round" /><path d="M49 76h22M51 52h20M52 40h18" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" /><rect x="48" y="68" width="25" height="9" rx="2" fill="#dbeafe" /></svg>; }

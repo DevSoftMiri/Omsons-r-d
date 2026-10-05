@@ -16,6 +16,13 @@ function safeDocumentType(type) {
   return type.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+function uniqueDocumentTypes(values) {
+  return values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.findIndex((item) => item.toLowerCase() === value.toLowerCase()) === index);
+}
+
 async function findProject(identifier) {
   const query = mongoose.isValidObjectId(identifier)
     ? { _id: identifier }
@@ -29,14 +36,30 @@ async function findProject(identifier) {
   return project;
 }
 
-function buildPrerequisiteResponse(certificates) {
-  return REQUIRED_PREREQUISITE_DOCUMENTS.map((type) => {
+function getProjectDocumentTypes(project, certificates = []) {
+  const exclusions = (project.prerequisiteDocumentExclusions || []).map((item) => item.toLowerCase());
+  return uniqueDocumentTypes([
+    ...REQUIRED_PREREQUISITE_DOCUMENTS,
+    ...(project.prerequisiteDocuments || []),
+    ...certificates.map((certificate) => certificate.type)
+  ]).filter((type) => !exclusions.includes(type.toLowerCase()));
+}
+
+function buildPrerequisiteResponse(project, certificates) {
+  return getProjectDocumentTypes(project, certificates).map((type) => {
     const certificate = certificates.find((item) => item.type === type);
+    const normalizedCertificate = certificate
+      ? {
+          ...certificate.toObject(),
+          publicUrl: certificate.publicUrl || certificate.fileUrl || '',
+          fileUrl: certificate.fileUrl || certificate.publicUrl || ''
+        }
+      : null;
     return {
       type,
       required: true,
-      status: certificate?.status || 'Missing',
-      certificate: certificate || null
+      status: normalizedCertificate?.status || 'Missing',
+      certificate: normalizedCertificate
     };
   });
 }
@@ -44,22 +67,104 @@ function buildPrerequisiteResponse(certificates) {
 export const listPrerequisites = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const certificates = await Certificate.find({ project: project._id }).sort({ updatedAt: -1 });
+  const documents = buildPrerequisiteResponse(project, certificates);
   res.json({
-    documents: buildPrerequisiteResponse(certificates),
+    documents,
     summary: {
-      required: REQUIRED_PREREQUISITE_DOCUMENTS.length,
+      required: documents.length,
       uploaded: certificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length,
       approved: certificates.filter((item) => item.status === 'Approved').length,
-      missing: REQUIRED_PREREQUISITE_DOCUMENTS.length - certificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length
+      missing: documents.length - certificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length
     }
   });
+});
+
+export const addPrerequisiteDocument = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const type = String(req.body.type || '').trim();
+  if (!type) {
+    res.status(400);
+    throw new Error('Document name is required');
+  }
+
+  const certificates = await Certificate.find({ project: project._id });
+  if (getProjectDocumentTypes(project, certificates).some((item) => item.toLowerCase() === type.toLowerCase())) {
+    res.status(409);
+    throw new Error('A prerequisite document with this name already exists');
+  }
+
+  project.prerequisiteDocuments = uniqueDocumentTypes([...(project.prerequisiteDocuments || []), type]);
+  await project.save();
+  const updatedCertificates = await Certificate.find({ project: project._id }).sort({ updatedAt: -1 });
+  res.status(201).json({
+    documents: buildPrerequisiteResponse(project, updatedCertificates),
+    summary: {
+      required: getProjectDocumentTypes(project, updatedCertificates).length,
+      uploaded: updatedCertificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length,
+      approved: updatedCertificates.filter((item) => item.status === 'Approved').length,
+      missing: getProjectDocumentTypes(project, updatedCertificates).length - updatedCertificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length
+    }
+  });
+});
+
+export const updatePrerequisiteDocument = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const oldType = decodeURIComponent(req.params.type);
+  const nextType = String(req.body.type || '').trim();
+  if (!nextType) {
+    res.status(400);
+    throw new Error('Document name is required');
+  }
+  const certificates = await Certificate.find({ project: project._id });
+  const exists = getProjectDocumentTypes(project, certificates).some((item) => item.toLowerCase() === nextType.toLowerCase() && item.toLowerCase() !== oldType.toLowerCase());
+  if (exists) {
+    res.status(409);
+    throw new Error('A prerequisite document with this name already exists');
+  }
+
+  project.prerequisiteDocuments = uniqueDocumentTypes([
+    ...(project.prerequisiteDocuments || []).filter((item) => item.toLowerCase() !== oldType.toLowerCase()),
+    nextType
+  ]);
+  if (REQUIRED_PREREQUISITE_DOCUMENTS.some((item) => item.toLowerCase() === oldType.toLowerCase())) {
+    project.prerequisiteDocumentExclusions = uniqueDocumentTypes([...(project.prerequisiteDocumentExclusions || []), oldType]);
+  }
+  project.prerequisiteDocumentExclusions = (project.prerequisiteDocumentExclusions || []).filter((item) => item.toLowerCase() !== nextType.toLowerCase());
+  await Certificate.updateMany({ project: project._id, type: oldType }, { type: nextType });
+  await project.save();
+  const updatedCertificates = await Certificate.find({ project: project._id }).sort({ updatedAt: -1 });
+  res.json({
+    documents: buildPrerequisiteResponse(project, updatedCertificates),
+    summary: {
+      required: getProjectDocumentTypes(project, updatedCertificates).length,
+      uploaded: updatedCertificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length,
+      approved: updatedCertificates.filter((item) => item.status === 'Approved').length,
+      missing: getProjectDocumentTypes(project, updatedCertificates).length - updatedCertificates.filter((item) => ['Uploaded', 'Approved', 'Rejected'].includes(item.status)).length
+    }
+  });
+});
+
+export const deletePrerequisiteDocument = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const type = decodeURIComponent(req.params.type);
+  const certificates = await Certificate.find({ project: project._id, type });
+  await Promise.all(certificates.map(async (certificate) => {
+    if (certificate.storagePath) await deleteProjectDocument(certificate.storagePath);
+    await certificate.deleteOne();
+  }));
+  project.prerequisiteDocuments = (project.prerequisiteDocuments || []).filter((item) => item.toLowerCase() !== type.toLowerCase());
+  if (REQUIRED_PREREQUISITE_DOCUMENTS.some((item) => item.toLowerCase() === type.toLowerCase())) {
+    project.prerequisiteDocumentExclusions = uniqueDocumentTypes([...(project.prerequisiteDocumentExclusions || []), type]);
+  }
+  await project.save();
+  res.status(204).end();
 });
 
 export const uploadPrerequisite = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const type = decodeURIComponent(req.params.type);
 
-  if (!REQUIRED_PREREQUISITE_DOCUMENTS.includes(type)) {
+  if (!getProjectDocumentTypes(project).some((item) => item.toLowerCase() === type.toLowerCase())) {
     res.status(400);
     throw new Error('Invalid prerequisite document type');
   }
@@ -88,8 +193,8 @@ export const uploadPrerequisite = asyncHandler(async (req, res) => {
       mimeType: req.file.mimetype,
       fileSize: req.file.size,
       storagePath: upload.storagePath,
-      publicUrl: upload.publicUrl,
-      fileUrl: upload.publicUrl,
+      publicUrl: upload.publicUrl || upload.fileUrl,
+      fileUrl: upload.fileUrl || upload.publicUrl,
       status: 'Uploaded',
       uploadedBy: req.user?._id,
       approvedBy: undefined,

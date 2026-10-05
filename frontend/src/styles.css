@@ -16,6 +16,172 @@ body {
   font-size: 1rem;
 }
 
+.main-app-compact {
+  font-size: 13px;
+}
+
+.main-app-compact main > div.min-h-screen {
+  padding: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .main-app-compact main > div.min-h-screen {
+    padding: 1rem 1.25rem;
+  }
+}
+
+.main-app-compact header.mb-4 {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.main-app-compact header h1 {
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.main-app-compact header p {
+  margin-top: 0.35rem;
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.main-app-compact header .h-11,
+.main-app-compact header .h-12 {
+  height: 2.35rem;
+}
+
+.main-app-compact header .w-12 {
+  width: 2.35rem;
+}
+
+.main-app-compact header label.h-11 {
+  min-width: 230px;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+}
+
+@media (min-width: 640px) {
+  .main-app-compact header label.h-11 {
+    width: 300px;
+  }
+}
+
+.main-app-compact .text-3xl {
+  font-size: 1.55rem;
+  line-height: 1.9rem;
+}
+
+.main-app-compact .text-2xl {
+  font-size: 1.25rem;
+  line-height: 1.55rem;
+}
+
+.main-app-compact .text-xl {
+  font-size: 1.05rem;
+  line-height: 1.4rem;
+}
+
+.main-app-compact .text-lg {
+  font-size: 0.98rem;
+  line-height: 1.35rem;
+}
+
+.main-app-compact .text-base {
+  font-size: 0.88rem;
+  line-height: 1.25rem;
+}
+
+.main-app-compact section.rounded-lg,
+.main-app-compact article.rounded-lg,
+.main-app-compact .panel {
+  padding: 0.85rem;
+}
+
+.main-app-compact .mb-5 {
+  margin-bottom: 0.9rem;
+}
+
+.main-app-compact .mb-4 {
+  margin-bottom: 0.75rem;
+}
+
+.main-app-compact .mt-5 {
+  margin-top: 0.9rem;
+}
+
+.main-app-compact .mt-4 {
+  margin-top: 0.75rem;
+}
+
+.main-app-compact .gap-5 {
+  gap: 0.9rem;
+}
+
+.main-app-compact .gap-4 {
+  gap: 0.75rem;
+}
+
+.main-app-compact .p-5 {
+  padding: 0.9rem;
+}
+
+.main-app-compact .p-4 {
+  padding: 0.75rem;
+}
+
+.main-app-compact .px-4 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.main-app-compact .py-4 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.main-app-compact .py-3 {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+.main-app-compact .h-12 {
+  height: 2.5rem;
+}
+
+.main-app-compact .h-11 {
+  height: 2.35rem;
+}
+
+.main-app-compact .h-10 {
+  height: 2.25rem;
+}
+
+.main-app-compact .primary-button,
+.main-app-compact .secondary-button {
+  height: 2.35rem;
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+  font-size: 0.78rem;
+}
+
+.main-app-compact .field,
+.main-app-compact select {
+  min-height: 2.25rem;
+  font-size: 0.82rem;
+}
+
+.main-app-compact table {
+  font-size: 0.86rem;
+}
+
+.main-app-compact .dashboard-status,
+.main-app-compact .project-card-status,
+.main-app-compact .team-status {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.74rem;
+}
+
 .workspace-compact {
   font-size: 12px;
 }
@@ -131,8 +297,7 @@ body {
 @layer components {
   .stage-step {
     position: relative;
-    width: 100px;
-    flex: 0 0 100px;
+    min-width: 0;
     text-align: center;
   }
 
@@ -173,9 +338,9 @@ body {
 
   .stage-line {
     position: absolute;
-    left: 62px;
+    left: calc(50% + 13px);
     top: 12px;
-    width: 76px;
+    width: calc(100% - 26px);
     height: 2px;
     background: #cfd8e6;
   }
@@ -190,6 +355,8 @@ body {
     font-size: 12px;
     font-weight: 600;
     line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -227,9 +394,7 @@ body {
 
   .project-stage-step {
     position: relative;
-    width: 14.285%;
-    flex: 0 0 14.285%;
-    min-width: 72px;
+    min-width: 0;
     text-align: center;
   }
 
@@ -287,6 +452,8 @@ body {
     font-size: 11px;
     font-weight: 600;
     line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -445,7 +612,9 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    border: 0;
     border-radius: 9999px;
+    cursor: pointer;
     padding: 8px 12px;
     font-size: 13px;
     font-weight: 800;

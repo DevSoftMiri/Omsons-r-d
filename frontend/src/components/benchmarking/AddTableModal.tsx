@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { useToast } from '../ToastProvider';
+import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
 
 export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (values: { name: string; initialColumns: number; initialRows: number }) => void }) {
   const [name, setName] = useState('');
+  const { showToast } = useToast();
   const [initialColumns, setInitialColumns] = useState(5);
   const [initialRows, setInitialRows] = useState(5);
 
@@ -9,7 +12,12 @@ export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onCl
 
   function submit() {
     const tableName = name.trim();
-    if (!tableName) return;
+    const missing = getMissingFields([
+      { label: 'Table Name', value: tableName },
+      { label: 'Initial columns', valid: initialColumns > 0 },
+      { label: 'Initial rows', valid: initialRows > 0 }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     onCreate({ name: tableName, initialColumns, initialRows });
     setName('');
     setInitialColumns(5);
@@ -28,11 +36,11 @@ export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onCl
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-semibold">
               Initial columns
-              <input className="field mt-2" min={1} max={50} type="number" value={initialColumns} onChange={(event) => setInitialColumns(Number(event.target.value))} />
+              <input className="field mt-2" inputMode="numeric" value={initialColumns} onChange={(event) => setInitialColumns(Number(event.target.value))} />
             </label>
             <label className="block text-sm font-semibold">
               Initial rows
-              <input className="field mt-2" min={1} max={200} type="number" value={initialRows} onChange={(event) => setInitialRows(Number(event.target.value))} />
+              <input className="field mt-2" inputMode="numeric" value={initialRows} onChange={(event) => setInitialRows(Number(event.target.value))} />
             </label>
           </div>
           <p className="text-sm text-slate-500">Examples: Material Comparison, Dimensional Comparison, Performance Testing</p>

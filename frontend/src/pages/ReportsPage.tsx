@@ -93,7 +93,7 @@ export function ReportsPage() {
                 <p className="text-sm font-semibold text-[#53688d]">Generated: {new Date(preview.generatedAt).toLocaleDateString('en-IN')}</p>
               </div>
               <div className="flex gap-2 print:hidden">
-                <button className="secondary-button h-10" onClick={() => showToast({ tone: 'success', title: 'PDF export prepared', message: 'Use Print to save as PDF.' })}><Download size={16} />Export PDF</button>
+                <button className="secondary-button h-10" onClick={printReport}><Download size={16} />Print / Save PDF</button>
                 <button className="secondary-button h-10" onClick={() => exportCsv(preview)}><Download size={16} />Export Excel</button>
                 <button className="secondary-button h-10" onClick={printReport}><Printer size={16} />Print</button>
               </div>

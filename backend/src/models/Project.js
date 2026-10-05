@@ -51,7 +51,9 @@ const projectSchema = new mongoose.Schema(
         label: String,
         done: { type: Boolean, default: false }
       }
-    ]
+    ],
+    prerequisiteDocuments: [{ type: String, trim: true }],
+    prerequisiteDocumentExclusions: [{ type: String, trim: true }]
   },
   { timestamps: true }
 );

@@ -89,15 +89,66 @@ function projectQuery(identifier) {
     : { productCode: identifier };
 }
 
-export const listProjects = asyncHandler(async (_req, res) => {
-  const projects = await Project.find()
-    .populate('teamMembers', 'name designation')
-    .populate('reportTo', 'name')
+async function populateProjectTeam(project) {
+  await project.populate('teamMembers', 'name email role designation isActive');
+  await project.populate('reportTo', 'name email role designation isActive');
+  return project;
+}
+
+function isStaffUser(user) {
+  return user?.role === 'Staff';
+}
+
+function isAssignedToProject(project, user) {
+  return project.teamMembers.some((member) => String(member._id || member) === String(user._id));
+}
+
+function serializeProjectForUser(project, user) {
+  const serialized = project.toJSON();
+  if (isStaffUser(user)) serialized.teamMembers = [];
+  return serialized;
+}
+
+function isPastTargetDate(targetDate) {
+  const target = new Date(targetDate);
+  if (Number.isNaN(target.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return target.getTime() < today.getTime();
+}
+
+async function applyAutomaticProjectStatus(project) {
+  if (!project || ['Completed', 'On Hold'].includes(project.status)) return project;
+  if (isPastTargetDate(project.targetDate) && project.status !== 'Delayed') {
+    project.status = 'Delayed';
+    await project.save();
+  }
+  return project;
+}
+
+export const listProjects = asyncHandler(async (req, res) => {
+  const query = isStaffUser(req.user) ? { teamMembers: req.user._id } : {};
+  const projects = await Project.find(query)
+    .populate('teamMembers', 'name email role designation isActive')
+    .populate('reportTo', 'name email role designation isActive')
     .sort({ updatedAt: -1 });
-  res.json(projects);
+  await Promise.all(projects.map(applyAutomaticProjectStatus));
+  res.json(projects.map((project) => serializeProjectForUser(project, req.user)));
 });
 
 export const createProject = asyncHandler(async (req, res) => {
+  const startDate = new Date(req.body.startDate);
+  const targetDate = new Date(req.body.targetDate);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(targetDate.getTime())) {
+    res.status(400);
+    throw new Error('Start Date and End Date are required');
+  }
+  if (targetDate.getTime() < startDate.getTime()) {
+    res.status(400);
+    throw new Error('End Date cannot be before Start Date');
+  }
+
   const admin = req.user.role === 'Admin' ? req.user : await User.findOne({ role: 'Admin' });
   const stageNames = normalizeStageNames(req.body);
   const reportTo = await resolveReportTo(req.body.reportTo, admin);
@@ -107,8 +158,8 @@ export const createProject = asyncHandler(async (req, res) => {
     productCode: req.body.productCode || await nextProductCode(),
     category: req.body.category,
     description: req.body.description,
-    startDate: req.body.startDate,
-    targetDate: req.body.targetDate,
+    startDate,
+    targetDate,
     priority: req.body.priority,
     status: req.body.status,
     reportTo,
@@ -128,27 +179,174 @@ export const createProject = asyncHandler(async (req, res) => {
     rows: []
   });
 
+  await applyAutomaticProjectStatus(project);
   res.status(201).json(project);
 });
 
 export const getProject = asyncHandler(async (req, res) => {
   const project = await Project.findOne(projectQuery(req.params.id))
-    .populate('teamMembers', 'name designation')
-    .populate('reportTo', 'name');
+    .populate('teamMembers', 'name email role designation isActive')
+    .populate('reportTo', 'name email role designation isActive');
   if (!project) {
     res.status(404);
     throw new Error('Project not found');
   }
+  if (isStaffUser(req.user) && !isAssignedToProject(project, req.user)) {
+    res.status(403);
+    throw new Error('Project is not assigned to this staff account');
+  }
+  await applyAutomaticProjectStatus(project);
   const benchmarking = await Benchmarking.findOne({ project: project._id });
   const bom = await BomItem.find({ project: project._id }).populate('vendor', 'name');
-  res.json({ project, benchmarking, bom, bomTotal: bom.reduce((sum, item) => sum + item.quantity * item.cost, 0) });
+  res.json({ project: serializeProjectForUser(project, req.user), benchmarking, bom, bomTotal: bom.reduce((sum, item) => sum + item.quantity * item.cost, 0) });
 });
 
-export const updateStage = asyncHandler(async (req, res) => {
-  const project = await Project.findById(req.params.id);
+export const listProjectTeamCandidates = asyncHandler(async (_req, res) => {
+  const users = await User.find({ role: 'Staff', $or: [{ isActive: true }, { isActive: { $exists: false } }] })
+    .select('name email role designation isActive')
+    .sort({ name: 1 });
+  res.json(users);
+});
+
+export const addProjectTeamMember = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  const user = await User.findOne({
+    _id: req.body.userId,
+    role: 'Staff',
+    $or: [{ isActive: true }, { isActive: { $exists: false } }]
+  });
+  if (!project || !user) {
+    res.status(404);
+    throw new Error('Project or team member not found');
+  }
+  if (!project.teamMembers.some((member) => String(member) === String(user._id))) project.teamMembers.push(user._id);
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const removeProjectTeamMember = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  const user = await User.findOne({ _id: req.params.userId, role: 'Staff' });
+  if (!project || !user) {
+    res.status(404);
+    throw new Error('Project or team member not found');
+  }
+  project.teamMembers = project.teamMembers.filter((member) => String(member) !== String(user._id));
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const updateProjectReportTo = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  const user = await User.findOne({
+    _id: req.body.userId,
+    role: 'Admin',
+    $or: [{ isActive: true }, { isActive: { $exists: false } }]
+  });
+  if (!project || !user) {
+    res.status(404);
+    throw new Error('Project or reporting admin not found');
+  }
+  project.reportTo = user._id;
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const addProjectStage = asyncHandler(async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project || !name) {
+    res.status(400);
+    throw new Error('Project and stage name are required');
+  }
+  if (project.stages.some((stage) => stage.name.toLowerCase() === name.toLowerCase())) {
+    res.status(409);
+    throw new Error('A stage with this name already exists');
+  }
+  const finalIndex = project.stages.findIndex((stage) => stage.name === 'Final Stage');
+  project.stages.splice(finalIndex < 0 ? project.stages.length : finalIndex, 0, {
+    name,
+    status: 'Locked',
+    progress: 0
+  });
+  refreshStageLocks(project);
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const reorderProjectStages = asyncHandler(async (req, res) => {
+  const orderedStageNames = Array.isArray(req.body.stages)
+    ? req.body.stages
+    : Array.isArray(req.body.stageNames)
+      ? req.body.stageNames
+      : [];
+  const project = await Project.findOne(projectQuery(req.params.id));
   if (!project) {
     res.status(404);
     throw new Error('Project not found');
+  }
+
+  const normalizedNames = orderedStageNames.map((stage) => String(stage || '').trim()).filter(Boolean);
+  if (!normalizedNames.length) {
+    res.status(400);
+    throw new Error('Stage order is required');
+  }
+  if (normalizedNames[normalizedNames.length - 1] !== 'Final Stage') {
+    res.status(400);
+    throw new Error('Final Stage must remain last');
+  }
+
+  const uniqueNames = new Set(normalizedNames.map((stage) => stage.toLowerCase()));
+  if (uniqueNames.size !== normalizedNames.length) {
+    res.status(400);
+    throw new Error('Stage order cannot contain duplicates');
+  }
+  if (normalizedNames.length !== project.stages.length) {
+    res.status(400);
+    throw new Error('Stage order must include every project stage');
+  }
+
+  const stagesByName = new Map(project.stages.map((stage) => [stage.name.toLowerCase(), stage]));
+  const reorderedStages = normalizedNames.map((name) => stagesByName.get(name.toLowerCase()));
+  if (reorderedStages.some((stage) => !stage)) {
+    res.status(400);
+    throw new Error('Stage order contains an unknown stage');
+  }
+
+  project.stages = reorderedStages;
+  refreshStageLocks(project);
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const updateProjectStatus = asyncHandler(async (req, res) => {
+  const status = String(req.body.status || '').trim();
+  if (!['Running', 'On Hold', 'Completed', 'Delayed'].includes(status)) {
+    res.status(400);
+    throw new Error('Project status must be Running, On Hold, Completed, or Delayed');
+  }
+
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  project.status = status;
+  await applyAutomaticProjectStatus(project);
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
+export const updateStage = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+  if (isStaffUser(req.user) && !isAssignedToProject(project, req.user)) {
+    res.status(403);
+    throw new Error('Project is not assigned to this staff account');
   }
 
   const stageIndex = findStageIndex(project, req.params.stage);
@@ -175,5 +373,5 @@ export const updateStage = asyncHandler(async (req, res) => {
 
   refreshStageLocks(project);
   await project.save();
-  res.json(project);
+  res.json(await populateProjectTeam(project));
 });

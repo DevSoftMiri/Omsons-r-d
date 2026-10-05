@@ -4,9 +4,12 @@ import { canCompleteStage } from '../utils/stages';
 import { useAppDispatch } from '../hooks';
 import { useToast } from '../components/ToastProvider';
 import { updateProjectStage } from '../services/projectService';
+import { getStageRoute } from '../utils/stages';
+import { useNavigate } from 'react-router-dom';
 
 export function useStageCompletion(project: Project) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
   async function complete(stage: StageName) {
@@ -29,13 +32,17 @@ export function useStageCompletion(project: Project) {
       }
 
       const sourceProject = updatedProject || project;
-      const index = sourceProject.stages.findIndex((item) => item.name === stage);
-      const next = sourceProject.stages[index + 1];
+      const next = sourceProject.stages.find((item) => item.status !== 'Completed');
       showToast({
         tone: 'success',
         title: `${stage} completed`,
-        message: next ? `${next.name} is now unlocked.` : 'All stages are complete.'
+        message: next && next.name !== stage ? `${next.name} is now unlocked.` : 'All stages are complete.'
       });
+      if (next) {
+        navigate(`/projects/${sourceProject.productCode}/${getStageRoute(next, sourceProject)}`);
+      } else if (stage !== 'Final Stage') {
+        navigate(`/projects/${sourceProject.productCode}/final-stage`);
+      }
       return true;
     } catch (error) {
       showToast({

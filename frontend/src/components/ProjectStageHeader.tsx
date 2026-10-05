@@ -1,4 +1,8 @@
 import { CalendarDays } from 'lucide-react';
+import { useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { updateProjectStatus } from '../services/projectService';
+import { upsertProject } from '../store';
 import type { Project } from '../types';
 
 const statusStyles: Record<Project['status'], string> = {
@@ -15,8 +19,23 @@ const priorityStyles: Record<Project['priority'], string> = {
 };
 
 export function ProjectStageHeader({ project, currentStage, statusOverride }: { project: Project; currentStage: string; statusOverride?: string }) {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const deadline = getDeadlineStatus(project.targetDate);
-  const reportTo = project.reportTo || 'Ravi';
+  const reportTo = project.reportTo;
+  const reportToRole = project.reportToDesignation || 'Admin';
+  const canUpdateStatus = user?.role === 'admin';
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  async function changeStatus(status: Project['status']) {
+    if (status === project.status) return;
+    setSavingStatus(true);
+    try {
+      dispatch(upsertProject(await updateProjectStatus(project.id, status)));
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-soft">
@@ -28,26 +47,40 @@ export function ProjectStageHeader({ project, currentStage, statusOverride }: { 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold leading-tight text-ink">{project.name}</h2>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${statusStyles[project.status]}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" />
-              {statusOverride || project.status}
-            </span>
+            {statusOverride || !canUpdateStatus ? (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${statusStyles[project.status]}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {statusOverride || project.status}
+              </span>
+            ) : (
+              <label className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${statusStyles[project.status]}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                <select className="bg-transparent font-bold outline-none" value={project.status} disabled={savingStatus} onChange={(event) => changeStatus(event.target.value as Project['status'])} title="Change project status">
+                  <option>Running</option>
+                  <option>On Hold</option>
+                  <option>Delayed</option>
+                  <option>Completed</option>
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="mt-1.5 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
             <HeaderFact label="Product Code" value={project.productCode} />
-            <HeaderFact label="Category" value="Laboratory Glassware" />
+            <HeaderFact label="Category" value={project.category} />
             <HeaderFact label="Current Stage" value={currentStage} />
             <HeaderFact label="Priority" value={project.priority} pillClass={priorityStyles[project.priority]} />
             <div className="border-slate-200 xl:border-l xl:pl-3">
               <p className="text-xs font-semibold text-slate-500">Report To</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-primary">{initials(reportTo)}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold">{reportTo}</p>
-                  <p className="text-xs text-slate-500">Product Manager</p>
+              {reportTo ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-primary">{initials(reportTo)}</span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{reportTo}</p>
+                    <p className="truncate text-xs text-slate-500">{reportToRole}</p>
+                  </div>
                 </div>
-              </div>
+              ) : <p className="mt-1 text-sm font-bold text-slate-400">--</p>}
             </div>
             <div className="border-slate-200 xl:border-l xl:pl-3">
               <p className="text-xs font-semibold text-slate-500">Target Date</p>

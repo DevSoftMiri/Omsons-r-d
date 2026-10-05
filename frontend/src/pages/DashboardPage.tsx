@@ -1,21 +1,12 @@
-import { ChevronDown, FlaskConical, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, MoreHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../components/PageTopBar';
 import { useAppDispatch, useAppSelector } from '../hooks';
-import { fetchProjects } from '../services/projectService';
-import { setProjects } from '../store';
-import type { Project, ProjectStatus } from '../types';
-
-const dashboardStages = [
-  { label: 'Overview', names: ['Prerequisites'] },
-  { label: 'Prerequisites', names: ['Prerequisites'] },
-  { label: 'Benchmarking', names: ['Benchmarking', 'Attachments', 'BOM'] },
-  { label: 'Design', names: ['Product Design'] },
-  { label: 'Programming', names: ['Programming', 'Reporting'] },
-  { label: 'Testing', names: ['Testing & Validation'] },
-  { label: 'Final', names: ['Final Stage'] }
-];
+import { fetchProjects, updateProjectStatus } from '../services/projectService';
+import { setProjects, upsertProject } from '../store';
+import { getStageRoute } from '../utils/stages';
+import type { Project, ProjectStatus, Stage } from '../types';
 
 function statusLabel(status: ProjectStatus) {
   if (status === 'Delayed') return 'At Risk';
@@ -23,12 +14,17 @@ function statusLabel(status: ProjectStatus) {
   return status;
 }
 
-function stageState(project: Project, index: number) {
-  const activeIndex = dashboardStages.findIndex((stage) => stage.names.includes(project.currentStage));
-  const progressIndex = activeIndex >= 0 ? activeIndex : Math.min(Math.floor(project.progress / 15), dashboardStages.length - 1);
-  if (project.progress >= 100 || index < progressIndex) return 'complete';
-  if (index === progressIndex) return 'active';
+function stageState(stage: Stage) {
+  if (stage.status === 'Completed') return 'complete';
+  if (stage.status === 'In Progress' || stage.status === 'Pending' || stage.status === 'Submitted') return 'active';
   return 'pending';
+}
+
+function stageLabel(name: string) {
+  if (name === 'Product Design') return 'Design';
+  if (name === 'Testing & Validation') return 'Testing';
+  if (name === 'Final Stage') return 'Final';
+  return name;
 }
 
 function ProductThumb({ project }: { project: Project }) {
@@ -44,10 +40,15 @@ function ProductThumb({ project }: { project: Project }) {
   );
 }
 
+const statusOptions = ['All Status', 'Running', 'On Hold', 'Completed', 'Delayed'] as const;
+
 export function DashboardPage() {
   const dispatch = useAppDispatch();
   const projects = useAppSelector((state) => state.projects.projects);
+  const user = useAppSelector((state) => state.auth.user);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
+  const [stageFilter, setStageFilter] = useState('All Stages');
 
   useEffect(() => {
     fetchProjects()
@@ -57,21 +58,27 @@ export function DashboardPage() {
 
   const visibleProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return projects;
-    return projects.filter((project) => `${project.productCode} ${project.name} ${project.currentStage}`.toLowerCase().includes(normalizedQuery));
-  }, [projects, query]);
+    return projects.filter((project) => {
+      const matchesQuery = !normalizedQuery || `${project.productCode} ${project.name} ${project.currentStage}`.toLowerCase().includes(normalizedQuery);
+      const matchesStatus = statusFilter === 'All Status' || project.status === statusFilter;
+      const matchesStage = stageFilter === 'All Stages' || project.currentStage === stageFilter;
+      return matchesQuery && matchesStatus && matchesStage;
+    });
+  }, [projects, query, stageFilter, statusFilter]);
+
+  const stageOptions = useMemo(() => ['All Stages', ...Array.from(new Set(projects.flatMap((project) => project.stages.map((stage) => stage.name))))], [projects]);
 
   return (
     <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
-      <PageTopBar title="R&D Project Dashboard" subtitle="Glassware product development from concept to production readiness" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel="New Project" actionHref="/projects/create" />
+      <PageTopBar title="R&D Project Dashboard" subtitle="Glassware product development from concept to production readiness" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel={user?.role === 'admin' ? 'New Project' : undefined} actionHref={user?.role === 'admin' ? '/projects/create' : undefined} />
 
       <section className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-[#06143d]">Projects</h2>
-          <button className="inline-flex h-11 items-center gap-10 rounded-lg border border-[#cad7eb] bg-white px-4 text-base font-semibold text-[#18315e]">
-            All Projects
-            <ChevronDown size={20} />
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <SelectLike value={stageFilter} options={stageOptions} onChange={setStageFilter} />
+            <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -100,16 +107,16 @@ export function DashboardPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-4 align-middle">
-                    <div className="flex items-start">
-                      {dashboardStages.map((stage, stageIndex) => {
-                        const state = stageState(project, stageIndex);
+                    <div className="grid gap-y-4" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(project.stages.length, 1), 9)}, minmax(0, 1fr))` }}>
+                      {project.stages.map((stage, stageIndex) => {
+                        const state = stageState(stage);
                         return (
-                          <div key={stage.label} className="stage-step">
+                          <div key={stage.id} className="stage-step">
                             <div className={`stage-dot ${state}`}>
                               {state === 'complete' ? '✓' : state === 'active' ? <span /> : null}
                             </div>
-                            {stageIndex < dashboardStages.length - 1 && <div className={`stage-line ${state === 'complete' ? 'complete' : ''}`} />}
-                            <p className={`stage-label ${state === 'active' ? 'active' : ''}`}>{stage.label}</p>
+                            {stageIndex < project.stages.length - 1 && <div className={`stage-line ${state === 'complete' ? 'complete' : ''}`} />}
+                            <p className={`stage-label ${state === 'active' ? 'active' : ''}`} title={stage.name}>{stageLabel(stage.name)}</p>
                           </div>
                         );
                       })}
@@ -125,9 +132,7 @@ export function DashboardPage() {
                     <span className={`dashboard-status ${project.status.toLowerCase().replace(' ', '-')}`}>{statusLabel(project.status)}</span>
                   </td>
                   <td className="px-4 py-4 text-right align-middle">
-                    <button className="inline-grid h-9 w-9 place-items-center rounded-full text-[#1d3767] transition hover:bg-[#edf4ff]" title="Project actions">
-                      <MoreHorizontal size={24} />
-                    </button>
+                    <ProjectActions project={project} />
                   </td>
                 </tr>
               ))}
@@ -141,6 +146,41 @@ export function DashboardPage() {
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+function SelectLike<T extends string>({ value, options, onChange }: { value: T; options: readonly T[]; onChange: (value: T) => void }) {
+  return (
+    <label className="relative">
+      <select value={value} onChange={(event) => onChange(event.target.value as T)} className="h-11 min-w-[150px] appearance-none rounded-lg border border-[#cad7eb] bg-white px-4 pr-10 text-sm font-semibold text-[#18315e]">
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-3.5 text-[#284b7c]" size={18} />
+    </label>
+  );
+}
+
+function ProjectActions({ project }: { project: Project }) {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  async function setStatus(status: Project['status']) {
+    dispatch(upsertProject(await updateProjectStatus(project.id, status)));
+  }
+
+  return (
+    <div className="group relative inline-block text-left">
+      <button className="inline-grid h-9 w-9 place-items-center rounded-full text-[#1d3767] transition hover:bg-[#edf4ff]" title="Project actions">
+        <MoreHorizontal size={24} />
+      </button>
+      <div className="invisible absolute right-0 top-10 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 text-left opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
+        <Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open Project</Link>
+        <Link className="menu-action" to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`}>View Current Stage</Link>
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
+        <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Project Code</button>
+      </div>
     </div>
   );
 }

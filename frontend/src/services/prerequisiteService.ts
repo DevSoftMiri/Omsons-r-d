@@ -75,6 +75,26 @@ function writeLocalPayload(projectId: string, payload: PrerequisitePayload) {
   return payload;
 }
 
+function normalizeCertificate(certificate: UploadedCertificate | null | undefined) {
+  if (!certificate) return null;
+  const url = certificate.fileUrl || certificate.publicUrl || '';
+  return {
+    ...certificate,
+    fileUrl: url,
+    publicUrl: certificate.publicUrl || url
+  };
+}
+
+function normalizePayload(payload: PrerequisitePayload): PrerequisitePayload {
+  return {
+    ...payload,
+    documents: payload.documents.map((document) => ({
+      ...document,
+      certificate: normalizeCertificate(document.certificate)
+    }))
+  };
+}
+
 function saveLocalUpload(projectId: string, type: string, file: File) {
   const payload = createLocalPayload(projectId);
   const certificate: UploadedCertificate = {
@@ -124,7 +144,7 @@ export async function fetchPrerequisites(projectId: string) {
     headers: authHeaders()
   });
   if (response.status === 404) return createLocalPayload(projectId);
-  return parseResponse<PrerequisitePayload>(response);
+  return parseResponse<PrerequisitePayload>(response).then(normalizePayload);
 }
 
 export async function uploadPrerequisite(projectId: string, type: string, file: File) {
@@ -139,13 +159,75 @@ export async function uploadPrerequisite(projectId: string, type: string, file: 
     headers: authHeaders(),
     body: formData
   });
-  if (response.ok) return response.json() as Promise<UploadedCertificate>;
+  if (response.ok) return (response.json() as Promise<UploadedCertificate>).then((certificate) => normalizeCertificate(certificate) as UploadedCertificate);
 
   const error = await response.json().catch(() => ({ message: 'Request failed' }));
   if (response.status === 404 || error.message === 'Project not found') {
     return saveLocalUpload(projectId, type, file);
   }
   throw new Error(error.message || 'Upload failed');
+}
+
+export async function addPrerequisiteDocument(projectId: string, type: string) {
+  if (!hasBackendAuth()) {
+    const payload = createLocalPayload(projectId);
+    const exists = payload.documents.some((document) => document.type.toLowerCase() === type.toLowerCase());
+    if (exists) throw new Error('A prerequisite document with this name already exists');
+    return writeLocalPayload(projectId, buildPayload([...payload.documents, { type, required: true, status: 'Missing', certificate: null }]));
+  }
+
+  const response = await fetch(`${API_BASE}/projects/${projectId}/prerequisites/documents`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    },
+    body: JSON.stringify({ type })
+  });
+  return parseResponse<PrerequisitePayload>(response).then(normalizePayload);
+}
+
+export async function updatePrerequisiteDocument(projectId: string, oldType: string, nextType: string) {
+  if (!hasBackendAuth()) {
+    const payload = createLocalPayload(projectId);
+    const exists = payload.documents.some((document) => document.type.toLowerCase() === nextType.toLowerCase() && document.type.toLowerCase() !== oldType.toLowerCase());
+    if (exists) throw new Error('A prerequisite document with this name already exists');
+    const documents = payload.documents.map((document) => document.type === oldType
+      ? {
+        ...document,
+        type: nextType,
+        certificate: document.certificate ? { ...document.certificate, type: nextType, updatedAt: new Date().toISOString() } : null
+      }
+      : document);
+    return writeLocalPayload(projectId, buildPayload(documents));
+  }
+
+  const response = await fetch(`${API_BASE}/projects/${projectId}/prerequisites/documents/${encodeURIComponent(oldType)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    },
+    body: JSON.stringify({ type: nextType })
+  });
+  return parseResponse<PrerequisitePayload>(response).then(normalizePayload);
+}
+
+export async function deletePrerequisiteDocument(projectId: string, type: string) {
+  if (!hasBackendAuth()) {
+    const payload = createLocalPayload(projectId);
+    writeLocalPayload(projectId, buildPayload(payload.documents.filter((document) => document.type !== type)));
+    return;
+  }
+
+  const response = await fetch(`${API_BASE}/projects/${projectId}/prerequisites/documents/${encodeURIComponent(type)}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || 'Request failed');
+  }
 }
 
 export async function reviewPrerequisite(projectId: string, certificateId: string, status: 'Approved' | 'Rejected') {

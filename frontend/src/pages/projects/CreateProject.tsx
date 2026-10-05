@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, GripVertical, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
-import { teamMembers, workflowStages } from '../../data/seed';
-import { useAppDispatch } from '../../hooks';
+import { workflowStages } from '../../data/seed';
+import { useAppDispatch, useAppSelector } from '../../hooks';
 import { upsertProject } from '../../store';
 import { createProject as createProjectApi } from '../../services/projectService';
 import { readActiveWorkflowStages } from '../../services/adminModuleStorage';
+import { fetchStaffAccounts, type StaffAccount } from '../../services/authService';
 import type { StageName } from '../../types';
+import { useToast } from '../../components/ToastProvider';
+import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
 
 const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
 
@@ -20,7 +23,7 @@ const projectSchema = z.object({
   startDate: z.string().min(1),
   targetDate: z.string().min(1),
   reportTo: z.string().optional(),
-  teamMemberIds: z.array(z.string()).min(1),
+  teamMemberIds: z.array(z.string()),
   priority: z.enum(['Low', 'Medium', 'High']),
   status: z.enum(['Running', 'On Hold', 'Completed', 'Delayed'])
 }).refine((values) => new Date(values.targetDate).getTime() >= new Date(values.startDate).getTime(), {
@@ -32,7 +35,11 @@ type ProjectFormValues = z.infer<typeof projectSchema>;
 
 export function CreateProject() {
   const dispatch = useAppDispatch();
+  const { showToast } = useToast();
+  const user = useAppSelector((state) => state.auth.user);
   const navigate = useNavigate();
+  const [accounts, setAccounts] = useState<StaffAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [customStageName, setCustomStageName] = useState('');
   const [orderedStages, setOrderedStages] = useState<StageName[]>(() => readActiveWorkflowStages().length ? readActiveWorkflowStages() : configurableStages);
   const [draggedStage, setDraggedStage] = useState<StageName | null>(null);
@@ -46,14 +53,58 @@ export function CreateProject() {
       description: '',
       startDate: new Date().toISOString().slice(0, 10),
       targetDate: '',
-      reportTo: teamMembers[0].name,
-      teamMemberIds: ['u2'],
+      reportTo: '',
+      teamMemberIds: [],
       priority: 'Medium',
       status: 'Running'
     }
   });
+  const startDate = form.watch('startDate');
+  const targetDate = form.watch('targetDate');
+  const adminAccounts = useMemo(() => accounts.filter((account) => account.role === 'Admin'), [accounts]);
+  const staffAccounts = useMemo(() => accounts.filter((account) => account.role === 'Staff'), [accounts]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingAccounts(true);
+    fetchStaffAccounts()
+      .then((items) => {
+        if (!active) return;
+        setAccounts(items);
+        const firstAdmin = items.find((account) => account.role === 'Admin');
+        if (firstAdmin && !form.getValues('reportTo')) form.setValue('reportTo', firstAdmin._id);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setLoadingAccounts(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [form]);
+
+  async function onInvalid() {
+    const values = form.getValues();
+    const missing = getMissingFields([
+      { label: 'Project Name', value: values.name },
+      { label: 'Description', value: values.description },
+      { label: 'Start Date', value: values.startDate },
+      { label: 'End Date', value: values.targetDate },
+      { label: 'Project Stages', valid: orderedStages.length > 0 },
+      { label: 'Valid date range', valid: !values.startDate || !values.targetDate || new Date(values.targetDate).getTime() >= new Date(values.startDate).getTime() }
+    ]);
+    showMissingFieldsToast(showToast, missing);
+  }
 
   async function onCreate(values: ProjectFormValues) {
+    const missing = getMissingFields([
+      { label: 'Project Name', value: values.name },
+      { label: 'Description', value: values.description },
+      { label: 'Start Date', value: values.startDate },
+      { label: 'End Date', value: values.targetDate },
+      { label: 'Project Stages', valid: orderedStages.length > 0 }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     setSaving(true);
     setError('');
     try {
@@ -61,7 +112,7 @@ export function CreateProject() {
         ...values,
         selectedStages: orderedStages,
         customStages: orderedStages.filter((stage) => !configurableStages.includes(stage)),
-        reportTo: values.reportTo || teamMembers[0].name,
+        reportTo: values.reportTo || user?.id || '',
         teamMemberIds: values.teamMemberIds
       });
       dispatch(upsertProject(project));
@@ -106,7 +157,11 @@ export function CreateProject() {
 
   function addCustomStage() {
     const name = customStageName.trim();
-    if (!name || orderedStages.some((stage) => stage.toLowerCase() === name.toLowerCase()) || name.toLowerCase() === 'final stage') return;
+    if (!name) {
+      showMissingFieldsToast(showToast, ['Custom Stage Name']);
+      return;
+    }
+    if (orderedStages.some((stage) => stage.toLowerCase() === name.toLowerCase()) || name.toLowerCase() === 'final stage') return;
     setOrderedStages((current) => [...current, name]);
     setCustomStageName('');
   }
@@ -117,7 +172,7 @@ export function CreateProject() {
         <ArrowLeft size={16} />
         Projects
       </Link>
-      <form className="panel mx-auto max-w-3xl space-y-4" onSubmit={form.handleSubmit(onCreate)}>
+      <form className="panel mx-auto max-w-3xl space-y-4" onSubmit={form.handleSubmit(onCreate, onInvalid)}>
         <h2 className="text-2xl font-bold">Create New Project</h2>
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
         <Field label="Project Name" error={form.formState.errors.name?.message}>
@@ -140,27 +195,40 @@ export function CreateProject() {
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Start Date" error={form.formState.errors.startDate?.message}>
-            <input className="field" type="date" {...form.register('startDate')} />
+            <input
+              className="field"
+              type="date"
+              {...form.register('startDate', {
+                onChange: (event) => {
+                  const nextStartDate = event.target.value;
+                  if (targetDate && nextStartDate && targetDate < nextStartDate) {
+                    form.setValue('targetDate', nextStartDate, { shouldDirty: true, shouldValidate: true });
+                  }
+                }
+              })}
+            />
           </Field>
           <Field label="End Date" error={form.formState.errors.targetDate?.message}>
-            <input className="field" type="date" {...form.register('targetDate')} />
+            <input className="field" type="date" min={startDate} {...form.register('targetDate')} />
           </Field>
         </div>
         <Field label="Report to Admin">
           <select className="field" {...form.register('reportTo')}>
-            {teamMembers.filter((member) => member.role === 'Admin').map((member) => <option key={member.id} value={member.name}>{member.name}</option>)}
+            <option value="">{loadingAccounts ? 'Loading admins...' : 'Select admin'}</option>
+            {adminAccounts.map((member) => <option key={member._id} value={member._id}>{member.name}</option>)}
           </select>
         </Field>
         <div className="rounded-lg border border-slate-200 p-3">
           <p className="mb-2 text-sm font-semibold">Team Members</p>
           <div className="grid gap-2 md:grid-cols-2">
-            {teamMembers.slice(1).map((member) => (
-              <label key={member.id} className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" value={member.id} {...form.register('teamMemberIds')} />
-                {member.name} - {member.role}
+            {staffAccounts.map((member) => (
+              <label key={member._id} className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" value={member._id} {...form.register('teamMemberIds')} />
+                {member.name} - {member.email}
               </label>
             ))}
           </div>
+          {!loadingAccounts && !staffAccounts.length ? <p className="text-sm font-semibold text-slate-500">No staff accounts found. Add staff from Team Members first.</p> : null}
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
           <p className="mb-2 text-sm font-semibold">Project Stages</p>

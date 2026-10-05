@@ -1,11 +1,13 @@
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { Box, CalendarDays, Check, ChevronRight, Download, Edit2, FileText, Filter, PackagePlus, Paperclip, Plus, ReceiptText, Search, ShoppingCart, Trash2, Upload } from 'lucide-react';
+import { Box, CalendarDays, Check, ChevronRight, Download, Edit2, FileText, PackagePlus, Paperclip, Plus, ReceiptText, Search, ShoppingCart, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
+import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
+import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
 type BomStatus = 'Pending' | 'Ordered' | 'Procured';
@@ -204,6 +206,18 @@ export function BOM() {
     setQuery('');
   }
 
+  function handleCompleteStage() {
+    const missing = [
+      !rows.length ? 'At least one BOM item' : '',
+      rows.some((row) => !row.itemName.trim()) ? 'Item Name' : '',
+      rows.some((row) => !row.category.trim()) ? 'Category' : '',
+      rows.some((row) => !row.unit.trim()) ? 'Unit' : '',
+      rows.some((row) => !Number.isFinite(row.quantityPerUnit) || row.quantityPerUnit <= 0) ? 'Quantity per Unit' : ''
+    ].filter(Boolean);
+    if (showMissingFieldsToast(showToast, missing)) return;
+    completeStage('BOM');
+  }
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
@@ -244,7 +258,6 @@ export function BOM() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input className="field pl-10" placeholder="Search items, supplier, or reference..." value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
-            <button className="secondary-button h-10 gap-2"><Filter size={16} />Filter</button>
             <select className="field h-10 w-32" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | BomStatus)}>
               <option>All</option>
               <option>Pending</option>
@@ -294,7 +307,7 @@ export function BOM() {
                     <td className="px-2.5 py-2.5">{row.quantityPerUnit}</td>
                     <td className="px-2.5 py-2.5">{row.unitCost === null ? '-' : formatCurrency(row.unitCost)}</td>
                     <td className="px-2.5 py-2.5 font-bold">{row.unitCost === null ? '-' : formatCurrency(row.quantityPerUnit * row.unitCost)}</td>
-                    <td className="px-2.5 py-2.5">{row.referenceDocument ? <button className="inline-flex items-center gap-1 font-semibold text-primary" onClick={() => openReference(row.referenceDocument)}><Paperclip size={14} />{row.referenceDocument}</button> : '-'}</td>
+                    <td className="px-2.5 py-2.5">{row.referenceDocument ? <button className="inline-flex items-center gap-1 font-semibold text-primary disabled:cursor-not-allowed disabled:text-slate-400" disabled={!resolveFileUrl(referenceFiles.find((file) => file.name === row.referenceDocument))} title={resolveFileUrl(referenceFiles.find((file) => file.name === row.referenceDocument)) ? 'Open reference' : NO_FILE_AVAILABLE} onClick={() => openFile(referenceFiles.find((file) => file.name === row.referenceDocument))}><Paperclip size={14} />{row.referenceDocument}</button> : '-'}</td>
                     <td className="px-2.5 py-2.5">
                       <select className={`rounded-full px-2.5 py-1 text-xs font-bold outline-none ${statusClass(row.status)}`} value={row.status} onChange={(event) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, status: event.target.value as BomStatus } : item))}>
                         <option>Pending</option><option>Ordered</option><option>Procured</option>
@@ -319,7 +332,7 @@ export function BOM() {
         <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3"><FileText className="text-primary" size={22} /><h3 className="font-bold">BOM Notes <span className="font-normal text-slate-500">(Optional)</span></h3></div>
-            <span className="text-sm font-bold text-primary">Edit</span>
+            <span className="text-xs font-semibold text-slate-400">Auto-saved</span>
           </div>
           <textarea className="field min-h-24 resize-none" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
@@ -332,7 +345,7 @@ export function BOM() {
         </div>
         <div className="text-right">
           {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid BOM item to complete this stage.</p> : null}
-          <button className="primary-button h-10 min-w-60 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!canComplete} onClick={() => completeStage('BOM')}><Check size={18} />Mark BOM Complete</button>
+          <button className={`primary-button h-10 min-w-60 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark BOM Complete</button>
         </div>
       </section>
 
@@ -532,20 +545,20 @@ function ReferenceDocuments({
               <p className="truncate text-sm font-bold">{file.name}</p>
               <p className="text-xs text-slate-500">{formatBytes(file.fileSize || 0)} stored in Supabase</p>
             </div>
-            <a className="text-primary" href={file.url || file.fileUrl} rel="noreferrer" target="_blank" title="Open reference">
+            <button className="text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(file)} title={resolveFileUrl(file) ? 'Open reference' : NO_FILE_AVAILABLE} onClick={() => openFile(file)}>
               <Download size={17} />
-            </a>
+            </button>
             <button className="text-rose-600" title="Delete reference" onClick={() => onDelete(file)}>
               <Trash2 size={17} />
             </button>
           </div>
         ))}
         {placeholderDocuments.map((document) => (
-          <button key={document} className="flex items-center gap-3 rounded-lg border border-dashed border-slate-200 p-3 text-left transition hover:bg-slate-50" onClick={() => openReference(document)}>
+          <button key={document} className="flex cursor-not-allowed items-center gap-3 rounded-lg border border-dashed border-slate-200 p-3 text-left opacity-70" disabled title={NO_FILE_AVAILABLE}>
             <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-500"><FileText size={20} /></span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold">{document}</p>
-              <p className="text-xs text-slate-500">Referenced by BOM row</p>
+              <p className="text-xs text-slate-500">No file available</p>
             </div>
             <Download className="text-primary" size={17} />
           </button>
@@ -706,13 +719,6 @@ function normalizeStatus(value: string): BomStatus {
   if (normalized === 'procured' || normalized === 'approved') return 'Procured';
   if (normalized === 'ordered') return 'Ordered';
   return 'Pending';
-}
-
-function openReference(documentName: string) {
-  const blob = new Blob([`Reference document placeholder: ${documentName}`], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener,noreferrer');
-  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function formatCurrency(value: number) {

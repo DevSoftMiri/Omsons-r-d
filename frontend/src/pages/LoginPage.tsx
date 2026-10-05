@@ -1,11 +1,14 @@
 import { Eye, EyeOff, FlaskConical, LogIn } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { useAppDispatch } from '../hooks';
 import { authenticate } from '../services/authService';
 import { login } from '../store';
+import { getMissingFields, showMissingFieldsToast } from '../utils/requiredFields';
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,6 +18,11 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
+    const missing = getMissingFields([
+      { label: 'Email', value: email },
+      { label: 'Password', value: password }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     setIsSubmitting(true);
     try {
       const session = await authenticate(email.trim(), password);
@@ -39,7 +47,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-5" noValidate onSubmit={handleSubmit}>
           <label className="block">
             <span className="mb-2 block text-sm font-bold text-slate-700">Email</span>
             <input className="field" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" required />

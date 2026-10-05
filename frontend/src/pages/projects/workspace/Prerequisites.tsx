@@ -10,23 +10,31 @@ import {
   FileImage,
   FileText,
   Info,
+  Pencil,
   MoreVertical,
   Plus,
+  Save,
   Trash2,
   Upload,
   XCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import type { Project } from '../../../types';
+import { downloadFile, openFile, resolveFileUrl, NO_FILE_AVAILABLE } from '../../../utils/fileActions';
+import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import {
+  addPrerequisiteDocument,
+  deletePrerequisiteDocument,
   deletePrerequisite,
   fetchPrerequisites,
   reviewPrerequisite,
   type PrerequisiteDocument,
   type PrerequisitePayload,
   type PrerequisiteStatus,
+  updatePrerequisiteDocument,
   uploadPrerequisite
 } from '../../../services/prerequisiteService';
 import { useProjectWorkspace } from './context';
@@ -59,13 +67,15 @@ const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp';
 export function Prerequisites() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
+  const { showToast } = useToast();
   const [payload, setPayload] = useState<PrerequisitePayload>(() => buildLocalPayload());
-  const [customDocuments, setCustomDocuments] = useState<PrerequisiteDocument[]>([]);
   const [newDocumentName, setNewDocumentName] = useState('');
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyType, setBusyType] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const documents = [...payload.documents, ...customDocuments];
+  const documents = payload.documents;
   const uploadedCount = documents.filter((document) => document.status !== 'Missing').length;
   const canComplete = uploadedCount === documents.length;
 
@@ -132,25 +142,68 @@ export function Prerequisites() {
     }
   }
 
-  function handleAddDocument() {
+  async function handleAddDocument() {
     const type = newDocumentName.trim();
-    if (!type) return;
+    if (showMissingFieldsToast(showToast, type ? [] : ['Document Name'])) return;
     const exists = documents.some((document) => document.type.toLowerCase() === type.toLowerCase());
     if (exists) {
       setMessage('A document with this name already exists.');
       return;
     }
-    setCustomDocuments((current) => [
-      ...current,
-      {
-        type,
-        required: true,
-        status: 'Missing',
-        certificate: null
-      }
-    ]);
-    setNewDocumentName('');
-    setMessage(`${type} added to the prerequisite checklist.`);
+    setBusyType(type);
+    try {
+      setPayload(await addPrerequisiteDocument(project.productCode, type));
+      setNewDocumentName('');
+      setMessage(`${type} added to the prerequisite checklist.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to add prerequisite document');
+    } finally {
+      setBusyType(null);
+    }
+  }
+
+  function startEditDocument(document: PrerequisiteDocument) {
+    setEditingType(document.type);
+    setEditingName(document.type);
+  }
+
+  async function saveDocumentName(document: PrerequisiteDocument) {
+    const nextType = editingName.trim();
+    if (showMissingFieldsToast(showToast, nextType ? [] : ['Document Name'])) return;
+    if (nextType === document.type) {
+      setEditingType(null);
+      return;
+    }
+    setBusyType(document.type);
+    try {
+      setPayload(await updatePrerequisiteDocument(project.productCode, document.type, nextType));
+      setEditingType(null);
+      setEditingName('');
+      setMessage(`${document.type} renamed to ${nextType}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to rename prerequisite document');
+    } finally {
+      setBusyType(null);
+    }
+  }
+
+  async function handleDeleteDocument(document: PrerequisiteDocument) {
+    setBusyType(document.type);
+    try {
+      await deletePrerequisiteDocument(project.productCode, document.type);
+      await refreshPrerequisites();
+      setMessage(`${document.type} deleted from the prerequisite checklist.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to delete prerequisite document');
+    } finally {
+      setBusyType(null);
+    }
+  }
+
+  function handleCompleteStage() {
+    const missingDocuments = documents.filter((document) => document.required && document.status === 'Missing').map((document) => document.type);
+    if (showMissingFieldsToast(showToast, missingDocuments.length ? [`Required documents (${missingDocuments.join(', ')})`] : [])) return;
+    completeStage('Prerequisites');
   }
 
   return (
@@ -223,10 +276,17 @@ export function Prerequisites() {
                     busy={busyType === document.type}
                     description={definition?.description || ''}
                     document={document}
+                    editing={editingType === document.type}
+                    editingName={editingName}
                     index={index}
                     loading={loading}
+                    onCancelEdit={() => { setEditingType(null); setEditingName(''); }}
                     onDelete={() => handleDelete(document)}
+                    onDeleteDocument={() => handleDeleteDocument(document)}
+                    onEdit={() => startEditDocument(document)}
+                    onEditingNameChange={setEditingName}
                     onReview={(status) => handleReview(document, status)}
+                    onSaveEdit={() => saveDocumentName(document)}
                     onUpload={(event) => handleUpload(document.type, event)}
                   />
                 );
@@ -251,9 +311,9 @@ export function Prerequisites() {
           </div>
           <div className="text-center">
             <button
-              className="primary-button min-w-72 justify-center disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={!canComplete}
-              onClick={() => completeStage('Prerequisites')}
+              aria-disabled={!canComplete}
+              onClick={handleCompleteStage}
+              className={`primary-button min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`}
             >
               <Check size={18} />
               Mark Prerequisites Complete
@@ -296,20 +356,34 @@ function DocumentRow({
   index,
   loading,
   busy,
+  editing,
+  editingName,
   onUpload,
   onReview,
-  onDelete
+  onDelete,
+  onEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditingNameChange,
+  onDeleteDocument
 }: {
   document: PrerequisiteDocument;
   description: string;
   index: number;
   loading: boolean;
   busy: boolean;
+  editing: boolean;
+  editingName: string;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onReview: (status: 'Approved' | 'Rejected') => void;
   onDelete: () => void;
+  onEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onEditingNameChange: (value: string) => void;
+  onDeleteDocument: () => void;
 }) {
-  const fileUrl = document.certificate?.publicUrl || document.certificate?.fileUrl;
+  const fileUrl = resolveFileUrl(document.certificate);
   const isImage = document.certificate?.mimeType?.startsWith('image/');
   const inputId = `prerequisite-${document.type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
@@ -321,7 +395,17 @@ function DocumentRow({
           <span className="h-10 w-px bg-slate-200" />
           <div>
             <div className="flex items-center gap-3">
-              <p className="font-bold">{document.type}</p>
+              {editing ? (
+                <input
+                  className="field h-9 min-w-60"
+                  value={editingName}
+                  onChange={(event) => onEditingNameChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') onSaveEdit();
+                    if (event.key === 'Escape') onCancelEdit();
+                  }}
+                />
+              ) : <p className="font-bold">{document.type}</p>}
               <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">Required</span>
             </div>
           </div>
@@ -338,7 +422,14 @@ function DocumentRow({
               {isImage ? <FileImage size={18} /> : <FileText size={18} />}
             </span>
             <div>
-              <p className="font-semibold">{document.certificate.fileName}</p>
+              <button
+                className={`text-left font-semibold ${fileUrl ? 'hover:text-primary' : 'cursor-not-allowed text-slate-500'}`}
+                disabled={!fileUrl}
+                title={fileUrl ? 'Open file' : NO_FILE_AVAILABLE}
+                onClick={() => openFile(document.certificate)}
+              >
+                {document.certificate.fileName}
+              </button>
               <p className="text-sm text-slate-500">{formatBytes(document.certificate.fileSize)} - {formatDate(document.certificate.updatedAt)}</p>
             </div>
           </div>
@@ -348,17 +439,36 @@ function DocumentRow({
       </td>
       <td className="rounded-r-lg border-y border-r border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
+          {editing ? (
+            <>
+              <button className="secondary-button min-w-24 justify-center text-primary" disabled={busy} onClick={onSaveEdit}>
+                <Save size={16} />
+                Save
+              </button>
+              <button className="icon-button h-10 w-10" disabled={busy} title="Cancel" onClick={onCancelEdit}>
+                <XCircle size={17} />
+              </button>
+            </>
+          ) : (
+            <>
           <input id={inputId} className="sr-only" type="file" accept={acceptedFileTypes} disabled={busy || loading} onChange={onUpload} />
           {fileUrl ? (
-            <a className="secondary-button min-w-28 justify-center text-primary" href={fileUrl} rel="noreferrer" target="_blank">
+            <button className="secondary-button min-w-28 justify-center text-primary" onClick={() => openFile(document.certificate)}>
               <Eye size={17} />
               View
-            </a>
+            </button>
           ) : (
-            <label className={`secondary-button min-w-28 justify-center text-primary ${busy || loading ? 'pointer-events-none cursor-not-allowed opacity-60' : 'cursor-pointer'}`} htmlFor={inputId}>
-              <Upload size={17} />
-              Upload
-            </label>
+            document.certificate ? (
+              <button className="secondary-button min-w-28 cursor-not-allowed justify-center opacity-60" disabled title={NO_FILE_AVAILABLE}>
+                <Eye size={17} />
+                No file
+              </button>
+            ) : (
+              <label className={`secondary-button min-w-28 justify-center text-primary ${busy || loading ? 'pointer-events-none cursor-not-allowed opacity-60' : 'cursor-pointer'}`} htmlFor={inputId}>
+                <Upload size={17} />
+                Upload
+              </label>
+            )
           )}
           {document.certificate ? (
             <div className="group relative">
@@ -378,19 +488,25 @@ function DocumentRow({
                   <XCircle size={15} />
                   Reject
                 </button>
-                {fileUrl ? (
-                  <a className="menu-action" href={fileUrl} rel="noreferrer" target="_blank">
-                    <Download size={15} />
-                    Download
-                  </a>
-                ) : null}
+                <button className="menu-action disabled:cursor-not-allowed disabled:opacity-50" disabled={!fileUrl} title={fileUrl ? 'Download' : NO_FILE_AVAILABLE} onClick={() => downloadFile(document.certificate, document.certificate?.fileName)}>
+                  <Download size={15} />
+                  Download
+                </button>
                 <button className="menu-action text-rose-600" disabled={busy} onClick={onDelete}>
                   <Trash2 size={15} />
-                  Delete
+                  Delete File
                 </button>
               </div>
             </div>
           ) : null}
+          <button className="icon-button h-10 w-10" disabled={busy || loading} title="Rename prerequisite" onClick={onEdit}>
+            <Pencil size={16} />
+          </button>
+          <button className="icon-button h-10 w-10 text-rose-600" disabled={busy || loading} title="Delete prerequisite" onClick={onDeleteDocument}>
+            <Trash2 size={16} />
+          </button>
+            </>
+          )}
         </div>
       </td>
     </tr>

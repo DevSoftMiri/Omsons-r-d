@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, ChevronRight, Edit3, Plus, Save, Trash2 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { addCustomStage, deleteCustomStage, moveCustomStage, updateCustomStage } from '../../../store';
+import { useAppDispatch, useAppSelector } from '../../../hooks';
+import { addCustomStage, deleteCustomStage, updateCustomStage, upsertProject } from '../../../store';
 import { canCompleteStage } from '../../../utils/stages';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
+import { reorderProjectStages } from '../../../services/projectService';
 
 export function CustomStage() {
   const { stageSlug } = useParams();
   const { project } = useProjectWorkspace();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const { showToast } = useToast();
   const { completeStage } = useStageCompletion(project);
   const stage = project.stages.find((item) => item.slug === stageSlug && item.isCustom);
@@ -20,6 +23,7 @@ export function CustomStage() {
   const [draftName, setDraftName] = useState(stage?.name || '');
   const [notes, setNotes] = useState(stage?.notes || '');
   const [checklistText, setChecklistText] = useState('');
+  const [reordering, setReordering] = useState(false);
   const completion = useMemo(() => stage ? canCompleteStage(project, stage.name) : { ok: false, blockedBy: 'Unknown stage' }, [project, stage]);
 
   if (!stage) {
@@ -36,6 +40,7 @@ export function CustomStage() {
   const checked = checklist.filter((item) => item.completed).length;
 
   function saveStage() {
+    if (showMissingFieldsToast(showToast, draftName.trim() ? [] : ['Stage Name'])) return;
     dispatch(updateCustomStage({ projectId: project.id, stageId: activeStage.id, name: draftName, notes, checklist }));
     setEditing(false);
     showToast({ tone: 'success', title: 'Custom stage updated', message: `${draftName.trim()} was saved.` });
@@ -43,7 +48,7 @@ export function CustomStage() {
 
   function addChecklistItem() {
     const label = checklistText.trim();
-    if (!label) return;
+    if (showMissingFieldsToast(showToast, label ? [] : ['Checklist Item'])) return;
     dispatch(updateCustomStage({
       projectId: project.id,
       stageId: activeStage.id,
@@ -76,7 +81,7 @@ export function CustomStage() {
 
   function addStage() {
     const name = newStageName.trim();
-    if (!name) return;
+    if (showMissingFieldsToast(showToast, name ? [] : ['Stage Name'])) return;
     dispatch(addCustomStage({ projectId: project.id, name }));
     setNewStageName('');
     showToast({ tone: 'success', title: 'Custom stage added', message: `${name} was added before Final Stage.` });
@@ -85,6 +90,29 @@ export function CustomStage() {
   function deleteStage() {
     dispatch(deleteCustomStage({ projectId: project.id, stageId: activeStage.id }));
     showToast({ tone: 'success', title: 'Custom stage deleted', message: `${activeStage.name} was removed.` });
+  }
+
+  function handleCompleteStage() {
+    if (showMissingFieldsToast(showToast, completion.ok ? [] : [completion.blockedBy ? `${completion.blockedBy} completed` : 'Previous stages completed'])) return;
+    completeStage(activeStage.name);
+  }
+
+  async function moveStage(direction: 'up' | 'down') {
+    const index = project.stages.findIndex((item) => item.id === activeStage.id);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < 0 || targetIndex >= project.stages.length - 1) return;
+    const orderedStages = project.stages.map((item) => item.name);
+    const [stageName] = orderedStages.splice(index, 1);
+    orderedStages.splice(targetIndex, 0, stageName);
+    setReordering(true);
+    try {
+      dispatch(upsertProject(await reorderProjectStages(project.id, orderedStages)));
+      showToast({ tone: 'success', title: 'Stage order updated' });
+    } catch (err) {
+      showToast({ tone: 'error', title: 'Reorder failed', message: err instanceof Error ? err.message : 'Unable to reorder stages' });
+    } finally {
+      setReordering(false);
+    }
   }
 
   return (
@@ -105,8 +133,12 @@ export function CustomStage() {
             <p className="mt-2 text-sm text-slate-600">Track stage-specific notes, checklist items, and completion status.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="secondary-button h-10" onClick={() => dispatch(moveCustomStage({ projectId: project.id, stageId: activeStage.id, direction: 'up' }))}><ArrowUp size={16} />Move Up</button>
-            <button className="secondary-button h-10" onClick={() => dispatch(moveCustomStage({ projectId: project.id, stageId: activeStage.id, direction: 'down' }))}><ArrowDown size={16} />Move Down</button>
+            {user?.role === 'admin' ? (
+              <>
+                <button className="secondary-button h-10 disabled:cursor-not-allowed disabled:opacity-50" disabled={reordering || project.stages.findIndex((item) => item.id === activeStage.id) <= 0} onClick={() => moveStage('up')}><ArrowUp size={16} />Move Up</button>
+                <button className="secondary-button h-10 disabled:cursor-not-allowed disabled:opacity-50" disabled={reordering || project.stages.findIndex((item) => item.id === activeStage.id) >= project.stages.length - 2} onClick={() => moveStage('down')}><ArrowDown size={16} />Move Down</button>
+              </>
+            ) : null}
             {editing ? <button className="primary-button h-10" onClick={saveStage}><Save size={16} />Save</button> : <button className="secondary-button h-10" onClick={() => setEditing(true)}><Edit3 size={16} />Edit</button>}
             <Link to="../overview" relative="path" className="secondary-button h-10 text-rose-600" onClick={deleteStage}><Trash2 size={16} />Delete</Link>
           </div>
@@ -155,7 +187,7 @@ export function CustomStage() {
           <p className="font-bold">Completion Status</p>
           <p className="text-sm text-slate-500">{completion.ok ? 'This stage can be completed.' : `${completion.blockedBy} must be completed first.`}</p>
         </div>
-        <button className="primary-button h-10 min-w-56 justify-center disabled:cursor-not-allowed disabled:bg-slate-300" disabled={!completion.ok} onClick={() => completeStage(activeStage.name)}>
+        <button className={`primary-button h-10 min-w-56 justify-center ${!completion.ok ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!completion.ok} onClick={handleCompleteStage}>
           <Check size={18} />
           Mark Stage Complete
         </button>

@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
+import { downloadFile, NO_FILE_AVAILABLE, resolveFileUrl } from '../../../utils/fileActions';
 import { useProjectWorkspace } from './context';
 
 type AttachmentFile = {
@@ -247,12 +248,12 @@ export function Attachments() {
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex justify-center gap-2">
-                      <button className="icon-button h-9 w-10 text-primary" title="View file" onClick={() => setPreviewFile(file)}>
+                      <button className="icon-button h-9 w-10 text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(file)} title={resolveFileUrl(file) ? 'View file' : NO_FILE_AVAILABLE} onClick={() => setPreviewFile(file)}>
                         <Eye size={18} />
                       </button>
-                      <a className={`icon-button h-9 w-10 text-primary ${file.url ? '' : 'pointer-events-none opacity-40'}`} href={file.url || undefined} download={file.name} title="Download file">
+                      <button className="icon-button h-9 w-10 text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(file)} title={resolveFileUrl(file) ? 'Download file' : NO_FILE_AVAILABLE} onClick={() => downloadFile(file, file.name)}>
                         <Download size={18} />
-                      </a>
+                      </button>
                       <div className="group relative">
                         <button className="icon-button h-9 w-10" title="More actions">
                           <MoreVertical size={18} />
@@ -300,7 +301,8 @@ function FileTile({ file }: { file: AttachmentFile }) {
 }
 
 function PreviewModal({ file, onClose }: { file: AttachmentFile; onClose: () => void }) {
-  const canPreview = Boolean(file.url);
+  const url = resolveFileUrl(file);
+  const canPreview = Boolean(url);
   const isImage = file.mimeType.startsWith('image/');
   const isPdf = file.mimeType === 'application/pdf';
 
@@ -318,9 +320,9 @@ function PreviewModal({ file, onClose }: { file: AttachmentFile; onClose: () => 
         </div>
         <div className="min-h-[55vh] overflow-auto bg-slate-100 p-4">
           {canPreview && isImage ? (
-            <img className="mx-auto max-h-[70vh] rounded-lg bg-white object-contain shadow-soft" src={file.url} alt={file.name} />
+            <img className="mx-auto max-h-[70vh] rounded-lg bg-white object-contain shadow-soft" src={url} alt={file.name} />
           ) : canPreview && isPdf ? (
-            <iframe className="h-[70vh] w-full rounded-lg bg-white" src={file.url} title={file.name} />
+            <iframe className="h-[70vh] w-full rounded-lg bg-white" src={url} title={file.name} />
           ) : (
             <div className="grid min-h-[55vh] place-items-center rounded-lg border border-slate-200 bg-white text-center">
               <div>
@@ -366,7 +368,7 @@ function toAttachmentFile(attachment: ProjectAttachment): AttachmentFile {
     uploadedOn: attachment.createdAt || attachment.updatedAt || new Date().toISOString(),
     uploadedBy: 'Current User',
     initials: 'CU',
-    url: attachment.url || attachment.fileUrl || '',
+    url: resolveFileUrl(attachment),
     mimeType
   };
 }

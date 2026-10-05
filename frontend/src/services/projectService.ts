@@ -30,6 +30,20 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function isPastTargetDate(targetDate: string) {
+  const target = new Date(targetDate);
+  if (Number.isNaN(target.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return target.getTime() < today.getTime();
+}
+
+function effectiveProjectStatus(status: Project['status'], targetDate: string): Project['status'] {
+  if (status === 'Completed' || status === 'On Hold') return status;
+  return isPastTargetDate(targetDate) ? 'Delayed' : status;
+}
+
 function normalizeProject(raw: any): Project {
   const rawProject = raw?.project || raw;
   const stages = Array.isArray(rawProject.stages) ? rawProject.stages : [];
@@ -53,6 +67,8 @@ function normalizeProject(raw: any): Project {
     }));
   }
 
+  const targetDate = rawProject.targetDate?.slice?.(0, 10) || rawProject.targetDate;
+
   return {
     id: rawProject._id || rawProject.id,
     name: rawProject.name,
@@ -60,17 +76,23 @@ function normalizeProject(raw: any): Project {
     category: rawProject.category,
     description: rawProject.description || '',
     startDate: rawProject.startDate?.slice?.(0, 10) || rawProject.startDate,
-    targetDate: rawProject.targetDate?.slice?.(0, 10) || rawProject.targetDate,
+    targetDate,
     reportTo: rawProject.reportTo?.name || rawProject.reportTo || '',
+    reportToId: rawProject.reportTo?._id || rawProject.reportTo?.id || '',
+    reportToEmail: rawProject.reportTo?.email || '',
+    reportToDesignation: rawProject.reportTo?.designation || rawProject.reportTo?.role || '',
     teamMembers: Array.isArray(rawProject.teamMembers)
       ? rawProject.teamMembers.map((member: any) => ({
         id: member._id || member.id || member.name,
         name: member.name,
-        role: member.designation || member.role || 'Staff'
+        role: member.role || 'Staff',
+        email: member.email || '',
+        designation: member.designation || member.role || 'Staff',
+        isActive: member.isActive ?? true
       }))
       : [],
     priority: rawProject.priority,
-    status: rawProject.status,
+    status: effectiveProjectStatus(rawProject.status, targetDate),
     currentStage: rawProject.currentStage || normalizedStages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage',
     progress: rawProject.overallProgress ?? Math.round(normalizedStages.reduce((sum, stage) => sum + stage.progress, 0) / Math.max(normalizedStages.length, 1)),
     stages: normalizedStages,
@@ -125,4 +147,62 @@ export async function updateProjectStage(projectId: string, stage: StageName, st
   });
   const project = await parseResponse<any>(response);
   return normalizeProject(project);
+}
+
+export async function updateProjectStatus(projectId: string, status: Project['status']) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    },
+    body: JSON.stringify({ status })
+  });
+  const project = await parseResponse<any>(response);
+  return normalizeProject(project);
+}
+
+export async function fetchProjectTeamCandidates(projectId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/team-candidates`, { headers: authHeaders() });
+  return parseResponse<Array<{ _id: string; name: string; role: 'Staff' | 'Admin'; designation?: string; email: string; isActive?: boolean }>>(response);
+}
+
+export async function addProjectTeamMember(projectId: string, userId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/team-members`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ userId })
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}
+
+export async function removeProjectTeamMember(projectId: string, userId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/team-members/${userId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}
+
+export async function updateProjectReportTo(projectId: string, userId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/report-to`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ userId })
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}
+
+export async function addProjectStage(projectId: string, name: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/stages`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ name })
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}
+
+export async function reorderProjectStages(projectId: string, stages: StageName[]) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/stages/reorder`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ stages })
+  });
+  return normalizeProject(await parseResponse<any>(response));
 }

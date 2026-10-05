@@ -1,10 +1,12 @@
 import { CheckCircle2, ChevronDown, Clock3, Mail, MoreHorizontal, PackageCheck, Phone, Plus, Search, Store, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { PageTopBar } from '../components/PageTopBar';
+import { useToast } from '../components/ToastProvider';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { fetchProjects } from '../services/projectService';
 import { setProjects } from '../store';
 import type { Project } from '../types';
+import { getMissingFields, showMissingFieldsToast } from '../utils/requiredFields';
 
 type VendorStatus = 'Active' | 'Inactive';
 
@@ -95,12 +97,14 @@ function buildVendorsFromProjects(projects: Project[]): VendorRow[] {
 
 export function VendorsPage() {
   const dispatch = useAppDispatch();
+  const { showToast } = useToast();
   const projects = useAppSelector((state) => state.projects.projects);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<(typeof categoryOptions)[number]>('All Categories');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [createdVendors, setCreatedVendors] = useState<VendorRow[]>([]);
+  const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -130,30 +134,45 @@ export function VendorsPage() {
 
   function closeForm() {
     setIsFormOpen(false);
+    setEditingVendorId(null);
     setForm(emptyForm);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const missing = getMissingFields([
+      { label: 'Vendor / Company Name', value: form.name },
+      { label: 'Category', value: form.category },
+      { label: 'Contact Person', value: form.contactPerson },
+      { label: 'What do they supply?', value: form.supply },
+      { label: 'Status', value: form.status }
+    ]);
+    if (showMissingFieldsToast(showToast, missing)) return;
     const linkedProject = projects.find((project) => project.id === form.projectId);
     const category = form.category || categoryFromText(form.supply);
-    setCreatedVendors((current) => [
-      ...current,
-      {
-        id: `vendor-${Date.now()}`,
-        name: form.name.trim(),
-        code: form.code.trim(),
-        category,
-        contactPerson: form.contactPerson.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-        location: form.location.trim(),
-        projects: linkedProject ? [linkedProject] : [],
-        status: form.status,
-        preferred: form.preferred,
-        notes: form.notes.trim()
+    const nextVendor = {
+      id: editingVendorId || `vendor-${Date.now()}`,
+      name: form.name.trim(),
+      code: form.code.trim(),
+      category,
+      contactPerson: form.contactPerson.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      location: form.location.trim(),
+      projects: linkedProject ? [linkedProject] : [],
+      status: form.status,
+      preferred: form.preferred,
+      notes: form.notes.trim()
+    };
+    setCreatedVendors((current) => {
+      if (editingVendorId && current.some((vendor) => vendor.id === editingVendorId)) {
+        return current.map((vendor) => vendor.id === editingVendorId ? nextVendor : vendor);
       }
-    ]);
+      return [
+        ...current,
+        nextVendor
+      ];
+    });
     closeForm();
   }
 
@@ -228,9 +247,20 @@ export function VendorsPage() {
                   </td>
                   <td className="px-4 py-4"><span className={`team-status ${vendor.status.toLowerCase()}`}>{vendor.status}</span></td>
                   <td className="px-4 py-4">
-                    <button className="grid h-9 w-9 place-items-center rounded-lg border border-[#d8e2f2] text-[#28406e] hover:bg-[#f4f8ff]" title="Vendor actions">
-                      <MoreHorizontal size={18} />
-                    </button>
+                    <VendorActions vendor={vendor} onEdit={() => { setEditingVendorId(vendor.id); setForm({
+                      name: vendor.name,
+                      code: vendor.code || '',
+                      category: vendor.category,
+                      contactPerson: vendor.contactPerson,
+                      phone: vendor.phone || '',
+                      email: vendor.email || '',
+                      location: vendor.location || '',
+                      supply: vendor.notes || vendor.category,
+                      projectId: vendor.projects[0]?.id || '',
+                      preferred: vendor.preferred,
+                      status: vendor.status,
+                      notes: vendor.notes || ''
+                    }); setIsFormOpen(true); }} />
                   </td>
                 </tr>
               ))}
@@ -248,9 +278,9 @@ export function VendorsPage() {
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#06143d]/30 px-4 py-3 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="w-full max-w-[900px] rounded-lg bg-white shadow-[0_24px_80px_rgba(6,20,61,0.25)]">
+          <form noValidate onSubmit={handleSubmit} className="w-full max-w-[900px] rounded-lg bg-white shadow-[0_24px_80px_rgba(6,20,61,0.25)]">
             <div className="flex items-center justify-between border-b border-[#d8e2f2] bg-white px-6 py-2.5">
-              <h2 className="text-lg font-bold text-[#06143d]">Add New Vendor</h2>
+              <h2 className="text-lg font-bold text-[#06143d]">{editingVendorId ? 'Edit Vendor' : 'Add New Vendor'}</h2>
               <button type="button" onClick={closeForm} className="grid h-8 w-8 place-items-center rounded-lg text-[#28406e] hover:bg-[#f4f8ff]" title="Close form">
                 <X size={19} />
               </button>
@@ -322,11 +352,27 @@ export function VendorsPage() {
 
             <div className="flex justify-end gap-3 border-t border-[#d8e2f2] bg-white px-6 py-2.5">
               <button type="button" onClick={closeForm} className="h-9 rounded-lg border border-[#d8e2f2] px-5 text-sm font-bold text-[#20385f] hover:bg-[#f4f8ff]">Cancel</button>
-              <button type="submit" className="h-9 rounded-lg bg-[#0066ff] px-5 text-sm font-bold text-white hover:bg-[#0056db]">Add Vendor</button>
+              <button type="submit" className="h-9 rounded-lg bg-[#0066ff] px-5 text-sm font-bold text-white hover:bg-[#0056db]">{editingVendorId ? 'Save Vendor' : 'Add Vendor'}</button>
             </div>
           </form>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function VendorActions({ vendor, onEdit }: { vendor: VendorRow; onEdit: () => void }) {
+  const linkedProject = vendor.projects[0];
+  return (
+    <div className="group relative inline-block">
+      <button className="grid h-9 w-9 place-items-center rounded-lg border border-[#d8e2f2] text-[#28406e] hover:bg-[#f4f8ff]" title="Vendor actions">
+        <MoreHorizontal size={18} />
+      </button>
+      <div className="invisible absolute right-0 top-10 z-20 w-48 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
+        <button className="menu-action" onClick={onEdit}>View / Edit</button>
+        <button className="menu-action" disabled={!vendor.email} onClick={() => vendor.email && navigator.clipboard?.writeText(vendor.email)}>Copy Email</button>
+        {linkedProject ? <a className="menu-action" href={`/projects/${linkedProject.productCode}/overview`}>Open Linked Project</a> : <button className="menu-action" disabled>No linked project</button>}
+      </div>
     </div>
   );
 }
