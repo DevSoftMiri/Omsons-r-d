@@ -107,7 +107,7 @@ export function ProjectsPage() {
           <SelectLike value={stageFilter} options={stageOptions} onChange={setStageFilter} />
           <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#0066ff] transition hover:bg-white"
+            className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#00494B] transition hover:bg-white"
             onClick={() => {
               setQuery('');
               setStageFilter('All Stages');
@@ -122,10 +122,10 @@ export function ProjectsPage() {
           <span className="text-base font-medium text-[#42557d]">Sort by:</span>
           <SelectLike value={sortBy} options={sortOptions} onChange={setSortBy} />
           <div className="flex rounded-lg bg-white p-1 shadow-sm">
-            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'grid' ? 'bg-[#0066ff] text-white' : 'text-[#345078]'}`} title="Grid view" onClick={() => setViewMode('grid')}>
+            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'grid' ? 'bg-[#00494B] text-white' : 'text-[#345078]'}`} title="Grid view" onClick={() => setViewMode('grid')}>
               <Grid2X2 size={19} />
             </button>
-            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'list' ? 'bg-[#0066ff] text-white' : 'text-[#345078]'}`} title="List view" onClick={() => setViewMode('list')}>
+            <button className={`grid h-10 w-10 place-items-center rounded-md ${viewMode === 'list' ? 'bg-[#00494B] text-white' : 'text-[#345078]'}`} title="List view" onClick={() => setViewMode('list')}>
               <List size={20} />
             </button>
           </div>
@@ -181,7 +181,7 @@ function ProjectCard({ project, compact = false }: { project: Project; compact?:
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-xl font-bold leading-6 text-[#06143d]">{project.productCode}</h3>
+              <h3 className="text-xl font-bold leading-6 text-[#333333]">{project.productCode}</h3>
               <p className="mt-1 text-base font-medium text-[#4a5e83]">{project.name}</p>
             </div>
             <div className="flex items-start gap-3">
@@ -193,12 +193,12 @@ function ProjectCard({ project, compact = false }: { project: Project; compact?:
           <div className="mt-4 flex items-end justify-between gap-5">
             <div>
               <p className="text-sm font-semibold text-[#56698c]">Current Stage</p>
-              <p className="text-lg font-bold leading-5 text-[#06143d]">{project.currentStage}</p>
+              <p className="text-lg font-bold leading-5 text-[#333333]">{project.currentStage}</p>
             </div>
             <div className="w-[185px] shrink-0">
-              <p className="mb-2 text-sm font-medium text-[#4a5e83]">Progress <span className="font-bold text-[#0066ff]">{project.progress}%</span></p>
+              <p className="mb-2 text-sm font-medium text-[#4a5e83]">Progress <span className="font-bold text-[#00494B]">{project.progress}%</span></p>
               <div className="h-2 rounded-full bg-[#dfe5ed]">
-                <div className="h-2 rounded-full bg-[#0066ff]" style={{ width: `${Math.min(project.progress, 100)}%` }} />
+                <div className="h-2 rounded-full bg-[#00494B]" style={{ width: `${Math.min(project.progress, 100)}%` }} />
               </div>
             </div>
           </div>
@@ -246,7 +246,7 @@ function ProjectCard({ project, compact = false }: { project: Project; compact?:
               <span className={`priority-pill ${project.priority.toLowerCase()}`}>{project.priority}</span>
             </div>
           </div>
-          <Link to={`/projects/${project.productCode}/overview`} className="inline-flex h-12 min-w-[110px] items-center justify-center gap-2 rounded-lg bg-[#eaf2ff] px-5 text-base font-bold text-[#0066ff] transition hover:bg-[#dceaff]">
+          <Link to={`/projects/${project.productCode}/overview`} className="inline-flex h-12 min-w-[110px] items-center justify-center gap-2 rounded-lg bg-[#eaf2ff] px-5 text-base font-bold text-[#00494B] transition hover:bg-[#dceaff]">
             Open
             <ArrowRight size={19} />
           </Link>

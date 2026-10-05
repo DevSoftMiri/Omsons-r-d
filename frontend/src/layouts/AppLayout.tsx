@@ -13,7 +13,7 @@ const navItems = [
   { label: 'Settings', href: '/settings', icon: Settings }
 ];
 
-const brandImageUrl = 'https://res.cloudinary.com/dzrg0utcm/image/upload/v1784113445/ChatGPT_Image_Jul_15_2026_04_32_56_PM_koo8hz.png';
+const brandImageUrl = '/omsonsnewlogo.jpeg';
 
 export function AppLayout() {
   const dispatch = useAppDispatch();
@@ -28,7 +28,7 @@ export function AppLayout() {
         </div>
         <nav className="grid gap-2.5 px-3.5">
           {visibleNavItems.map((item) => (
-            <NavLink key={item.label} to={item.href} className={({ isActive }) => `grid h-12 w-full grid-cols-[34px_minmax(0,1fr)] items-center rounded-lg px-4 text-left text-[15px] font-bold transition ${isActive ? 'bg-[#eaf2ff] text-[#0066ff] shadow-sm' : 'text-[#243b67] hover:bg-[#f3f7ff]'}`}>
+            <NavLink key={item.label} to={item.href} className={({ isActive }) => `grid h-12 w-full grid-cols-[34px_minmax(0,1fr)] items-center rounded-lg px-4 text-left text-[15px] font-bold transition ${isActive ? 'bg-[#eaf2ff] text-[#00494B] shadow-sm' : 'text-[#333333] hover:bg-[#f3f7ff]'}`}>
               <span className="grid h-8 w-8 place-items-center">
                 <item.icon size={21} strokeWidth={2.15} />
               </span>
@@ -38,7 +38,7 @@ export function AppLayout() {
         </nav>
         <div className="mt-auto px-3.5 pb-5">
           <button
-            className="grid h-12 w-full grid-cols-[34px_minmax(0,1fr)] items-center rounded-lg px-4 text-left text-[15px] font-bold text-[#243b67] transition hover:bg-[#f3f7ff]"
+            className="grid h-12 w-full grid-cols-[34px_minmax(0,1fr)] items-center rounded-lg px-4 text-left text-[15px] font-bold text-[#333333] transition hover:bg-[#f3f7ff]"
             onClick={() => dispatch(logout())}
           >
             <span className="grid h-8 w-8 place-items-center">

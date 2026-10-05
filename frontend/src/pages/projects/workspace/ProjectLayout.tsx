@@ -89,23 +89,23 @@ export function ProjectLayout() {
             </div>
           ) : null}
           <div className="min-w-0">
-            <header className="sticky top-0 z-20 flex h-11 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-2.5 backdrop-blur">
+            <header className="sticky top-0 z-20 flex h-11 items-center justify-between gap-3 border-b border-[#333333] bg-[#333333] px-2.5 text-white backdrop-blur">
               <div className="flex min-w-0 items-center gap-2">
-                <button className="icon-button lg:hidden" title={sidebarOpen ? 'Close stages' : 'Open stages'} onClick={() => setSidebarOpen((open) => !open)}>
+                <button className="icon-button border-white/15 bg-white/10 text-white hover:bg-white/15 lg:hidden" title={sidebarOpen ? 'Close stages' : 'Open stages'} onClick={() => setSidebarOpen((open) => !open)}>
                   {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
                 </button>
                 <div className="min-w-0 lg:hidden">
-                  <p className="truncate text-sm font-bold text-ink">{project.name}</p>
-                  <p className="text-xs font-semibold text-slate-500">{project.currentStage}</p>
+                  <p className="truncate text-sm font-bold text-white">{project.name}</p>
+                  <p className="text-xs font-semibold text-white/75">{project.currentStage}</p>
                 </div>
               </div>
               {user && (
                 <div className="ml-auto text-right">
-                  <p className="truncate text-sm font-bold text-ink">{user.name}</p>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">{user.role}</p>
+                  <p className="truncate text-sm font-bold text-white">{user.name}</p>
+                  <p className="text-[11px] font-semibold uppercase text-white/75">{user.role}</p>
                 </div>
               )}
-              <button className="icon-button" title="Logout" onClick={() => dispatch(logout())}>
+              <button className="icon-button border-white/15 bg-white/10 text-white hover:bg-white/15" title="Logout" onClick={() => dispatch(logout())}>
                 <LogOut size={16} />
               </button>
             </header>

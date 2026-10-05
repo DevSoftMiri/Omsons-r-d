@@ -85,7 +85,7 @@ export function SettingsPage() {
 
       <div className="grid gap-5 lg:grid-cols-[250px_1fr]">
         <aside className="rounded-lg border border-[#dde6f2] bg-white p-3 shadow-sm">
-          {sections.map((section) => <button key={section} className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold ${active === section ? 'bg-[#eaf2ff] text-[#0066ff]' : 'text-[#243b67] hover:bg-[#f7faff]'}`} onClick={() => setActive(section)}>{section}</button>)}
+          {sections.map((section) => <button key={section} className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold ${active === section ? 'bg-[#eaf2ff] text-[#00494B]' : 'text-[#333333] hover:bg-[#f7faff]'}`} onClick={() => setActive(section)}>{section}</button>)}
         </aside>
 
         <main className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
@@ -120,10 +120,10 @@ export function SettingsPage() {
                     onDragEnd={() => setDraggedStage(null)}
                     className="flex items-center gap-3 rounded-lg border border-[#d8e2f2] bg-[#f8fbff] p-3"
                   >
-                    <GripVertical className={stage.required ? 'text-slate-300' : 'text-[#0066ff]'} size={18} />
+                    <GripVertical className={stage.required ? 'text-slate-300' : 'text-[#00494B]'} size={18} />
                     <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-bold text-[#53688d]">{index + 1}</span>
                     <div className="min-w-0 flex-1">
-                      {editingStageId === stage.id ? <input className="field h-9" value={stage.name} onChange={(event) => patchStage(stage.id, { name: event.target.value })} /> : <p className="font-bold text-[#06143d]">{stage.name} {stage.required ? <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-[#0066ff]">Required Stage</span> : null}</p>}
+                      {editingStageId === stage.id ? <input className="field h-9" value={stage.name} onChange={(event) => patchStage(stage.id, { name: event.target.value })} /> : <p className="font-bold text-[#333333]">{stage.name} {stage.required ? <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-[#00494B]">Required Stage</span> : null}</p>}
                       <input className="mt-1 w-full bg-transparent text-sm font-medium text-[#53688d] outline-none" value={stage.description} onChange={(event) => patchStage(stage.id, { description: event.target.value })} />
                     </div>
                     <Toggle checked={stage.active} disabled={stage.required} onChange={(checked) => patchStage(stage.id, { active: checked })} />
@@ -190,7 +190,7 @@ export function SettingsPage() {
 }
 
 function Panel({ title, children, onSave, onCancel }: { title: string; children: React.ReactNode; onSave: () => void; onCancel: () => void }) {
-  return <section><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-[#06143d]">{title}</h2><div className="flex gap-2"><button className="secondary-button h-10" onClick={onCancel}>Cancel</button><button className="primary-button h-10" onClick={onSave}><Save size={16} />Save Changes</button></div></div>{children}</section>;
+  return <section><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-[#333333]">{title}</h2><div className="flex gap-2"><button className="secondary-button h-10" onClick={onCancel}>Cancel</button><button className="primary-button h-10" onClick={onSave}><Save size={16} />Save Changes</button></div></div>{children}</section>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -198,7 +198,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Toggle({ checked, disabled = false, onChange }: { checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
-  return <button type="button" disabled={disabled} onClick={() => onChange(!checked)} className={`h-6 w-11 rounded-full p-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-[#0066ff]' : 'bg-slate-300'}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? 'translate-x-5' : ''}`} /></button>;
+  return <button type="button" disabled={disabled} onClick={() => onChange(!checked)} className={`h-6 w-11 rounded-full p-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-[#00494B]' : 'bg-slate-300'}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? 'translate-x-5' : ''}`} /></button>;
 }
 
 function SettingToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {

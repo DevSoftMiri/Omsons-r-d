@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#2563eb',
-        ink: '#172033',
+        primary: '#00494B',
+        ink: '#333333',
         mist: '#eef4ff'
       },
       boxShadow: {

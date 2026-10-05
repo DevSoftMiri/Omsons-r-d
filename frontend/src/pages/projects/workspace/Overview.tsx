@@ -403,7 +403,7 @@ function BeakerVisual() {
       <path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" fill="#f8fafc" />
       <path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" stroke="#334155" strokeWidth="2.5" strokeLinejoin="round" />
       <path d="M45 82c8 5 22 5 30 0" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-      <path d="M49 76h22" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
+      <path d="M49 76h22" stroke="#00494B" strokeWidth="2" strokeLinecap="round" />
       <path d="M50 64h21M51 52h20M52 40h18" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
       <path d="M38 29c-4 2-7 5-8 10" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
       <path d="M79 29c4 2 8 5 10 10" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
@@ -418,7 +418,7 @@ function ProgressSummaryCard({ progress, completedStages, totalStages }: { progr
       <div className="flex items-center gap-3">
         <div
           className="grid h-16 w-16 shrink-0 place-items-center rounded-full"
-          style={{ background: `conic-gradient(#2563eb ${progress * 3.6}deg, #e2e8f0 0deg)` }}
+          style={{ background: `conic-gradient(#00494B ${progress * 3.6}deg, #e2e8f0 0deg)` }}
         >
           <div className="grid h-11 w-11 place-items-center rounded-full bg-white text-base font-bold">{progress}%</div>
         </div>

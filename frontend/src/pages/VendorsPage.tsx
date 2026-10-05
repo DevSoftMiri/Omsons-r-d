@@ -192,7 +192,7 @@ export function VendorsPage() {
           <SelectLike value={categoryFilter} options={categoryOptions} onChange={setCategoryFilter} />
           <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
           <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#0066ff] transition hover:bg-[#f4f8ff]"
+            className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#00494B] transition hover:bg-[#f4f8ff]"
             onClick={() => {
               setQuery('');
               setCategoryFilter('All Categories');
@@ -224,9 +224,9 @@ export function VendorsPage() {
                   <td className="px-4 py-4 text-sm font-medium text-[#3f5580]">{index + 1}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#eaf2ff] text-base font-black text-[#0066ff]">{initials(vendor.name)}</span>
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#eaf2ff] text-base font-black text-[#00494B]">{initials(vendor.name)}</span>
                       <div>
-                        <p className="font-bold text-[#06143d]">{vendor.name}</p>
+                        <p className="font-bold text-[#333333]">{vendor.name}</p>
                         <p className="text-sm font-medium text-[#53688d]">{vendor.code || '--'}</p>
                       </div>
                     </div>
@@ -238,12 +238,12 @@ export function VendorsPage() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="space-y-1 text-sm font-semibold text-[#20385f]">
-                      <p className="flex items-center gap-2"><Phone size={14} className="text-[#0066ff]" />{vendor.phone || '--'}</p>
-                      <p className="flex items-center gap-2"><Mail size={14} className="text-[#0066ff]" />{vendor.email || '--'}</p>
+                      <p className="flex items-center gap-2"><Phone size={14} className="text-[#00494B]" />{vendor.phone || '--'}</p>
+                      <p className="flex items-center gap-2"><Mail size={14} className="text-[#00494B]" />{vendor.email || '--'}</p>
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    {vendor.projects.length ? <span className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-xs font-bold text-[#0066ff]">{vendor.projects.length} Project{vendor.projects.length > 1 ? 's' : ''}</span> : <span className="text-sm font-semibold text-[#7a8aa8]">--</span>}
+                    {vendor.projects.length ? <span className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-xs font-bold text-[#00494B]">{vendor.projects.length} Project{vendor.projects.length > 1 ? 's' : ''}</span> : <span className="text-sm font-semibold text-[#7a8aa8]">--</span>}
                   </td>
                   <td className="px-4 py-4"><span className={`team-status ${vendor.status.toLowerCase()}`}>{vendor.status}</span></td>
                   <td className="px-4 py-4">
@@ -269,7 +269,7 @@ export function VendorsPage() {
           {!filteredVendors.length ? (
             <div className="px-4 py-12 text-center">
               <Store className="mx-auto text-[#7a8aa8]" size={34} />
-              <p className="mt-3 font-bold text-[#06143d]">No vendors found</p>
+              <p className="mt-3 font-bold text-[#333333]">No vendors found</p>
               <p className="mt-1 text-sm text-[#53688d]">Vendors will appear here from project BOMs or when you add one.</p>
             </div>
           ) : null}
@@ -277,10 +277,10 @@ export function VendorsPage() {
       </section>
 
       {isFormOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[#06143d]/30 px-4 py-3 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#333333]/30 px-4 py-3 backdrop-blur-sm">
           <form noValidate onSubmit={handleSubmit} className="w-full max-w-[900px] rounded-lg bg-white shadow-[0_24px_80px_rgba(6,20,61,0.25)]">
             <div className="flex items-center justify-between border-b border-[#d8e2f2] bg-white px-6 py-2.5">
-              <h2 className="text-lg font-bold text-[#06143d]">{editingVendorId ? 'Edit Vendor' : 'Add New Vendor'}</h2>
+              <h2 className="text-lg font-bold text-[#333333]">{editingVendorId ? 'Edit Vendor' : 'Add New Vendor'}</h2>
               <button type="button" onClick={closeForm} className="grid h-8 w-8 place-items-center rounded-lg text-[#28406e] hover:bg-[#f4f8ff]" title="Close form">
                 <X size={19} />
               </button>
@@ -325,7 +325,7 @@ export function VendorsPage() {
                   </select>
                 </FormField>
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-[#d8e2f2] bg-[#f8fbff] px-3 text-sm font-semibold text-[#20385f] md:col-span-3">
-                  <input type="checkbox" checked={form.preferred} onChange={(event) => updateForm('preferred', event.target.checked)} className="h-4 w-4 rounded border-[#b8c8dd] text-[#0066ff]" />
+                  <input type="checkbox" checked={form.preferred} onChange={(event) => updateForm('preferred', event.target.checked)} className="h-4 w-4 rounded border-[#b8c8dd] text-[#00494B]" />
                   <span><span className="block font-bold">Preferred Vendor</span><span className="text-xs font-medium text-[#53688d]">Mark as preferred</span></span>
                 </label>
                 <FormField label="Status" required className="md:col-span-3">
@@ -352,7 +352,7 @@ export function VendorsPage() {
 
             <div className="flex justify-end gap-3 border-t border-[#d8e2f2] bg-white px-6 py-2.5">
               <button type="button" onClick={closeForm} className="h-9 rounded-lg border border-[#d8e2f2] px-5 text-sm font-bold text-[#20385f] hover:bg-[#f4f8ff]">Cancel</button>
-              <button type="submit" className="h-9 rounded-lg bg-[#0066ff] px-5 text-sm font-bold text-white hover:bg-[#0056db]">{editingVendorId ? 'Save Vendor' : 'Add Vendor'}</button>
+              <button type="submit" className="h-9 rounded-lg bg-[#00494B] px-5 text-sm font-bold text-white hover:bg-[#007D7D]">{editingVendorId ? 'Save Vendor' : 'Add Vendor'}</button>
             </div>
           </form>
         </div>
@@ -403,7 +403,7 @@ function VendorStat({ icon: Icon, label, value, tone }: { icon: typeof UsersRoun
       <span className={`team-stat-icon ${tone}`}><Icon size={26} /></span>
       <div>
         <p className="text-sm font-semibold text-[#53688d]">{label}</p>
-        <p className="mt-1 text-3xl font-bold leading-none text-[#06143d]">{value}</p>
+        <p className="mt-1 text-3xl font-bold leading-none text-[#333333]">{value}</p>
       </div>
     </div>
   );
@@ -412,7 +412,7 @@ function VendorStat({ icon: Icon, label, value, tone }: { icon: typeof UsersRoun
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="mb-2 border-b border-[#d8e2f2] pb-1 text-sm font-bold text-[#06143d]">{title}</h3>
+      <h3 className="mb-2 border-b border-[#d8e2f2] pb-1 text-sm font-bold text-[#333333]">{title}</h3>
       <div className="grid gap-x-3 gap-y-2 md:grid-cols-6">{children}</div>
     </section>
   );

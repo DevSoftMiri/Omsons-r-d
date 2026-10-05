@@ -581,7 +581,7 @@ function BeakerVisual() {
       <path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" fill="#f8fafc" />
       <path d="M39 24l6 72c.7 7 6.6 12 13.6 12h2.8c7 0 12.9-5 13.6-12l6-72" stroke="#334155" strokeWidth="2.5" strokeLinejoin="round" />
       <path d="M45 82c8 5 22 5 30 0" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-      <path d="M49 76h22" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
+      <path d="M49 76h22" stroke="#00494B" strokeWidth="2" strokeLinecap="round" />
       <path d="M50 64h21M51 52h20M52 40h18" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
       <rect x="48" y="68" width="25" height="9" rx="2" fill="#dbeafe" />
     </svg>

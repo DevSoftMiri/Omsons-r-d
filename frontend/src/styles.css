@@ -319,14 +319,14 @@ body {
   }
 
   .stage-dot.complete {
-    border-color: #0066ff;
-    background: #0066ff;
+    border-color: #00494B;
+    background: #00494B;
   }
 
   .stage-dot.active {
-    border: 5px solid #a9ccff;
-    background: #0066ff;
-    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.16);
+    border: 5px solid rgba(0, 73, 75, 0.32);
+    background: #00494B;
+    box-shadow: 0 0 0 2px rgba(0, 73, 75, 0.16);
   }
 
   .stage-dot.active span {
@@ -346,7 +346,7 @@ body {
   }
 
   .stage-line.complete {
-    background: #0066ff;
+    background: #00494B;
   }
 
   .stage-label {
@@ -384,7 +384,7 @@ body {
 
   .dashboard-status.delayed {
     background: #ffedcf;
-    color: #c64f00;
+    color: #E85222;
   }
 
   .dashboard-status.on-hold {
@@ -416,21 +416,21 @@ body {
   }
 
   .project-stage-dot.complete {
-    border-color: #1474ff;
-    background: #1474ff;
+    border-color: #00494B;
+    background: #00494B;
   }
 
   .project-stage-dot.active {
-    border: 4px solid #1474ff;
+    border: 4px solid #00494B;
     background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(20, 116, 255, 0.16);
+    box-shadow: 0 0 0 2px rgba(0, 73, 75, 0.16);
   }
 
   .project-stage-dot.active span {
     width: 5px;
     height: 5px;
     border-radius: 9999px;
-    background: #1474ff;
+    background: #00494B;
   }
 
   .project-stage-line {
@@ -443,7 +443,7 @@ body {
   }
 
   .project-stage-line.complete {
-    background: #1474ff;
+    background: #00494B;
   }
 
   .project-stage-label {
@@ -458,7 +458,7 @@ body {
   }
 
   .project-stage-label.active {
-    color: #06143d;
+    color: #333333;
     font-weight: 800;
   }
 
@@ -490,7 +490,7 @@ body {
 
   .project-card-status.delayed {
     background: #ffedcf;
-    color: #d06b00;
+    color: #E85222;
   }
 
   .project-card-status.on-hold {
@@ -514,7 +514,7 @@ body {
 
   .priority-pill.medium {
     background: #fff0d2;
-    color: #d06b00;
+    color: #E85222;
   }
 
   .priority-pill.low {
@@ -532,7 +532,7 @@ body {
 
   .team-stat-icon.blue {
     background: #eaf2ff;
-    color: #0066ff;
+    color: #00494B;
   }
 
   .team-stat-icon.purple {
@@ -547,11 +547,11 @@ body {
 
   .team-stat-icon.orange {
     background: #fff0d7;
-    color: #f59e0b;
+    color: #E85222;
   }
 
   .team-stat-mark.blue {
-    color: #0066ff;
+    color: #00494B;
   }
 
   .team-stat-mark.purple {
@@ -563,7 +563,7 @@ body {
   }
 
   .team-stat-mark.orange {
-    color: #f59e0b;
+    color: #E85222;
   }
 
   .team-role {
@@ -585,7 +585,7 @@ body {
 
   .team-role.manager {
     background: #eaf2ff;
-    color: #0066ff;
+    color: #00494B;
   }
 
   .team-role.engineer {
@@ -595,7 +595,7 @@ body {
 
   .team-role.designer {
     background: #fff0d7;
-    color: #d97706;
+    color: #E85222;
   }
 
   .team-role.qa {
@@ -650,7 +650,7 @@ body {
     border-radius: 8px;
     background: #eaf2ff;
     padding: 7px 10px;
-    color: #0066ff;
+    color: #00494B;
     font-size: 12px;
     font-weight: 800;
     line-height: 1;
@@ -742,7 +742,12 @@ body {
   }
 
   .primary-button {
-    @apply inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700;
+    @apply inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition;
+    background: #00494B;
+  }
+
+  .primary-button:hover {
+    background: #007D7D;
   }
 
   .secondary-button {
@@ -754,7 +759,12 @@ body {
   }
 
   .field {
-    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-blue-100;
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:ring-2;
+    --tw-ring-color: rgba(0, 125, 125, 0.18);
+  }
+
+  .field:focus {
+    border-color: #00494B;
   }
 
   .grid-head {
@@ -812,4 +822,11 @@ body {
   .workspace-compact .panel {
     @apply p-2.5;
   }
+}
+
+.text-orange-500,
+.text-orange-600,
+.text-orange-700,
+.text-orange-800 {
+  color: #E85222;
 }

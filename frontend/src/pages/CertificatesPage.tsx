@@ -156,7 +156,7 @@ export function CertificatesPage() {
                 const status = certificateStatus(certificate.expiryDate);
                 return (
                   <tr key={certificate.id} className="border-b border-[#e2e8f2] last:border-b-0">
-                    <td className="px-4 py-4 font-bold text-[#06143d]"><button onClick={() => openCertificate(certificate, 'view')} className="hover:text-[#0066ff]">{certificate.name}</button><p className="text-sm font-medium text-[#53688d]">{certificate.documentName}</p></td>
+                    <td className="px-4 py-4 font-bold text-[#333333]"><button onClick={() => openCertificate(certificate, 'view')} className="hover:text-[#00494B]">{certificate.name}</button><p className="text-sm font-medium text-[#53688d]">{certificate.documentName}</p></td>
                     <td className="px-4 py-4 text-sm font-semibold text-[#20385f]">{certificate.number}</td>
                     <td className="px-4 py-4"><Badge>{certificate.type}</Badge></td>
                     <td className="px-4 py-4 text-sm font-semibold text-[#20385f]">{project?.productCode || '--'}<p className="text-xs text-[#53688d]">{certificate.product || project?.name}</p></td>
@@ -180,10 +180,10 @@ export function CertificatesPage() {
       </section>
 
       {drawerMode ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#06143d]/30 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex justify-end bg-[#333333]/30 backdrop-blur-sm">
           <aside className="h-full w-full max-w-[520px] overflow-y-auto bg-white shadow-2xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white p-5">
-              <h2 className="text-xl font-bold text-[#06143d]">{drawerMode === 'view' ? 'Certificate Details' : drawerMode === 'edit' ? 'Edit Certificate' : 'Add Certificate'}</h2>
+              <h2 className="text-xl font-bold text-[#333333]">{drawerMode === 'view' ? 'Certificate Details' : drawerMode === 'edit' ? 'Edit Certificate' : 'Add Certificate'}</h2>
               <button className="icon-button h-9 w-9" onClick={() => setDrawerMode(null)}><X size={18} /></button>
             </div>
             <div className="grid gap-3 p-5">
@@ -213,8 +213,8 @@ export function CertificatesPage() {
 }
 
 function Stat({ label, value, tone = 'blue' }: { label: string; value: number; tone?: 'blue' | 'green' | 'orange' | 'red' }) {
-  const colors = { blue: 'text-[#0066ff] bg-[#eaf2ff]', green: 'text-[#00834f] bg-[#d9f7eb]', orange: 'text-[#d06b00] bg-[#fff0d2]', red: 'text-[#e11d48] bg-[#ffdce5]' };
-  return <div className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-sm"><FileBadge className={`mb-3 rounded-lg p-2 ${colors[tone]}`} size={42} /><p className="text-sm font-semibold text-[#53688d]">{label}</p><p className="mt-1 text-3xl font-bold text-[#06143d]">{value}</p></div>;
+  const colors = { blue: 'text-[#00494B] bg-[#eaf2ff]', green: 'text-[#00834f] bg-[#d9f7eb]', orange: 'text-[#E85222] bg-[#fff0d2]', red: 'text-[#e11d48] bg-[#ffdce5]' };
+  return <div className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-sm"><FileBadge className={`mb-3 rounded-lg p-2 ${colors[tone]}`} size={42} /><p className="text-sm font-semibold text-[#53688d]">{label}</p><p className="mt-1 text-3xl font-bold text-[#333333]">{value}</p></div>;
 }
 
 function Select({ value, onChange, options, labels = {} }: { value: string; onChange: (value: string) => void; options: string[]; labels?: Record<string, string> }) {
@@ -222,11 +222,11 @@ function Select({ value, onChange, options, labels = {} }: { value: string; onCh
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-lg bg-[#eaf2ff] px-3 py-1.5 text-xs font-bold text-[#0066ff]">{children}</span>;
+  return <span className="rounded-lg bg-[#eaf2ff] px-3 py-1.5 text-xs font-bold text-[#00494B]">{children}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const className = status === 'Valid' ? 'bg-[#d9f7eb] text-[#00834f]' : status === 'Expiring Soon' ? 'bg-[#fff0d2] text-[#d06b00]' : status === 'Expired' ? 'bg-[#ffdce5] text-[#e11d48]' : 'bg-[#edf2f7] text-[#64748b]';
+  const className = status === 'Valid' ? 'bg-[#d9f7eb] text-[#00834f]' : status === 'Expiring Soon' ? 'bg-[#fff0d2] text-[#E85222]' : status === 'Expired' ? 'bg-[#ffdce5] text-[#e11d48]' : 'bg-[#edf2f7] text-[#64748b]';
   return <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${className}`}>{status}</span>;
 }
 
@@ -235,9 +235,9 @@ function CertField({ label, error, children }: { label: string; error?: string; 
 }
 
 function EmptyState() {
-  return <div className="py-12 text-center text-sm text-[#53688d]"><FileBadge className="mx-auto mb-3 text-[#7a8aa8]" size={36} /><p className="font-bold text-[#06143d]">No certificates found</p><p>Certificates will appear here when you add them.</p></div>;
+  return <div className="py-12 text-center text-sm text-[#53688d]"><FileBadge className="mx-auto mb-3 text-[#7a8aa8]" size={36} /><p className="font-bold text-[#333333]">No certificates found</p><p>Certificates will appear here when you add them.</p></div>;
 }
 
 function Confirm({ title, onCancel, onConfirm }: { title: string; onCancel: () => void; onConfirm: () => void }) {
-  return <div className="fixed inset-0 z-[60] grid place-items-center bg-[#06143d]/30 px-4"><div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl"><p className="text-lg font-bold text-[#06143d]">{title}</p><p className="mt-1 text-sm text-slate-600">This action cannot be undone.</p><div className="mt-5 flex justify-end gap-3"><button className="secondary-button" onClick={onCancel}>Cancel</button><button className="primary-button bg-rose-600 hover:bg-rose-700" onClick={onConfirm}>Delete</button></div></div></div>;
+  return <div className="fixed inset-0 z-[60] grid place-items-center bg-[#333333]/30 px-4"><div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl"><p className="text-lg font-bold text-[#333333]">{title}</p><p className="mt-1 text-sm text-slate-600">This action cannot be undone.</p><div className="mt-5 flex justify-end gap-3"><button className="secondary-button" onClick={onCancel}>Cancel</button><button className="primary-button bg-rose-600 hover:bg-rose-700" onClick={onConfirm}>Delete</button></div></div></div>;
 }

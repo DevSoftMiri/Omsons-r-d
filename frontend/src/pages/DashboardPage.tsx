@@ -74,7 +74,7 @@ export function DashboardPage() {
 
       <section className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-[#06143d]">Projects</h2>
+          <h2 className="text-2xl font-bold text-[#333333]">Projects</h2>
           <div className="flex flex-wrap gap-2">
             <SelectLike value={stageFilter} options={stageOptions} onChange={setStageFilter} />
             <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
@@ -101,7 +101,7 @@ export function DashboardPage() {
                     <Link to={`/projects/${project.productCode}/overview`} className="flex items-center gap-4">
                       <ProductThumb project={project} />
                       <span>
-                        <span className="block text-base font-bold text-[#06143d]">{project.productCode}</span>
+                        <span className="block text-base font-bold text-[#333333]">{project.productCode}</span>
                         <span className="mt-1 block text-base font-medium text-[#344b76]">{project.name}</span>
                       </span>
                     </Link>
@@ -123,9 +123,9 @@ export function DashboardPage() {
                     </div>
                   </td>
                   <td className="px-4 py-4 align-middle">
-                    <p className="mb-2 text-base font-bold text-[#06143d]">{project.progress}%</p>
+                    <p className="mb-2 text-base font-bold text-[#333333]">{project.progress}%</p>
                     <div className="h-2.5 w-52 rounded-full bg-[#dfe5ed]">
-                      <div className="h-2.5 rounded-full bg-[#0066ff]" style={{ width: `${Math.min(project.progress, 100)}%` }} />
+                      <div className="h-2.5 rounded-full bg-[#00494B]" style={{ width: `${Math.min(project.progress, 100)}%` }} />
                     </div>
                   </td>
                   <td className="px-4 py-4 align-middle">
@@ -140,7 +140,7 @@ export function DashboardPage() {
           </table>
           {!visibleProjects.length ? (
             <div className="border-b border-[#e2e8f2] px-4 py-10 text-center">
-              <p className="font-bold text-[#06143d]">No projects found</p>
+              <p className="font-bold text-[#333333]">No projects found</p>
               <p className="mt-1 text-sm text-[#53688d]">Create a project to see it on the dashboard.</p>
             </div>
           ) : null}

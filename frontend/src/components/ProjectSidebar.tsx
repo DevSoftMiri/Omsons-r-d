@@ -65,22 +65,22 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
 
   return (
     <aside
-      className="project-sidebar border-b border-slate-200 bg-slate-950 p-3 text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden lg:border-b-0"
+      className="project-sidebar border-b border-[#333333] bg-[#333333] p-3 text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden lg:border-b-0"
       style={{ '--sidebar-items': itemCount } as CSSProperties}
     >
-      <Link to="/projects" className="project-sidebar-back flex items-center gap-2 rounded-lg px-3 py-2 font-bold text-slate-100 hover:bg-white/10" onClick={onNavigate}>
+      <Link to="/projects" className="project-sidebar-back flex items-center gap-2 rounded-lg px-3 py-2 font-bold text-white hover:bg-white/10" onClick={onNavigate}>
         <ArrowLeft size={16} />
         <span className="truncate">{project.name}</span>
       </Link>
       <div className="project-sidebar-card rounded-lg bg-white/5 p-4">
-        <p className="project-sidebar-code font-bold text-blue-200">{project.productCode}</p>
+        <p className="project-sidebar-code font-bold text-white">{project.productCode}</p>
         <p className="project-sidebar-category mt-1 font-bold">{project.category}</p>
       </div>
       {user?.role === 'admin' ? <div className="mb-2">
         {adding ? (
           <div className="rounded-lg bg-white/10 p-2">
             <input
-              className="h-8 w-full rounded-md border border-white/10 bg-slate-900 px-2 text-xs font-semibold text-white outline-none placeholder:text-slate-400 focus:border-blue-300"
+              className="h-8 w-full rounded-md border border-white/10 bg-[#333333] px-2 text-xs font-semibold text-white outline-none placeholder:text-white/60 focus:border-white"
               placeholder="New stage name"
               value={stageName}
               onChange={(event) => setStageName(event.target.value)}
@@ -95,20 +95,20 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
                 <Plus size={13} />
                 {saving ? 'Adding...' : 'Add'}
               </button>
-              <button className="grid h-7 w-8 place-items-center rounded-md bg-white/10 text-slate-200 hover:bg-white/15" title="Cancel" onClick={() => { setAdding(false); setError(''); }}>
+              <button className="grid h-7 w-8 place-items-center rounded-md bg-white/10 text-white hover:bg-white/15" title="Cancel" onClick={() => { setAdding(false); setError(''); }}>
                 <X size={13} />
               </button>
             </div>
           </div>
         ) : (
-          <button className="flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 text-xs font-bold text-blue-100 hover:bg-white/10" onClick={() => setAdding(true)}>
+          <button className="flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 text-xs font-bold text-white hover:bg-white/10" onClick={() => setAdding(true)}>
             <Plus size={14} />
             Add Stage
           </button>
         )}
       </div> : null}
       <nav className="project-sidebar-nav grid">
-        <NavLink to="overview" onClick={onNavigate} className={({ isActive }) => `project-sidebar-link flex items-center justify-between rounded-lg px-4 font-semibold ${isActive ? 'bg-primary text-white' : 'text-slate-200 hover:bg-white/10'}`}>
+        <NavLink to="overview" onClick={onNavigate} className={({ isActive }) => `project-sidebar-link flex items-center justify-between rounded-lg px-4 font-semibold ${isActive ? 'bg-primary text-white' : 'text-white hover:bg-white/10'}`}>
           <span>Overview</span>
         </NavLink>
         {project.stages.map((stage, index) => {
@@ -120,7 +120,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
           const reorderControls = canReorder ? (
             <span className="ml-2 flex shrink-0 items-center gap-1">
               <button
-                className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                className="grid h-6 w-6 place-items-center rounded-md text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!canMoveUp || Boolean(reorderingStage)}
                 title="Move stage up"
                 onClick={(event) => { event.preventDefault(); event.stopPropagation(); void moveStage(index, 'up'); }}
@@ -128,7 +128,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
                 <ArrowUp size={13} />
               </button>
               <button
-                className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                className="grid h-6 w-6 place-items-center rounded-md text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!canMoveDown || Boolean(reorderingStage)}
                 title="Move stage down"
                 onClick={(event) => { event.preventDefault(); event.stopPropagation(); void moveStage(index, 'down'); }}
@@ -139,7 +139,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
           ) : null;
           if (!canOpen) {
             return (
-              <span key={stage.id} className="project-sidebar-link flex cursor-not-allowed items-center justify-between rounded-lg px-4 font-semibold text-slate-500" title="Complete the previous stage first">
+              <span key={stage.id} className="project-sidebar-link flex cursor-not-allowed items-center justify-between rounded-lg px-4 font-semibold text-white/60" title="Complete the previous stage first">
                 <span className="truncate">{stage.name}</span>
                 <span className="flex items-center gap-2">
                   {reorderControls}
@@ -149,7 +149,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
             );
           }
           return (
-            <NavLink key={stage.id} to={getStageRoute(stage)} onClick={onNavigate} className={({ isActive }) => `project-sidebar-link flex items-center justify-between rounded-lg px-4 font-semibold ${isActive ? 'bg-primary text-white' : locked ? 'text-slate-400 hover:bg-white/10' : 'text-slate-200 hover:bg-white/10'}`}>
+            <NavLink key={stage.id} to={getStageRoute(stage)} onClick={onNavigate} className={({ isActive }) => `project-sidebar-link flex items-center justify-between rounded-lg px-4 font-semibold ${isActive ? 'bg-primary text-white' : locked ? 'text-white/70 hover:bg-white/10' : 'text-white hover:bg-white/10'}`}>
               <span className="truncate">{stage.name}</span>
               <span className="flex items-center gap-2">
                 {reorderControls}

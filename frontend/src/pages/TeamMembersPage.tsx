@@ -147,7 +147,7 @@ export function TeamMembersPage() {
       <section className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[#06143d]">Team Members</h2>
+            <h2 className="text-xl font-bold text-[#333333]">Team Members</h2>
             <p className="mt-1 text-sm font-medium text-[#42557d]">Assign projects, update roles, and reset passwords from Actions.</p>
           </div>
         </div>
@@ -156,7 +156,7 @@ export function TeamMembersPage() {
           <SearchBox query={query} setQuery={setQuery} placeholder="Search by name, email or role..." wide />
           <SelectLike value={roleFilter} options={roleOptions} onChange={setRoleFilter} />
           <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
-          <button className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#0066ff] transition hover:bg-[#f4f8ff]" onClick={() => { setQuery(''); setRoleFilter('All Roles'); setStatusFilter('All Status'); }}>
+          <button className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#00494B] transition hover:bg-[#f4f8ff]" onClick={() => { setQuery(''); setRoleFilter('All Roles'); setStatusFilter('All Status'); }}>
             <X size={16} />
             Clear Filters
           </button>
@@ -183,7 +183,7 @@ export function TeamMembersPage() {
                     <div className="flex items-center gap-3">
                       <Avatar name={member.name} admin={member.role === 'Admin'} />
                       <div>
-                        <p className="font-bold text-[#06143d]">{member.name}</p>
+                        <p className="font-bold text-[#333333]">{member.name}</p>
                         <p className="text-sm font-medium text-[#53688d]">{member.email}</p>
                       </div>
                     </div>
@@ -226,7 +226,7 @@ export function TeamMembersPage() {
           </table>
           {!filteredMembers.length ? (
             <div className="px-4 py-10 text-center">
-              <p className="font-bold text-[#06143d]">No team members found</p>
+              <p className="font-bold text-[#333333]">No team members found</p>
               <p className="mt-1 text-sm text-[#53688d]">Create accounts to assign team members to projects.</p>
             </div>
           ) : null}
@@ -355,14 +355,14 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
   }
 
   return (
-    <div className="fixed inset-y-0 left-0 right-0 z-50 grid place-items-center bg-[#06143d]/30 p-5 backdrop-blur-sm sm:p-6 lg:left-[292px] lg:p-8">
+    <div className="fixed inset-y-0 left-0 right-0 z-50 grid place-items-center bg-[#333333]/30 p-5 backdrop-blur-sm sm:p-6 lg:left-[292px] lg:p-8">
       <button type="button" aria-label="Close manage team member popup" className="absolute inset-0 cursor-default" onClick={onClose} />
       <section className="relative flex max-h-[calc(100vh-3rem)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-white/70 bg-white shadow-[0_24px_80px_rgba(6,20,61,0.25)] sm:max-h-[calc(100vh-4rem)]">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-[#f8fbff] px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar name={member.name} admin={member.role === 'Admin'} />
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-[#06143d]">Manage Team Member</h2>
+              <h2 className="truncate text-xl font-bold text-[#333333]">Manage Team Member</h2>
               <p className="truncate text-sm font-semibold text-[#53688d]">{member.name} · {member.email}</p>
             </div>
           </div>
@@ -376,7 +376,7 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-[#06143d]">Account Details</h3>
+                <h3 className="font-bold text-[#333333]">Account Details</h3>
                 <p className="mt-1 text-sm font-medium text-slate-500">Update login details, role, designation, and account access.</p>
               </div>
               <span className={roleClass(member.designation || member.role)}>{member.designation || member.role}</span>
@@ -388,7 +388,7 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:row-span-2">
-            <h3 className="font-bold text-[#06143d]">Assigned Projects</h3>
+            <h3 className="font-bold text-[#333333]">Assigned Projects</h3>
             <div className="mt-3 grid gap-2">
               {member.assignedProjects.map((project) => (
                 <div key={project.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
@@ -411,7 +411,7 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
 
           {member.reportingProjects.length ? (
             <section className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
-              <h3 className="font-bold text-[#06143d]">Reporting Owner For</h3>
+              <h3 className="font-bold text-[#333333]">Reporting Owner For</h3>
               <div className="mt-3 grid gap-2">
                 {member.reportingProjects.map((project) => <Link key={project.id} className="font-bold text-primary" to={`/projects/${project.productCode}/overview`}>{project.productCode} - {project.name}</Link>)}
               </div>
@@ -419,7 +419,7 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
           ) : null}
 
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="font-bold text-[#06143d]">Reset Password</h3>
+            <h3 className="font-bold text-[#333333]">Reset Password</h3>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input className="field h-10" type="password" value={newPassword} placeholder="New password" onChange={(event) => setNewPassword(event.target.value)} />
               <button className="secondary-button h-10 shrink-0 justify-center text-primary" onClick={savePassword} disabled={savingPassword}><KeyRound size={15} />{savingPassword ? 'Resetting...' : 'Reset'}</button>
@@ -477,7 +477,7 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: typeof UserRound; 
         <span className={`team-stat-icon ${tone}`}><Icon size={26} /></span>
         <div>
           <p className="text-sm font-semibold text-[#53688d]">{label}</p>
-          <p className="mt-1 text-3xl font-bold leading-none text-[#06143d]">{value}</p>
+          <p className="mt-1 text-3xl font-bold leading-none text-[#333333]">{value}</p>
         </div>
       </div>
       <Icon className={`team-stat-mark ${tone}`} size={21} />
