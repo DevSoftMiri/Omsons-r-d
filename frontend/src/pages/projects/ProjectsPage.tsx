@@ -3,14 +3,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../../components/PageTopBar';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchProjects, updateProjectStatus } from '../../services/projectService';
-import { setProjects, upsertProject } from '../../store';
+import { deleteProject, fetchProjects, updateProjectStatus } from '../../services/projectService';
+import { removeProject, setProjects, upsertProject } from '../../store';
 import { getStageRoute } from '../../utils/stages';
 import type { Project, ProjectStatus, Stage } from '../../types';
 
 const statusOptions = ['All Status', 'Running', 'On Hold', 'Completed', 'Delayed'] as const;
 const baseStageOptions = ['All Stages'] as const;
-const sortOptions = ['Latest Created', 'Start Date', 'Target Date', 'Progress', 'Priority', 'Status'] as const;
+const sortOptions = ['First Created', 'Start Date', 'Target Date', 'Progress', 'Priority', 'Status'] as const;
 
 function statusLabel(status: ProjectStatus) {
   if (status === 'Delayed') return 'At Risk';
@@ -52,7 +52,7 @@ export function ProjectsPage() {
   const [query, setQuery] = useState('');
   const [stageFilter, setStageFilter] = useState('All Stages');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
-  const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]>('Latest Created');
+  const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]>('First Created');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export function ProjectsPage() {
       if (sortBy === 'Progress') return b.progress - a.progress;
       if (sortBy === 'Priority') return priorityOrder[b.priority] - priorityOrder[a.priority];
       if (sortBy === 'Status') return a.status.localeCompare(b.status);
-      return b.productCode.localeCompare(a.productCode);
+      return a.productCode.localeCompare(b.productCode, undefined, { numeric: true });
     });
   }, [projects, query, sortBy, stageFilter, statusFilter]);
 
@@ -263,6 +263,13 @@ function ProjectCardActions({ project }: { project: Project }) {
     dispatch(upsertProject(await updateProjectStatus(project.id, status)));
   }
 
+  async function removeCurrentProject() {
+    const confirmed = window.confirm(`Delete project ${project.productCode}?\n\nThis will permanently delete the project and its related database records.`);
+    if (!confirmed) return;
+    await deleteProject(project.id);
+    dispatch(removeProject(project.id));
+  }
+
   return (
     <div className="group relative">
       <button className="grid h-8 w-6 place-items-center text-[#21406d]" title="Project actions">
@@ -274,6 +281,7 @@ function ProjectCardActions({ project }: { project: Project }) {
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action text-rose-600" onClick={removeCurrentProject}>Delete Project</button> : null}
         <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Code</button>
       </div>
     </div>

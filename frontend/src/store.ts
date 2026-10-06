@@ -95,6 +95,10 @@ const projectsSlice = createSlice({
       else state.projects.unshift(action.payload);
       state.selectedProjectId = action.payload.id;
     },
+    removeProject(state, action: PayloadAction<string>) {
+      state.projects = state.projects.filter((project) => project.id !== action.payload && project.productCode !== action.payload);
+      if (state.selectedProjectId === action.payload) state.selectedProjectId = state.projects[0]?.id ?? null;
+    },
     createProject(state, action: PayloadAction<Omit<Project, 'id' | 'productCode' | 'progress' | 'stages' | 'bom' | 'reports' | 'currentStage'> & { selectedStages?: StageName[]; customStages?: string[] }>) {
       const productCode = `GLW-${String(state.projects.length + 101).padStart(4, '0')}`;
       const { selectedStages: requestedStages, customStages: requestedCustomStages, ...projectValues } = action.payload;
@@ -187,7 +191,7 @@ function refreshProjectWorkflow(project: Project) {
 }
 
 export const { login, logout } = authSlice.actions;
-export const { selectProject, setProjects, upsertProject, createProject, completeStage, addCustomStage, updateCustomStage, deleteCustomStage, moveCustomStage } = projectsSlice.actions;
+export const { selectProject, setProjects, upsertProject, removeProject, createProject, completeStage, addCustomStage, updateCustomStage, deleteCustomStage, moveCustomStage } = projectsSlice.actions;
 
 export const store = configureStore({
   reducer: {

@@ -1,8 +1,9 @@
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, MoreVertical, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks';
-import { updateProjectStatus } from '../services/projectService';
-import { upsertProject } from '../store';
+import { deleteProject, updateProjectStatus } from '../services/projectService';
+import { removeProject, upsertProject } from '../store';
 import type { Project } from '../types';
 
 const statusStyles: Record<Project['status'], string> = {
@@ -20,12 +21,14 @@ const priorityStyles: Record<Project['priority'], string> = {
 
 export function ProjectStageHeader({ project, currentStage, statusOverride }: { project: Project; currentStage: string; statusOverride?: string }) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const deadline = getDeadlineStatus(project.targetDate);
   const reportTo = project.reportTo;
   const reportToRole = project.reportToDesignation || 'Admin';
   const canUpdateStatus = user?.role === 'admin';
   const [savingStatus, setSavingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function changeStatus(status: Project['status']) {
     if (status === project.status) return;
@@ -34,6 +37,19 @@ export function ProjectStageHeader({ project, currentStage, statusOverride }: { 
       dispatch(upsertProject(await updateProjectStatus(project.id, status)));
     } finally {
       setSavingStatus(false);
+    }
+  }
+
+  async function removeCurrentProject() {
+    const confirmed = window.confirm(`Delete project ${project.productCode}?\n\nThis will permanently delete the project and its related database records.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await deleteProject(project.id);
+      dispatch(removeProject(project.id));
+      navigate('/projects', { replace: true });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -63,6 +79,19 @@ export function ProjectStageHeader({ project, currentStage, statusOverride }: { 
                 </select>
               </label>
             )}
+            {canUpdateStatus ? (
+              <div className="group relative">
+                <button className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition hover:bg-slate-100" title="Project actions">
+                  <MoreVertical size={18} />
+                </button>
+                <div className="invisible absolute right-0 top-9 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
+                  <button className="menu-action text-rose-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={deleting} onClick={removeCurrentProject}>
+                    <Trash2 size={15} />
+                    Delete Project
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-1.5 grid gap-2 md:grid-cols-3 xl:grid-cols-6">

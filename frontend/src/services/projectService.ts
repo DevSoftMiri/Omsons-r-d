@@ -162,6 +162,14 @@ export async function updateProjectStatus(projectId: string, status: Project['st
   return normalizeProject(project);
 }
 
+export async function deleteProject(projectId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return parseResponse<{ message: string; id: string; productCode: string }>(response);
+}
+
 export async function fetchProjectTeamCandidates(projectId: string) {
   const response = await fetch(`${API_BASE}/projects/${projectId}/team-candidates`, { headers: authHeaders() });
   return parseResponse<Array<{ _id: string; name: string; role: 'Staff' | 'Admin'; designation?: string; email: string; isActive?: boolean }>>(response);

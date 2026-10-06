@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../components/PageTopBar';
 import { useAppDispatch, useAppSelector } from '../hooks';
-import { fetchProjects, updateProjectStatus } from '../services/projectService';
-import { setProjects, upsertProject } from '../store';
+import { deleteProject, fetchProjects, updateProjectStatus } from '../services/projectService';
+import { removeProject, setProjects, upsertProject } from '../store';
 import { getStageRoute } from '../utils/stages';
 import type { Project, ProjectStatus, Stage } from '../types';
 
@@ -168,6 +168,13 @@ function ProjectActions({ project }: { project: Project }) {
     dispatch(upsertProject(await updateProjectStatus(project.id, status)));
   }
 
+  async function removeCurrentProject() {
+    const confirmed = window.confirm(`Delete project ${project.productCode}?\n\nThis will permanently delete the project and its related database records.`);
+    if (!confirmed) return;
+    await deleteProject(project.id);
+    dispatch(removeProject(project.id));
+  }
+
   return (
     <div className="group relative inline-block text-left">
       <button className="inline-grid h-9 w-9 place-items-center rounded-full text-[#1d3767] transition hover:bg-[#edf4ff]" title="Project actions">
@@ -179,6 +186,7 @@ function ProjectActions({ project }: { project: Project }) {
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
         {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
+        {user?.role === 'admin' ? <button className="menu-action text-rose-600" onClick={removeCurrentProject}>Delete Project</button> : null}
         <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Project Code</button>
       </div>
     </div>

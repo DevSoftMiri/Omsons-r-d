@@ -3,7 +3,11 @@ import { Project } from '../models/Project.js';
 import { User } from '../models/User.js';
 import { Benchmarking } from '../models/Benchmarking.js';
 import { BomItem } from '../models/BomItem.js';
+import { Attachment } from '../models/Attachment.js';
+import { Certificate } from '../models/Certificate.js';
+import { Report } from '../models/Report.js';
 import { WORKFLOW_STAGES } from '../constants/workflow.js';
+import { deleteProjectDocument } from '../services/supabaseStorageService.js';
 
 async function nextProductCode() {
   const count = await Project.countDocuments();
@@ -127,12 +131,20 @@ async function applyAutomaticProjectStatus(project) {
   return project;
 }
 
+async function deleteStoredProjectDocument(path) {
+  try {
+    await deleteProjectDocument(path);
+  } catch (error) {
+    console.warn(`Unable to delete project document "${path}": ${error.message}`);
+  }
+}
+
 export const listProjects = asyncHandler(async (req, res) => {
   const query = isStaffUser(req.user) ? { teamMembers: req.user._id } : {};
   const projects = await Project.find(query)
     .populate('teamMembers', 'name email role designation isActive')
     .populate('reportTo', 'name email role designation isActive')
-    .sort({ updatedAt: -1 });
+    .sort({ createdAt: 1, _id: 1 });
   await Promise.all(projects.map(applyAutomaticProjectStatus));
   res.json(projects.map((project) => serializeProjectForUser(project, req.user)));
 });
@@ -336,6 +348,34 @@ export const updateProjectStatus = asyncHandler(async (req, res) => {
   await applyAutomaticProjectStatus(project);
   await project.save();
   res.json(await populateProjectTeam(project));
+});
+
+export const deleteProject = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  const [attachments, certificates] = await Promise.all([
+    Attachment.find({ project: project._id }).select('storagePath'),
+    Certificate.find({ project: project._id }).select('storagePath')
+  ]);
+  const storagePaths = [...attachments, ...certificates]
+    .map((item) => item.storagePath)
+    .filter(Boolean);
+
+  await Promise.all(storagePaths.map((path) => deleteStoredProjectDocument(path)));
+  await Promise.all([
+    Attachment.deleteMany({ project: project._id }),
+    Benchmarking.deleteMany({ project: project._id }),
+    BomItem.deleteMany({ project: project._id }),
+    Certificate.deleteMany({ project: project._id }),
+    Report.deleteMany({ project: project._id })
+  ]);
+  await project.deleteOne();
+
+  res.json({ message: 'Project deleted successfully', id: String(project._id), productCode: project.productCode });
 });
 
 export const updateStage = asyncHandler(async (req, res) => {

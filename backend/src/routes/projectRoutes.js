@@ -9,7 +9,7 @@ import {
   updateBenchmarkingTable
 } from '../controllers/benchmarkingController.js';
 import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
-import { addProjectStage, addProjectTeamMember, createProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
+import { addProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
 import {
   addPrerequisiteDocument,
   deletePrerequisiteDocument,
@@ -39,6 +39,7 @@ router.patch('/:id/report-to', protect, authorize('Admin'), updateProjectReportT
 router.post('/:id/stages', protect, authorize('Admin'), addProjectStage);
 router.patch('/:id/stages/reorder', protect, authorize('Admin'), reorderProjectStages);
 router.patch('/:id/status', protect, authorize('Admin'), updateProjectStatus);
+router.delete('/:id', protect, authorize('Admin'), deleteProject);
 router.get('/:id/attachments', protect, listAttachments);
 router.post('/:id/attachments/upload', protect, prerequisiteUpload.single('file'), uploadAttachment);
 router.delete('/:id/attachments/:attachmentId', protect, deleteAttachment);
