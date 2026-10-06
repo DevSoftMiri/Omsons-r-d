@@ -15,6 +15,7 @@ import { useToast } from '../../components/ToastProvider';
 import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
 
 const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
+const categoryOptions = ['Beaker', 'Flask', 'Condenser', 'Pipette', 'Tube'];
 
 const projectSchema = z.object({
   name: z.string().min(3),
@@ -180,9 +181,10 @@ export function CreateProject() {
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Category">
-            <select className="field" {...form.register('category')}>
-              {['Beaker', 'Flask', 'Condenser', 'Pipette', 'Tube'].map((item) => <option key={item}>{item}</option>)}
-            </select>
+            <input className="field" list="project-category-options" placeholder="Select or type category" {...form.register('category')} />
+            <datalist id="project-category-options">
+              {categoryOptions.map((item) => <option key={item} value={item} />)}
+            </datalist>
           </Field>
           <Field label="Priority">
             <select className="field" {...form.register('priority')}>
