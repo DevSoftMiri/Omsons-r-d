@@ -41,6 +41,8 @@ const nextActionText: Record<CoreStageName, string[]> = {
   Benchmarking: ['Review competitor specifications', 'Paste updated benchmark data', 'Mark benchmarking complete'],
   Attachments: ['Upload drawings and design files', 'Preview uploaded documents', 'Confirm file versions'],
   BOM: ['Review material costs', 'Update procurement stages', 'Confirm vendor readiness'],
+  'Electrical BOM': ['Review electrical components', 'Upload electrical BOM document', 'Confirm pad and soldering costs'],
+  'Mechanical BOM': ['Review mechanical parts', 'Upload mechanical BOM document', 'Confirm drawings and suppliers'],
   'Product Design': ['Upload CAD drawing', 'Review version history', 'Mark design complete'],
   Programming: ['Validate machine parameters', 'Complete PLC logic checklist', 'Run final programming validation'],
   Reporting: ['Submit daily work report', 'Review logged hours', 'Mark reporting complete'],

@@ -2,6 +2,10 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Box, CalendarDays, Check, ChevronRight, Download, Edit2, FileText, PackagePlus, Paperclip, Plus, ReceiptText, Search, ShoppingCart, Trash2, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AddTableModal } from '../../../components/benchmarking/AddTableModal';
+import { BenchmarkingTable } from '../../../components/benchmarking/BenchmarkingTable';
+import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
+import type { BenchmarkingTableData, SelectedCell } from '../../../components/benchmarking/types';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
@@ -25,13 +29,96 @@ type BomRow = {
   status: BomStatus;
 };
 
+type ElectricalBomRow = {
+  id: string;
+  item: string;
+  specification: string;
+  qty: string;
+  unit: string;
+  pricePerUnit: string;
+  totalCost: string;
+  referenceDesignator: string;
+  supplierSource: string;
+  pad: string;
+  totalPad: string;
+  solderingCost: string;
+  totalSolderCost: string;
+  finalCost: string;
+  remarks: string;
+};
+
+type MechanicalBomRow = {
+  id: string;
+  srNo: string;
+  partNumber: string;
+  item: string;
+  specification: string;
+  material: string;
+  qty: string;
+  unit: string;
+  drawing: string;
+  unitCost: string;
+  totalCost: string;
+  supplier: string;
+  remarks: string;
+};
+
 const units = ['kg', 'g', 'mg', 'L', 'ml', 'pcs', 'm', 'cm', 'mm', 'roll', 'sheet', 'box'];
 const defaultNotes = '';
+const electricalBomStage = 'Electrical BOM';
+const mechanicalBomStage = 'Mechanical BOM';
+const electricalBomColumns: Array<{ key: keyof ElectricalBomRow; label: string; className?: string }> = [
+  { key: 'item', label: 'Item', className: 'min-w-44' },
+  { key: 'specification', label: 'Specification', className: 'min-w-56' },
+  { key: 'qty', label: 'Qty', className: 'min-w-16 text-center' },
+  { key: 'unit', label: 'Unit', className: 'min-w-20 text-center' },
+  { key: 'pricePerUnit', label: 'Price per Unit', className: 'min-w-28 text-center' },
+  { key: 'totalCost', label: 'Total Cost', className: 'min-w-28 text-center' },
+  { key: 'referenceDesignator', label: 'Reference Designator', className: 'min-w-56' },
+  { key: 'supplierSource', label: 'Supplier / Source', className: 'min-w-44' },
+  { key: 'pad', label: 'Pad', className: 'min-w-20 text-center' },
+  { key: 'totalPad', label: 'Total Pad', className: 'min-w-24 text-center' },
+  { key: 'solderingCost', label: 'Soldering Cost', className: 'min-w-28 text-center' },
+  { key: 'totalSolderCost', label: 'Total Solder Cost', className: 'min-w-32 text-center' },
+  { key: 'finalCost', label: 'Final Cost', className: 'min-w-28 text-center' },
+  { key: 'remarks', label: 'Remarks', className: 'min-w-36' }
+];
 
-export function BOM() {
+const defaultElectricalRows: ElectricalBomRow[] = [];
+
+const mechanicalBomColumns: Array<{ key: keyof MechanicalBomRow; label: string; className?: string }> = [
+  { key: 'srNo', label: 'Sr. No.', className: 'w-14 text-center' },
+  { key: 'partNumber', label: 'Part number', className: 'w-28' },
+  { key: 'item', label: 'Item', className: 'w-40' },
+  { key: 'specification', label: 'Specification', className: 'w-44' },
+  { key: 'material', label: 'Material', className: 'w-28' },
+  { key: 'qty', label: 'Qty', className: 'w-16 text-center' },
+  { key: 'unit', label: 'Unit', className: 'w-20 text-center' },
+  { key: 'drawing', label: 'Drawing', className: 'w-28' },
+  { key: 'unitCost', label: 'Unit Cost', className: 'w-20 text-center' },
+  { key: 'totalCost', label: 'Total Cost', className: 'w-20 text-center' },
+  { key: 'supplier', label: 'Supplier', className: 'w-24' },
+  { key: 'remarks', label: 'Remarks', className: 'w-24' }
+];
+
+const defaultMechanicalRows: MechanicalBomRow[] = [
+  makeMechanicalRow('1', '', 'AC PowerCord', '3Core, 6A', '', '1', 'Pcs'),
+  makeMechanicalRow('2', '', 'Power Socket with Fuse', 'With fuse', '', '1', 'Pcs'),
+  makeMechanicalRow('3', '', 'Earth Wire', '1.5 sqmm, 100 mm', '', '1', 'Pcs'),
+  makeMechanicalRow('4', '', 'PCB', 'OG-005-1225-R1', '', '1', 'Pcs'),
+  makeMechanicalRow('5', '', 'Thermocouple', 'K-Type', '', '1', 'Pcs'),
+  makeMechanicalRow('6', '', 'External Temperature', 'PT100', '', '1', 'Pcs'),
+  makeMechanicalRow('7', '', 'Probe Connector', 'Plastic Mould', '', '1', 'Pcs'),
+  makeMechanicalRow('8', '', 'Fiberglass Sleeve', 'High temperature', '', '1', 'Pcs')
+];
+
+export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electrical BOM' | 'Mechanical BOM' }) {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
+  const isBaseBomStage = currentStage === 'BOM';
+  const isElectricalStage = currentStage === 'Electrical BOM';
+  const isMechanicalStage = currentStage === 'Mechanical BOM';
   const storageKey = `bom:${project.productCode}`;
   const [rows, setRows] = useState<BomRow[]>(() => readStoredBom(storageKey, project.bom).rows);
   const [activeCategory, setActiveCategory] = useState('All Items');
@@ -45,26 +132,50 @@ export function BOM() {
   const [lastSaved, setLastSaved] = useState(() => readStoredBom(storageKey, project.bom).lastSaved);
   const [saveState, setSaveState] = useState<'Saved' | 'Saving...'>('Saved');
   const [referenceFiles, setReferenceFiles] = useState<ProjectAttachment[]>([]);
+  const [electricalRows, setElectricalRows] = useState<ElectricalBomRow[]>(() => readStoredBom(storageKey, project.bom).electricalRows);
+  const [electricalFiles, setElectricalFiles] = useState<ProjectAttachment[]>([]);
+  const [uploadingElectrical, setUploadingElectrical] = useState(false);
+  const [mechanicalRows, setMechanicalRows] = useState<MechanicalBomRow[]>(() => readStoredBom(storageKey, project.bom).mechanicalRows);
+  const [mechanicalFiles, setMechanicalFiles] = useState<ProjectAttachment[]>([]);
+  const [uploadingMechanical, setUploadingMechanical] = useState(false);
+  const [electricalTables, setElectricalTables] = useState<BenchmarkingTableData[]>(() => readStoredBom(storageKey, project.bom).electricalTables);
+  const [selectedElectricalCell, setSelectedElectricalCell] = useState<SelectedCell | null>(null);
+  const [showElectricalTableModal, setShowElectricalTableModal] = useState(false);
+  const [deleteElectricalTable, setDeleteElectricalTable] = useState<BenchmarkingTableData | null>(null);
+  const [mechanicalTables, setMechanicalTables] = useState<BenchmarkingTableData[]>(() => readStoredBom(storageKey, project.bom).mechanicalTables);
+  const [selectedMechanicalCell, setSelectedMechanicalCell] = useState<SelectedCell | null>(null);
+  const [showMechanicalTableModal, setShowMechanicalTableModal] = useState(false);
+  const [deleteMechanicalTable, setDeleteMechanicalTable] = useState<BenchmarkingTableData | null>(null);
 
   useEffect(() => {
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
       const timestamp = new Date().toISOString();
-      localStorage.setItem(storageKey, JSON.stringify({ rows, notes, lastSaved: timestamp }));
+      localStorage.setItem(storageKey, JSON.stringify({ rows, electricalRows, mechanicalRows, electricalTables, mechanicalTables, notes, lastSaved: timestamp }));
       setLastSaved(timestamp);
       setSaveState('Saved');
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [notes, rows, storageKey]);
+  }, [electricalRows, electricalTables, mechanicalRows, mechanicalTables, notes, rows, storageKey]);
 
   useEffect(() => {
     let active = true;
-    fetchProjectAttachments(project.productCode, 'BOM')
-      .then((attachments) => {
-        if (active) setReferenceFiles(attachments);
+    Promise.all([
+      fetchProjectAttachments(project.productCode, 'BOM'),
+      fetchProjectAttachments(project.productCode, electricalBomStage),
+      fetchProjectAttachments(project.productCode, mechanicalBomStage)
+    ])
+      .then(([bomAttachments, electricalAttachments, mechanicalAttachments]) => {
+        if (!active) return;
+        setReferenceFiles(bomAttachments);
+        setElectricalFiles(electricalAttachments);
+        setMechanicalFiles(mechanicalAttachments);
       })
       .catch(() => {
-        if (active) setReferenceFiles([]);
+        if (!active) return;
+        setReferenceFiles([]);
+        setElectricalFiles([]);
+        setMechanicalFiles([]);
       });
     return () => {
       active = false;
@@ -101,7 +212,13 @@ export function BOM() {
     Pending: rows.filter((row) => row.status === 'Pending').length
   };
   const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selected.includes(row.id));
-  const canComplete = rows.length > 0 && rows.every((row) => row.itemName && row.category && row.unit && row.quantityPerUnit > 0);
+  const hasElectricalData = electricalRows.some((row) => Object.entries(row).some(([key, value]) => key !== 'id' && value.trim())) || electricalTables.some(tableHasData);
+  const hasMechanicalData = mechanicalRows.some((row) => Object.entries(row).some(([key, value]) => key !== 'id' && value.trim())) || mechanicalTables.some(tableHasData);
+  const canComplete = isElectricalStage
+    ? hasElectricalData
+    : isMechanicalStage
+      ? hasMechanicalData
+    : rows.length > 0 && rows.every((row) => row.itemName && row.category && row.unit && row.quantityPerUnit > 0);
 
   function upsertRow(row: BomRow) {
     setRows((current) => current.some((item) => item.id === row.id)
@@ -142,6 +259,192 @@ export function BOM() {
         message: error instanceof Error ? error.message : 'Reference document could not be deleted.'
       });
     }
+  }
+
+  async function uploadElectricalDocument(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const validTypes = [
+      'application/pdf',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'image/webp'
+    ];
+    const validExtension = /\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name);
+    if (!validTypes.includes(file.type) && !validExtension) {
+      showToast({ tone: 'error', title: 'Invalid document', message: 'Upload a PDF, Excel/CSV, JPG, PNG, or WebP file for Electrical BOM.' });
+      event.target.value = '';
+      return;
+    }
+    setUploadingElectrical(true);
+    try {
+      const attachment = await uploadProjectAttachment(project.productCode, electricalBomStage, file);
+      setElectricalFiles((current) => [attachment, ...current]);
+      showToast({ tone: 'success', title: 'Electrical BOM document uploaded', message: `${attachment.name} was added.` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Upload failed', message: error instanceof Error ? error.message : 'Electrical BOM document could not be uploaded.' });
+    } finally {
+      setUploadingElectrical(false);
+      event.target.value = '';
+    }
+  }
+
+  async function deleteElectricalDocument(file: ProjectAttachment) {
+    try {
+      await deleteProjectAttachment(project.productCode, electricalBomStage, file._id);
+      setElectricalFiles((current) => current.filter((attachment) => attachment._id !== file._id));
+      showToast({ tone: 'success', title: 'Electrical document deleted', message: `${file.name} was removed.` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Delete failed', message: error instanceof Error ? error.message : 'Electrical BOM document could not be deleted.' });
+    }
+  }
+
+  async function uploadMechanicalDocument(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const validTypes = [
+      'application/pdf',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'image/webp'
+    ];
+    const validExtension = /\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name);
+    if (!validTypes.includes(file.type) && !validExtension) {
+      showToast({ tone: 'error', title: 'Invalid document', message: 'Upload a PDF, Excel/CSV, JPG, PNG, or WebP file for Mechanical BOM.' });
+      event.target.value = '';
+      return;
+    }
+    setUploadingMechanical(true);
+    try {
+      const attachment = await uploadProjectAttachment(project.productCode, mechanicalBomStage, file);
+      setMechanicalFiles((current) => [attachment, ...current]);
+      showToast({ tone: 'success', title: 'Mechanical BOM document uploaded', message: `${attachment.name} was added.` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Upload failed', message: error instanceof Error ? error.message : 'Mechanical BOM document could not be uploaded.' });
+    } finally {
+      setUploadingMechanical(false);
+      event.target.value = '';
+    }
+  }
+
+  async function deleteMechanicalDocument(file: ProjectAttachment) {
+    try {
+      await deleteProjectAttachment(project.productCode, mechanicalBomStage, file._id);
+      setMechanicalFiles((current) => current.filter((attachment) => attachment._id !== file._id));
+      showToast({ tone: 'success', title: 'Mechanical document deleted', message: `${file.name} was removed.` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Delete failed', message: error instanceof Error ? error.message : 'Mechanical BOM document could not be deleted.' });
+    }
+  }
+
+  function updateElectricalRow(rowId: string, key: keyof ElectricalBomRow, value: string) {
+    setElectricalRows((current) => current.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
+  }
+
+  function addElectricalRow() {
+    setElectricalRows((current) => [...current, makeElectricalRow('', '', '1', 'Pc', '', '', '', '', '', '', '', '', '')]);
+  }
+
+  function resetElectricalBom() {
+    setElectricalRows(defaultElectricalRows);
+  }
+
+  function updateElectricalTable(table: BenchmarkingTableData) {
+    setElectricalTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
+  }
+
+  function createElectricalTable(values: { name: string; initialColumns: number; initialRows: number }) {
+    const columns = Array.from({ length: values.initialColumns }, () => ({ id: makeId('col') }));
+    const rows = Array.from({ length: values.initialRows }, () => ({
+      id: makeId('row'),
+      cells: columns.reduce<Record<string, string>>((cells, column) => {
+        cells[column.id] = '';
+        return cells;
+      }, {})
+    }));
+    setElectricalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
+    setShowElectricalTableModal(false);
+  }
+
+  function confirmDeleteElectricalTable() {
+    if (!deleteElectricalTable) return;
+    setElectricalTables((current) => current.filter((table) => table._id !== deleteElectricalTable._id));
+    setDeleteElectricalTable(null);
+  }
+
+  async function importElectricalTableCsv(table: BenchmarkingTableData, file: File) {
+    const imported = makeSpreadsheetTable(table.name, parseCsvRows(await file.text()));
+    setElectricalTables((current) => current.map((candidate) => candidate._id === table._id ? { ...imported, _id: table._id } : candidate));
+  }
+
+  function exportElectricalTableCsv(table: BenchmarkingTableData) {
+    const csv = table.rows
+      .map((row) => table.columns.map((column) => `"${(row.cells[column.id] || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${project.productCode}-${table.name.replace(/\s+/g, '-')}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function updateMechanicalTable(table: BenchmarkingTableData) {
+    setMechanicalTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
+  }
+
+  function createMechanicalTable(values: { name: string; initialColumns: number; initialRows: number }) {
+    const columns = Array.from({ length: values.initialColumns }, () => ({ id: makeId('col') }));
+    const rows = Array.from({ length: values.initialRows }, () => ({
+      id: makeId('row'),
+      cells: columns.reduce<Record<string, string>>((cells, column) => {
+        cells[column.id] = '';
+        return cells;
+      }, {})
+    }));
+    setMechanicalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
+    setShowMechanicalTableModal(false);
+  }
+
+  function confirmDeleteMechanicalTable() {
+    if (!deleteMechanicalTable) return;
+    setMechanicalTables((current) => current.filter((table) => table._id !== deleteMechanicalTable._id));
+    setDeleteMechanicalTable(null);
+  }
+
+  async function importMechanicalTableCsv(table: BenchmarkingTableData, file: File) {
+    const imported = makeSpreadsheetTable(table.name, parseCsvRows(await file.text()));
+    setMechanicalTables((current) => current.map((candidate) => candidate._id === table._id ? { ...imported, _id: table._id } : candidate));
+  }
+
+  function exportMechanicalTableCsv(table: BenchmarkingTableData) {
+    const csv = table.rows
+      .map((row) => table.columns.map((column) => `"${(row.cells[column.id] || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${project.productCode}-${table.name.replace(/\s+/g, '-')}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function updateMechanicalRow(rowId: string, key: keyof MechanicalBomRow, value: string) {
+    setMechanicalRows((current) => current.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
+  }
+
+  function addMechanicalRow() {
+    setMechanicalRows((current) => [...current, makeMechanicalRow(String(current.length + 1), '', '', '', '', '1', 'Pcs')]);
+  }
+
+  function resetMechanicalBom() {
+    setMechanicalRows(defaultMechanicalRows);
   }
 
   function removeSelected() {
@@ -199,6 +502,10 @@ export function BOM() {
   function resetBom() {
     const seeded = seedBomRows(project.bom);
     setRows(seeded);
+    setElectricalRows(defaultElectricalRows);
+    setElectricalTables([]);
+    setMechanicalRows(defaultMechanicalRows);
+    setMechanicalTables([]);
     setNotes(defaultNotes);
     setSelected([]);
     setActiveCategory('All Items');
@@ -207,22 +514,32 @@ export function BOM() {
   }
 
   function handleCompleteStage() {
-    const missing = [
-      !rows.length ? 'At least one BOM item' : '',
-      rows.some((row) => !row.itemName.trim()) ? 'Item Name' : '',
-      rows.some((row) => !row.category.trim()) ? 'Category' : '',
-      rows.some((row) => !row.unit.trim()) ? 'Unit' : '',
-      rows.some((row) => !Number.isFinite(row.quantityPerUnit) || row.quantityPerUnit <= 0) ? 'Quantity per Unit' : ''
-    ].filter(Boolean);
+    const missing = isElectricalStage
+      ? [
+        !hasElectricalData ? 'Electrical BOM item or custom table data' : ''
+      ].filter(Boolean)
+      : isMechanicalStage
+        ? [
+          !hasMechanicalData ? 'Mechanical BOM item or custom table data' : ''
+        ].filter(Boolean)
+      : [
+        !rows.length ? 'At least one BOM item' : '',
+        rows.some((row) => !row.itemName.trim()) ? 'Item Name' : '',
+        rows.some((row) => !row.category.trim()) ? 'Category' : '',
+        rows.some((row) => !row.unit.trim()) ? 'Unit' : '',
+        rows.some((row) => !Number.isFinite(row.quantityPerUnit) || row.quantityPerUnit <= 0) ? 'Quantity per Unit' : ''
+      ].filter(Boolean);
     if (showMissingFieldsToast(showToast, missing)) return;
-    completeStage('BOM');
+    completeStage(currentStage);
   }
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
-      <TopCrumbs title={project.name} code={project.productCode} />
-      <ProjectStageHeader project={project} currentStage="BOM" />
+      <TopCrumbs title={project.name} code={project.productCode} currentStage={currentStage} />
+      <ProjectStageHeader project={project} currentStage={currentStage} />
 
+      {isBaseBomStage ? (
+        <>
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Bill of Materials (BOM)</h2>
@@ -337,6 +654,200 @@ export function BOM() {
           <textarea className="field min-h-24 resize-none" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
       </section>
+        </>
+      ) : null}
+
+      {isElectricalStage ? <section className="rounded-lg border border-slate-200 bg-white shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-3">
+          <div>
+            <h3 className="text-lg font-bold">Electrical BOM</h3>
+            <p className="mt-1 text-sm text-slate-500">Track PCB/electrical components, pads, soldering cost, final cost and related documents.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="secondary-button h-10 gap-2" onClick={resetElectricalBom}>Reset Electrical BOM</button>
+            <button className="primary-button h-10 gap-2" onClick={addElectricalRow}><Plus size={16} />Add Electrical Item</button>
+            <button className="secondary-button h-10 gap-2 text-primary" onClick={() => setShowElectricalTableModal(true)}><Plus size={16} />Create New Table</button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1720px] border-collapse text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600">
+                {electricalBomColumns.map((column) => (
+                  <th key={column.key} className={`border border-slate-200 px-2 py-2.5 font-bold ${column.className || ''}`}>{column.label}</th>
+                ))}
+                <th className="border border-slate-200 px-2 py-2.5 text-center font-bold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {electricalRows.map((row) => (
+                <tr key={row.id}>
+                  {electricalBomColumns.map((column) => (
+                    <td key={column.key} className="border border-slate-200 p-0">
+                      <input
+                        className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''}`}
+                        value={row[column.key]}
+                        onChange={(event) => updateElectricalRow(row.id, column.key, event.target.value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="border border-slate-200 px-2 py-1 text-center">
+                    <button className="icon-button h-8 w-8 text-rose-600" title="Delete electrical item" onClick={() => setElectricalRows((current) => current.filter((item) => item.id !== row.id))}>
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-200 p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Paperclip className="text-primary" size={21} />
+              <h4 className="font-bold">Electrical BOM Documents</h4>
+              <span className="text-sm text-slate-500">{electricalFiles.length} files</span>
+            </div>
+            <label className={`secondary-button h-10 cursor-pointer gap-2 text-primary ${uploadingElectrical ? 'pointer-events-none opacity-60' : ''}`} htmlFor="electrical-bom-upload">
+              <Upload size={16} />
+              {uploadingElectrical ? 'Uploading...' : 'Upload Valid Document'}
+            </label>
+            <input id="electrical-bom-upload" className="sr-only" type="file" accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadElectricalDocument} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {electricalFiles.map((file) => (
+              <div key={file._id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-100 text-primary"><FileText size={20} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{file.name}</p>
+                  <p className="text-xs text-slate-500">{formatBytes(file.fileSize || 0)}</p>
+                </div>
+                <button className="text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(file)} title={resolveFileUrl(file) ? 'Open document' : NO_FILE_AVAILABLE} onClick={() => openFile(file)}>
+                  <Download size={17} />
+                </button>
+                <button className="text-rose-600" title="Delete document" onClick={() => deleteElectricalDocument(file)}>
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            ))}
+            {!electricalFiles.length ? (
+              <div className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+                Upload electrical BOM files such as PDF, Excel, CSV, or component reference images.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section> : null}
+
+      {isElectricalStage ? electricalTables.map((table, index) => (
+        <BenchmarkingTable
+          key={table._id}
+          index={index}
+          selectedCell={selectedElectricalCell}
+          table={table}
+          onChangeTable={updateElectricalTable}
+          onDeleteTable={setDeleteElectricalTable}
+          onExportCsv={exportElectricalTableCsv}
+          onImportCsv={importElectricalTableCsv}
+          onSelectCell={setSelectedElectricalCell}
+        />
+      )) : null}
+
+      {isMechanicalStage ? <section className="rounded-lg border border-slate-200 bg-white shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-3">
+          <div>
+            <h3 className="text-lg font-bold">Mechanical BOM</h3>
+            <p className="mt-1 text-sm text-slate-500">Track mechanical parts, specifications, drawings, cost, supplier and remarks.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="secondary-button h-10 gap-2" onClick={resetMechanicalBom}>Reset Mechanical BOM</button>
+            <button className="primary-button h-10 gap-2" onClick={addMechanicalRow}><Plus size={16} />Add Mechanical Item</button>
+            <button className="secondary-button h-10 gap-2 text-primary" onClick={() => setShowMechanicalTableModal(true)}><Plus size={16} />Create New Table</button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] table-fixed border-collapse text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600">
+                {mechanicalBomColumns.map((column) => (
+                  <th key={column.key} className={`border border-slate-200 px-1.5 py-2 text-center font-bold leading-tight ${column.className || ''}`}>{column.label}</th>
+                ))}
+                <th className="w-16 border border-slate-200 px-1.5 py-2 text-center font-bold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mechanicalRows.map((row) => (
+                <tr key={row.id}>
+                  {mechanicalBomColumns.map((column) => (
+                    <td key={column.key} className="border border-slate-200 p-0">
+                      <input
+                        className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''}`}
+                        value={row[column.key]}
+                        onChange={(event) => updateMechanicalRow(row.id, column.key, event.target.value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="border border-slate-200 px-1.5 py-1 text-center">
+                    <button className="icon-button h-7 w-7 text-rose-600" title="Delete mechanical item" onClick={() => setMechanicalRows((current) => current.filter((item) => item.id !== row.id))}>
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-200 p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Paperclip className="text-primary" size={21} />
+              <h4 className="font-bold">Mechanical BOM Documents</h4>
+              <span className="text-sm text-slate-500">{mechanicalFiles.length} files</span>
+            </div>
+            <label className={`secondary-button h-10 cursor-pointer gap-2 text-primary ${uploadingMechanical ? 'pointer-events-none opacity-60' : ''}`} htmlFor="mechanical-bom-upload">
+              <Upload size={16} />
+              {uploadingMechanical ? 'Uploading...' : 'Upload Valid Document'}
+            </label>
+            <input id="mechanical-bom-upload" className="sr-only" type="file" accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadMechanicalDocument} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {mechanicalFiles.map((file) => (
+              <div key={file._id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-100 text-primary"><FileText size={20} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{file.name}</p>
+                  <p className="text-xs text-slate-500">{formatBytes(file.fileSize || 0)}</p>
+                </div>
+                <button className="text-primary disabled:cursor-not-allowed disabled:opacity-40" disabled={!resolveFileUrl(file)} title={resolveFileUrl(file) ? 'Open document' : NO_FILE_AVAILABLE} onClick={() => openFile(file)}>
+                  <Download size={17} />
+                </button>
+                <button className="text-rose-600" title="Delete document" onClick={() => deleteMechanicalDocument(file)}>
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            ))}
+            {!mechanicalFiles.length ? (
+              <div className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+                Upload mechanical BOM files such as PDF, Excel, CSV, drawings, or part reference images.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section> : null}
+
+      {isMechanicalStage ? mechanicalTables.map((table, index) => (
+        <BenchmarkingTable
+          key={table._id}
+          index={index}
+          selectedCell={selectedMechanicalCell}
+          table={table}
+          onChangeTable={updateMechanicalTable}
+          onDeleteTable={setDeleteMechanicalTable}
+          onExportCsv={exportMechanicalTableCsv}
+          onImportCsv={importMechanicalTableCsv}
+          onSelectCell={setSelectedMechanicalCell}
+        />
+      )) : null}
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
@@ -344,8 +855,8 @@ export function BOM() {
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid BOM item to complete this stage.</p> : null}
-          <button className={`primary-button h-10 min-w-60 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark BOM Complete</button>
+          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid {isElectricalStage ? 'electrical BOM' : isMechanicalStage ? 'mechanical BOM' : 'BOM'} item to complete this stage.</p> : null}
+          <button className={`primary-button h-10 min-w-60 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark {currentStage} Complete</button>
         </div>
       </section>
 
@@ -360,15 +871,31 @@ export function BOM() {
         />
       ) : null}
       {deleteRow ? <DeleteDialog row={deleteRow} onCancel={() => setDeleteRow(null)} onDelete={() => removeRow(deleteRow)} /> : null}
+      <AddTableModal
+        examples="Examples: PCB Costing, Component Alternatives, Vendor Comparison"
+        open={showElectricalTableModal}
+        title="Create Electrical BOM Table"
+        onClose={() => setShowElectricalTableModal(false)}
+        onCreate={createElectricalTable}
+      />
+      <DeleteTableDialog table={deleteElectricalTable} onCancel={() => setDeleteElectricalTable(null)} onConfirm={confirmDeleteElectricalTable} />
+      <AddTableModal
+        examples="Examples: Fabrication Parts, Drawing Checklist, Supplier Comparison"
+        open={showMechanicalTableModal}
+        title="Create Mechanical BOM Table"
+        onClose={() => setShowMechanicalTableModal(false)}
+        onCreate={createMechanicalTable}
+      />
+      <DeleteTableDialog table={deleteMechanicalTable} onCancel={() => setDeleteMechanicalTable(null)} onConfirm={confirmDeleteMechanicalTable} />
     </div>
   );
 }
 
-function TopCrumbs({ title, code }: { title: string; code: string }) {
+function TopCrumbs({ title, code, currentStage }: { title: string; code: string; currentStage: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3"><Link to="../overview" relative="path" className="icon-button h-10 w-10" title="Back to overview"><ChevronRight className="rotate-180" size={18} /></Link><h1 className="text-xl font-bold">{title}</h1></div>
-      <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-500"><Link to="/projects" className="hover:text-primary">Projects</Link><ChevronRight size={15} /><Link to="../overview" relative="path" className="hover:text-primary">{code}</Link><ChevronRight size={15} /><span className="font-bold text-ink">BOM</span></div>
+      <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-500"><Link to="/projects" className="hover:text-primary">Projects</Link><ChevronRight size={15} /><Link to="../overview" relative="path" className="hover:text-primary">{code}</Link><ChevronRight size={15} /><span className="font-bold text-ink">{currentStage}</span></div>
     </div>
   );
 }
@@ -618,6 +1145,72 @@ function statusClass(status: BomStatus) {
   return 'bg-slate-100 text-slate-600';
 }
 
+function makeElectricalRow(
+  item: string,
+  specification: string,
+  qty: string,
+  unit: string,
+  pricePerUnit: string,
+  totalCost: string,
+  referenceDesignator: string,
+  supplierSource: string,
+  pad: string,
+  totalPad: string,
+  solderingCost: string,
+  totalSolderCost: string,
+  finalCost: string,
+  remarks = ''
+): ElectricalBomRow {
+  return {
+    id: `electrical_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    item,
+    specification,
+    qty,
+    unit,
+    pricePerUnit,
+    totalCost,
+    referenceDesignator,
+    supplierSource,
+    pad,
+    totalPad,
+    solderingCost,
+    totalSolderCost,
+    finalCost,
+    remarks
+  };
+}
+
+function makeMechanicalRow(
+  srNo: string,
+  partNumber: string,
+  item: string,
+  specification: string,
+  material: string,
+  qty: string,
+  unit: string,
+  drawing = '',
+  unitCost = '',
+  totalCost = '',
+  supplier = '',
+  remarks = ''
+): MechanicalBomRow {
+  return {
+    id: `mechanical_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    srNo,
+    partNumber,
+    item,
+    specification,
+    material,
+    qty,
+    unit,
+    drawing,
+    unitCost,
+    totalCost,
+    supplier,
+    remarks
+  };
+}
+
 function seedBomRows(items: Array<{ id: string; materialName: string; vendor: string; quantity: number; cost: number; procurementStage: string }>): BomRow[] {
   const fallback: BomRow[] = [];
   if (!items.length) return fallback;
@@ -634,9 +1227,43 @@ function referenceDocuments(rows: BomRow[]) {
   return Array.from(new Set(rows.map((row) => row.referenceDocument).filter(Boolean)));
 }
 
+function tableHasData(table: BenchmarkingTableData) {
+  return table.rows.some((row) => Object.values(row.cells).some((value) => value.trim()));
+}
+
+function makeId(prefix: string) {
+  return `${prefix}_${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`}`;
+}
+
+function makeSpreadsheetTable(name: string, values: string[][]): BenchmarkingTableData {
+  const columnCount = Math.max(1, ...values.map((row) => row.length));
+  const columns = Array.from({ length: columnCount }, () => ({ id: makeId('col') }));
+  return {
+    _id: makeId('table'),
+    name,
+    columns,
+    rows: (values.length ? values : [['']]).map((row) => ({
+      id: makeId('row'),
+      cells: columns.reduce<Record<string, string>>((cells, column, columnIndex) => {
+        cells[column.id] = row[columnIndex] || '';
+        return cells;
+      }, {})
+    }))
+  };
+}
+
+function isLegacyElectricalSample(rows: ElectricalBomRow[]) {
+  const sampleItems = ['Buzzer', 'Connector 2Pin', 'Connector 3Pin', 'Connector 5Pin', 'Connector 6Pin', 'Connector 8Pin'];
+  return rows.length === sampleItems.length && rows.every((row, index) => row.item === sampleItems[index]);
+}
+
 function readStoredBom(key: string, seedItems: Parameters<typeof seedBomRows>[0]) {
   const fallback = {
     rows: seedBomRows(seedItems),
+    electricalRows: defaultElectricalRows,
+    mechanicalRows: defaultMechanicalRows,
+    electricalTables: [] as BenchmarkingTableData[],
+    mechanicalTables: [] as BenchmarkingTableData[],
     notes: defaultNotes,
     lastSaved: new Date().toISOString()
   };
@@ -644,8 +1271,13 @@ function readStoredBom(key: string, seedItems: Parameters<typeof seedBomRows>[0]
   if (!saved) return fallback;
   try {
     const parsed = JSON.parse(saved) as Partial<typeof fallback>;
+    const electricalRows = Array.isArray(parsed.electricalRows) ? parsed.electricalRows : fallback.electricalRows;
     return {
       rows: Array.isArray(parsed.rows) ? parsed.rows : fallback.rows,
+      electricalRows: isLegacyElectricalSample(electricalRows) ? fallback.electricalRows : electricalRows,
+      mechanicalRows: Array.isArray(parsed.mechanicalRows) ? parsed.mechanicalRows : fallback.mechanicalRows,
+      electricalTables: Array.isArray(parsed.electricalTables) ? parsed.electricalTables : fallback.electricalTables,
+      mechanicalTables: Array.isArray(parsed.mechanicalTables) ? parsed.mechanicalTables : fallback.mechanicalTables,
       notes: typeof parsed.notes === 'string' ? parsed.notes : fallback.notes,
       lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
     };

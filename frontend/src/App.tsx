@@ -46,6 +46,8 @@ export function App() {
         <Route path="benchmarking" element={<Benchmarking />} />
         <Route path="attachments" element={<Attachments />} />
         <Route path="bom" element={<BOM />} />
+        <Route path="electrical-bom" element={<BOM currentStage="Electrical BOM" />} />
+        <Route path="mechanical-bom" element={<BOM currentStage="Mechanical BOM" />} />
         <Route path="product-design" element={<ProductDesign />} />
         <Route path="programming" element={<Programming />} />
         <Route path="testing-validation" element={<TestingValidation />} />

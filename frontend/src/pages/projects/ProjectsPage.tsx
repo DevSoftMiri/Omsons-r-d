@@ -26,6 +26,8 @@ function stageState(stage: Stage) {
 
 function stageLabel(name: string) {
   if (name === 'Product Design') return 'Design';
+  if (name === 'Electrical BOM') return 'Electrical';
+  if (name === 'Mechanical BOM') return 'Mechanical';
   if (name === 'Testing & Validation') return 'Testing';
   if (name === 'Final Stage') return 'Final';
   return name;

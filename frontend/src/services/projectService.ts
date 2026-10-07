@@ -59,6 +59,24 @@ function normalizeProject(raw: any): Project {
       }))
       : []
   }));
+  if (normalizedStages.some((stage) => stage.name === 'BOM') && !normalizedStages.some((stage) => stage.name === 'Electrical BOM')) {
+    const bomIndex = normalizedStages.findIndex((stage) => stage.name === 'BOM');
+    const previousStagesComplete = normalizedStages.slice(0, bomIndex + 1).every((stage) => stage.status === 'Completed');
+    normalizedStages.splice(bomIndex + 1, 0, makeStage('Electrical BOM', bomIndex + 1, {
+      id: `${rawProject._id || rawProject.id}-electrical-bom`,
+      status: previousStagesComplete ? 'Pending' : 'Locked',
+      progress: 0
+    }));
+  }
+  if (normalizedStages.some((stage) => stage.name === 'Electrical BOM') && !normalizedStages.some((stage) => stage.name === 'Mechanical BOM')) {
+    const electricalIndex = normalizedStages.findIndex((stage) => stage.name === 'Electrical BOM');
+    const previousStagesComplete = normalizedStages.slice(0, electricalIndex + 1).every((stage) => stage.status === 'Completed');
+    normalizedStages.splice(electricalIndex + 1, 0, makeStage('Mechanical BOM', electricalIndex + 1, {
+      id: `${rawProject._id || rawProject.id}-mechanical-bom`,
+      status: previousStagesComplete ? 'Pending' : 'Locked',
+      progress: 0
+    }));
+  }
   if (!normalizedStages.some((stage) => stage.name === 'Final Stage')) {
     normalizedStages.push(makeStage('Final Stage', normalizedStages.length, {
       id: `${rawProject._id || rawProject.id}-final-stage`,

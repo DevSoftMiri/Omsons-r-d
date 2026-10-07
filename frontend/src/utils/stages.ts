@@ -5,6 +5,8 @@ export const coreStageRoutes: Record<CoreStageName, string> = {
   Benchmarking: 'benchmarking',
   Attachments: 'attachments',
   BOM: 'bom',
+  'Electrical BOM': 'electrical-bom',
+  'Mechanical BOM': 'mechanical-bom',
   'Product Design': 'product-design',
   Programming: 'programming',
   Reporting: 'reporting',

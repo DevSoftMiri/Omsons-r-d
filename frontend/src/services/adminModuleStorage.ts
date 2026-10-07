@@ -119,7 +119,22 @@ export function saveReports(items: GeneratedReport[]) {
 }
 
 export function readSettings(): AppSettings {
-  return readJson<AppSettings>(settingsKey, defaultSettings());
+  const settings = readJson<AppSettings>(settingsKey, defaultSettings());
+  const knownStages = new Set(settings.workflow.map((stage) => stage.name));
+  const missingStages = workflowStages.filter((stage) => !knownStages.has(stage));
+  if (!missingStages.length) return settings;
+  const finalIndex = settings.workflow.findIndex((stage) => stage.name === 'Final Stage');
+  const additions = missingStages.map((stage) => ({
+    id: String(stage).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    name: stage,
+    description: `${stage} stage tasks and approvals.`,
+    active: true,
+    required: stage === 'Final Stage'
+  }));
+  const workflow = [...settings.workflow];
+  workflow.splice(finalIndex < 0 ? workflow.length : finalIndex, 0, ...additions.filter((stage) => stage.name !== 'Final Stage'));
+  if (missingStages.includes('Final Stage')) workflow.push(additions.find((stage) => stage.name === 'Final Stage')!);
+  return { ...settings, workflow };
 }
 
 export function saveSettings(settings: AppSettings) {

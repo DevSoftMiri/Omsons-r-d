@@ -30,6 +30,17 @@ export function SpreadsheetGrid({
   onDeleteRow: (rowId: string) => void;
   onDeleteColumn: (columnId: string) => void;
 }) {
+  function cellClass(rowIndex: number, columnId: string, value: string) {
+    const header = table.rows[0]?.cells[columnId]?.trim().toLowerCase();
+    const normalized = value.trim().toLowerCase();
+    if (rowIndex > 0 && header === 'results') {
+      if (normalized === 'pass') return 'bg-emerald-100 text-emerald-800';
+      if (normalized === 'fail') return 'bg-red-600 text-white';
+      if (normalized === 'retest') return 'bg-amber-100 text-amber-800';
+    }
+    return rowIndex === 0 ? 'bg-blue-50' : 'bg-white';
+  }
+
   function handlePaste(event: ClipboardEvent<HTMLInputElement>, rowId: string, columnId: string) {
     const text = event.clipboardData.getData('text/plain');
     if (!text.includes('\t') && !text.includes('\n')) return;
@@ -74,11 +85,13 @@ export function SpreadsheetGrid({
               </th>
               {table.columns.map((column) => {
                 const selected = selectedCell?.tableId === table._id && selectedCell.rowId === row.id && selectedCell.columnId === column.id;
+                const value = row.cells[column.id] || '';
+                const colorClass = cellClass(rowIndex, column.id, value);
                 return (
-                  <td key={column.id} className={`border border-slate-200 p-0 ${rowIndex === 0 ? 'bg-blue-50' : 'bg-white'}`}>
+                  <td key={column.id} className={`border border-slate-200 p-0 ${colorClass}`}>
                     <input
-                      className={`h-9 w-full min-w-44 px-2 outline-none ${rowIndex === 0 ? 'font-semibold' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : 'focus:ring-2 focus:ring-inset focus:ring-primary'}`}
-                      value={row.cells[column.id] || ''}
+                      className={`h-9 w-full min-w-44 bg-transparent px-2 outline-none ${rowIndex === 0 ? 'font-semibold' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : 'focus:ring-2 focus:ring-inset focus:ring-primary'}`}
+                      value={value}
                       onChange={(event) => onCellChange(row.id, column.id, event.target.value)}
                       onFocus={() => onSelectCell({ tableId: table._id, rowId: row.id, columnId: column.id })}
                       onPaste={(event) => handlePaste(event, row.id, column.id)}

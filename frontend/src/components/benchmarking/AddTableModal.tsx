@@ -2,7 +2,19 @@ import { useState } from 'react';
 import { useToast } from '../ToastProvider';
 import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
 
-export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (values: { name: string; initialColumns: number; initialRows: number }) => void }) {
+export function AddTableModal({
+  open,
+  onClose,
+  onCreate,
+  title = 'Create Benchmarking Table',
+  examples = 'Examples: Material Comparison, Dimensional Comparison, Performance Testing'
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (values: { name: string; initialColumns: number; initialRows: number }) => void;
+  title?: string;
+  examples?: string;
+}) {
   const [name, setName] = useState('');
   const { showToast } = useToast();
   const [initialColumns, setInitialColumns] = useState(5);
@@ -27,7 +39,7 @@ export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onCl
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
       <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-soft">
-        <h2 className="text-xl font-bold">Create Benchmarking Table</h2>
+        <h2 className="text-xl font-bold">{title}</h2>
         <div className="mt-5 space-y-4">
           <label className="block text-sm font-semibold">
             Table Name
@@ -43,7 +55,7 @@ export function AddTableModal({ open, onClose, onCreate }: { open: boolean; onCl
               <input className="field mt-2" inputMode="numeric" value={initialRows} onChange={(event) => setInitialRows(Number(event.target.value))} />
             </label>
           </div>
-          <p className="text-sm text-slate-500">Examples: Material Comparison, Dimensional Comparison, Performance Testing</p>
+          <p className="text-sm text-slate-500">{examples}</p>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button className="secondary-button" onClick={onClose}>Cancel</button>
