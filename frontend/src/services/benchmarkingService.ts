@@ -1,5 +1,6 @@
 export interface BenchmarkingColumn {
   id: string;
+  width?: number;
 }
 
 export interface BenchmarkingRow {

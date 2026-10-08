@@ -76,6 +76,13 @@ export function BenchmarkingTable({
     });
   }
 
+  function resizeColumn(columnId: string, width: number) {
+    onChangeTable({
+      ...table,
+      columns: table.columns.map((column) => column.id === columnId ? { ...column, width } : column)
+    });
+  }
+
   function pasteCells(startRowId: string, startColumnId: string, values: string[][]) {
     const rowStart = table.rows.findIndex((row) => row.id === startRowId);
     const columnStart = table.columns.findIndex((column) => column.id === startColumnId);
@@ -141,6 +148,7 @@ export function BenchmarkingTable({
         onDeleteColumn={deleteColumn}
         onDeleteRow={deleteRow}
         onPasteCells={pasteCells}
+        onResizeColumn={resizeColumn}
         onSelectCell={onSelectCell}
       />
       <div className="mt-2 flex justify-end text-slate-500">

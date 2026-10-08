@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 
 const benchmarkingColumnSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true }
+    id: { type: String, required: true },
+    width: { type: Number, min: 40, max: 520 }
   },
   { _id: false }
 );
