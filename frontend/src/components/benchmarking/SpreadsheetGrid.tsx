@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import type { ClipboardEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 import type { BenchmarkingTableData, SelectedCell } from './types';
+import { evaluateCell } from './formulaUtils';
 
 const DEFAULT_COLUMN_WIDTH = 176;
 const MIN_COLUMN_WIDTH = 40;
@@ -77,11 +78,11 @@ export function SpreadsheetGrid({
     const header = (column?.label || table.rows[0]?.cells[columnId] || '').trim().toLowerCase();
     const normalized = value.trim().toLowerCase();
     if (rowIndex > 0 && header === 'results') {
-      if (normalized === 'pass') return 'bg-emerald-100 text-emerald-800';
-      if (normalized === 'fail') return 'bg-red-600 text-white';
-      if (normalized === 'retest') return 'bg-amber-100 text-amber-800';
+      if (normalized === 'pass') return 'bg-emerald-50 text-emerald-800';
+      if (normalized === 'fail') return 'bg-rose-50 text-rose-800';
+      if (normalized === 'retest') return 'bg-amber-50 text-amber-800';
     }
-    return rowIndex === 0 ? 'bg-blue-50' : 'bg-white';
+    return 'bg-white';
   }
 
   function handlePaste(
@@ -127,28 +128,53 @@ export function SpreadsheetGrid({
   }
 
   const tableWidth = 48 + table.columns.reduce((sum, column) => sum + columnWidth(column.width), 0);
+  const selectedRowIndex = selectedCell?.tableId === table._id
+    ? table.rows.findIndex((row) => row.id === selectedCell.rowId)
+    : -1;
+  const selectedColumnIndex = selectedCell?.tableId === table._id
+    ? table.columns.findIndex((column) => column.id === selectedCell.columnId)
+    : -1;
+  const selectedRawValue = selectedRowIndex >= 0 && selectedColumnIndex >= 0
+    ? table.rows[selectedRowIndex].cells[table.columns[selectedColumnIndex].id] || ''
+    : '';
 
   return (
-    <div className="w-full max-w-full overflow-x-auto rounded-lg border border-slate-200">
-      <table className="table-fixed border-collapse text-sm" style={{ width: tableWidth, minWidth: tableWidth, maxWidth: tableWidth }}>
+    <div className="space-y-2">
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-400">Formula</span>
+        <input
+          className="min-w-0 flex-1 bg-transparent font-mono text-sm text-slate-700 outline-none"
+          value={selectedRawValue}
+          placeholder="Select a cell to view or enter a formula"
+          onChange={(event) => {
+            if (selectedRowIndex >= 0 && selectedColumnIndex >= 0) {
+              onCellChange(table.rows[selectedRowIndex].id, table.columns[selectedColumnIndex].id, event.target.value);
+            }
+          }}
+          aria-label="Formula bar"
+        />
+        <span className="hidden shrink-0 text-[11px] text-slate-400 sm:inline">Use =SUM(A2:A5)</span>
+      </div>
+      <div className="w-full max-w-full overflow-auto rounded-lg border border-slate-200">
+        <table className="table-fixed border-collapse text-left text-xs" style={{ width: tableWidth, minWidth: tableWidth, maxWidth: tableWidth }}>
         <colgroup>
-          <col className="w-12" />
+          <col style={{ width: 48, minWidth: 48, maxWidth: 48 }} />
           {table.columns.map((column) => (
             <col key={column.id} style={{ width: columnWidth(column.width), minWidth: columnWidth(column.width), maxWidth: columnWidth(column.width) }} />
           ))}
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 h-8 w-12 border border-slate-200 bg-slate-100 text-slate-400" />
+            <th className="h-9 w-12 border border-slate-200 bg-white px-1.5 py-2.5 text-center font-extrabold text-slate-700" />
             {table.columns.map((column, index) => (
               <th
                 key={column.id}
-                className="relative h-8 overflow-hidden border border-slate-200 bg-slate-100 px-2 text-center text-xs font-semibold text-slate-500"
+                className="relative h-9 overflow-hidden border border-slate-200 bg-white px-2 py-2.5 text-center font-extrabold leading-tight text-slate-700"
               >
                 <div className="flex items-center justify-center gap-2">
                   {editableColumnLabels ? (
                     <input
-                      className="h-6 min-w-0 flex-1 rounded border border-transparent bg-white/70 px-1 text-center text-xs font-semibold text-slate-700 outline-none focus:border-primary"
+                      className="h-7 min-w-0 flex-1 bg-transparent px-1 text-center text-xs font-extrabold text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
                       value={column.label || ''}
                       onChange={(event) => onColumnLabelChange?.(column.id, event.target.value)}
                       placeholder={columnLetter(index)}
@@ -158,7 +184,8 @@ export function SpreadsheetGrid({
                   )}
                   {table.columns.length > 1 ? (
                     <button
-                      className="grid h-5 w-5 place-items-center text-slate-400 hover:text-rose-600"
+                      type="button"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                       title="Delete column"
                       onClick={() => {
                         if (window.confirm('Delete this column?'))
@@ -171,7 +198,7 @@ export function SpreadsheetGrid({
                 </div>
                 <button
                   type="button"
-                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none bg-transparent hover:bg-primary/20"
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none bg-transparent transition hover:bg-primary/30"
                   aria-label={`Resize column ${columnLetter(index)}`}
                   onMouseDown={(event) => startColumnResize(event, column.id, column.width)}
                 />
@@ -182,12 +209,13 @@ export function SpreadsheetGrid({
         <tbody>
           {table.rows.map((row, rowIndex) => (
             <tr key={row.id}>
-              <th className="sticky left-0 z-10 h-9 w-12 border border-slate-200 bg-slate-100 text-center text-xs font-semibold text-slate-500">
+              <th className="h-9 w-12 border border-slate-200 px-1.5 text-center text-xs font-extrabold text-slate-700">
                 <div className="flex items-center justify-center gap-1">
                   <span>{rowIndex + 1}</span>
                   {table.rows.length > 1 ? (
                     <button
-                      className="grid h-5 w-5 place-items-center text-slate-400 hover:text-rose-600"
+                      type="button"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                       title="Delete row"
                       onClick={() => onDeleteRow(row.id)}
                     >
@@ -201,20 +229,21 @@ export function SpreadsheetGrid({
                   selectedCell?.tableId === table._id &&
                   selectedCell.rowId === row.id &&
                   selectedCell.columnId === column.id;
-                const value = row.cells[column.id] || '';
+                const rawValue = row.cells[column.id] || '';
+                const value = evaluateCell(table, rowIndex, columnIndex);
                 const colorClass = cellClass(rowIndex, column.id, value);
                 return (
                   <td
                     key={column.id}
-                    className={`overflow-hidden border border-slate-200 p-0 ${colorClass}`}
+                    className={`overflow-hidden border border-slate-200 p-0 align-top ${colorClass}`}
                   >
                     <textarea
-                      className={`block min-h-9 w-full resize-none whitespace-normal break-words bg-transparent px-2 py-2 leading-5 outline-none ${rowIndex === 0 ? 'font-semibold' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : 'focus:ring-2 focus:ring-inset focus:ring-primary'}`}
+                      className={`block h-9 w-full resize-none whitespace-normal break-words bg-transparent px-2 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${rowIndex === 0 ? 'font-extrabold text-slate-800' : ''} ${selected ? 'bg-primary/[.06] ring-2 ring-inset ring-primary' : ''}`}
                       data-column-index={columnIndex}
                       data-row-index={rowIndex}
                       data-spreadsheet-table={table._id}
                       rows={1}
-                      value={value}
+                      value={selected ? rawValue : value}
                       onChange={(event) =>
                         onCellChange(row.id, column.id, event.target.value)
                       }
@@ -233,8 +262,9 @@ export function SpreadsheetGrid({
               })}
             </tr>
           ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

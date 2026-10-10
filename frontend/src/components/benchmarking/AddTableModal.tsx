@@ -38,8 +38,11 @@ export function AddTableModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-      <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-soft">
-        <h2 className="text-xl font-bold">{title}</h2>
+      <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+        <div className="border-b border-slate-200 pb-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Benchmarking</p>
+          <h2 className="mt-1 text-xl font-bold text-slate-900">{title}</h2>
+        </div>
         <div className="mt-5 space-y-4">
           <label className="block text-sm font-semibold">
             Table Name
@@ -57,9 +60,9 @@ export function AddTableModal({
           </div>
           <p className="text-sm text-slate-500">{examples}</p>
         </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <button className="secondary-button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" onClick={submit}>Create Table</button>
+        <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
+          <button className="secondary-button h-10" onClick={onClose}>Cancel</button>
+          <button className="primary-button h-10" onClick={submit}>Create Table</button>
         </div>
       </section>
     </div>

@@ -47,7 +47,7 @@ function makeId(prefix: string) {
 }
 
 function makeTable(name: string, values: string[][]): BenchmarkingTableData {
-  const columnCount = Math.max(...values.map((row) => row.length));
+  const columnCount = Math.max(...values.map((row) => row.length), 1);
   const columns = Array.from({ length: columnCount }, (_, index) => ({ id: `col_${index + 1}` }));
   return {
     _id: makeId('table'),
@@ -63,38 +63,37 @@ function makeTable(name: string, values: string[][]): BenchmarkingTableData {
   };
 }
 
-function demoWorkbook(projectId: string): BenchmarkingWorkbook {
+function makeBlankTable(name = 'Benchmarking Table', columnCount = 5, rowCount = 5): BenchmarkingTableData {
+  const columns = Array.from({ length: columnCount }, () => ({ id: makeId('col') }));
+  return {
+    _id: makeId('table'),
+    name,
+    columns,
+    rows: Array.from({ length: rowCount }, () => ({
+      id: makeId('row'),
+      cells: columns.reduce<Record<string, string>>((cells, column) => {
+        cells[column.id] = '';
+        return cells;
+      }, {})
+    }))
+  };
+}
+
+function blankWorkbook(projectId: string): BenchmarkingWorkbook {
   const now = new Date().toISOString();
   return {
     _id: `local_${projectId}`,
     project: projectId,
     reviewStatus: 'draft',
     updatedAt: now,
-    tables: [
-      makeTable('Material Comparison', [
-        ['Parameter', 'Our Target', 'Borosil (Competitor)', 'Duran (Competitor)', 'Remarks'],
-        ['Glass Type', 'Borosilicate 3.3', 'Borosilicate 3.3', 'Borosilicate 3.3', 'Both meet requirement'],
-        ['Thermal Resistance', '>= 500', '510', '560', 'Duran better'],
-        ['Chemical Resistance', 'Excellent', 'Excellent', 'Excellent', 'All good'],
-        ['Transparency', 'High', 'High', 'Very High', 'Duran slightly better'],
-        ['', '', '', '', '']
-      ]),
-      makeTable('Dimensional Comparison', [
-        ['Parameter', 'Our Target', 'Brand A', 'Brand B', 'Unit', 'Tolerance', 'Remarks'],
-        ['Capacity (Nominal)', '250', '250', '250', 'ml', '+/-5%', 'Matches'],
-        ['Height', '90', '88', '91', 'mm', '+/-2', 'Within range'],
-        ['Top Diameter', '70', '69', '71', 'mm', '+/-2', 'Within range'],
-        ['Wall Thickness', '1.5', '1.4', '1.6', 'mm', '+/-0.2', 'Brand B better'],
-        ['', '', '', '', '', '', '']
-      ])
-    ]
+    tables: [makeBlankTable()]
   };
 }
 
 function readLocalWorkbook(projectId: string) {
   const saved = localStorage.getItem(localKey(projectId));
   if (saved) return JSON.parse(saved) as BenchmarkingWorkbook;
-  const workbook = demoWorkbook(projectId);
+  const workbook = blankWorkbook(projectId);
   writeLocalWorkbook(projectId, workbook);
   return workbook;
 }

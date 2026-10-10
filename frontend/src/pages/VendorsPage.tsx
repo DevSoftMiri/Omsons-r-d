@@ -4,14 +4,14 @@ import { PageTopBar } from '../components/PageTopBar';
 import { useToast } from '../components/ToastProvider';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { fetchProjects } from '../services/projectService';
+import { createVendor, fetchVendors, updateVendor, type VendorPaymentType, type VendorRecord, type VendorStatus } from '../services/vendorService';
 import { setProjects } from '../store';
 import type { Project } from '../types';
 import { getMissingFields, showMissingFieldsToast } from '../utils/requiredFields';
 
-type VendorStatus = 'Active' | 'Inactive';
-
 interface VendorRow {
   id: string;
+  persisted: boolean;
   name: string;
   code?: string;
   category: string;
@@ -20,6 +20,11 @@ interface VendorRow {
   phone?: string;
   email?: string;
   location?: string;
+  suppliedComponents: string;
+  paymentType: VendorPaymentType;
+  advancePercentage: number;
+  creditDays: number;
+  paymentTerms?: string;
   projects: Project[];
   status: VendorStatus;
   preferred: boolean;
@@ -34,11 +39,16 @@ const emptyForm = {
   code: '',
   category: '',
   contactPerson: '',
+  designation: '',
   phone: '',
   email: '',
   location: '',
   supply: '',
   projectId: '',
+  paymentType: 'Advance' as VendorPaymentType,
+  advancePercentage: '',
+  creditDays: '',
+  paymentTerms: '',
   preferred: true,
   status: 'Active' as VendorStatus,
   notes: ''
@@ -55,6 +65,21 @@ function categoryFromText(value: string) {
   if (text.includes('test') || text.includes('lab')) return 'Testing';
   if (text.includes('component')) return 'Component';
   return 'Raw Material';
+}
+
+function paymentSummary(vendor: VendorRow) {
+  if (vendor.paymentType === 'Credit') return `Credit ${vendor.creditDays || 0} days`;
+  return `Advance ${vendor.advancePercentage || 0}%`;
+}
+
+function mapSavedVendor(vendor: VendorRecord, projects: Project[]): VendorRow {
+  return {
+    ...vendor,
+    persisted: true,
+    projects: projects.filter((project) =>
+      project.bom.some((item) => item.vendor?.trim().toLowerCase() === vendor.name.trim().toLowerCase())
+    )
+  };
 }
 
 function buildVendorsFromProjects(projects: Project[]): VendorRow[] {
@@ -75,7 +100,8 @@ function buildVendorsFromProjects(projects: Project[]): VendorRow[] {
       }
 
       byVendor.set(key, {
-        id: key,
+        id: `bom-${key}`,
+        persisted: false,
         name,
         code: '',
         category: categoryFromText(item.materialName),
@@ -84,6 +110,11 @@ function buildVendorsFromProjects(projects: Project[]): VendorRow[] {
         phone: '',
         email: '',
         location: '',
+        suppliedComponents: item.materialName,
+        paymentType: 'Advance',
+        advancePercentage: 0,
+        creditDays: 0,
+        paymentTerms: '',
         projects: [project],
         status: 'Active',
         preferred: false,
@@ -103,7 +134,8 @@ export function VendorsPage() {
   const [categoryFilter, setCategoryFilter] = useState<(typeof categoryOptions)[number]>('All Categories');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [createdVendors, setCreatedVendors] = useState<VendorRow[]>([]);
+  const [savedVendors, setSavedVendors] = useState<VendorRecord[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(true);
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
@@ -113,7 +145,26 @@ export function VendorsPage() {
       .catch(() => undefined);
   }, [dispatch]);
 
-  const vendors = useMemo(() => [...buildVendorsFromProjects(projects), ...createdVendors], [createdVendors, projects]);
+  useEffect(() => {
+    setVendorsLoading(true);
+    fetchVendors()
+      .then(setSavedVendors)
+      .catch((error) => {
+        showToast({
+          tone: 'error',
+          title: 'Unable to load vendors',
+          message: error instanceof Error ? error.message : 'Please try again.'
+        });
+      })
+      .finally(() => setVendorsLoading(false));
+  }, [showToast]);
+
+  const vendors = useMemo(() => {
+    const savedRows = savedVendors.map((vendor) => mapSavedVendor(vendor, projects));
+    const savedNames = new Set(savedRows.map((vendor) => vendor.name.trim().toLowerCase()));
+    const bomRows = buildVendorsFromProjects(projects).filter((vendor) => !savedNames.has(vendor.name.trim().toLowerCase()));
+    return [...savedRows, ...bomRows];
+  }, [projects, savedVendors]);
   const filteredVendors = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return vendors.filter((vendor) => {
@@ -138,42 +189,72 @@ export function VendorsPage() {
     setForm(emptyForm);
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const missing = getMissingFields([
       { label: 'Vendor / Company Name', value: form.name },
       { label: 'Category', value: form.category },
       { label: 'Contact Person', value: form.contactPerson },
-      { label: 'What do they supply?', value: form.supply },
+      { label: 'Components / Materials Supplied', value: form.supply },
+      { label: 'Payment Type', value: form.paymentType },
       { label: 'Status', value: form.status }
     ]);
     if (showMissingFieldsToast(showToast, missing)) return;
+
+    const advancePercentage = Number(form.advancePercentage || 0);
+    const creditDays = Number(form.creditDays || 0);
+    if (form.paymentType === 'Advance' && (!Number.isFinite(advancePercentage) || advancePercentage < 0 || advancePercentage > 100)) {
+      showToast({ tone: 'error', title: 'Check advance percentage', message: 'Advance percentage must be between 0 and 100.' });
+      return;
+    }
+    if (form.paymentType === 'Credit' && (!Number.isFinite(creditDays) || creditDays <= 0)) {
+      showToast({ tone: 'error', title: 'Check credit days', message: 'Credit days must be greater than 0.' });
+      return;
+    }
+
     const linkedProject = projects.find((project) => project.id === form.projectId);
     const category = form.category || categoryFromText(form.supply);
-    const nextVendor = {
-      id: editingVendorId || `vendor-${Date.now()}`,
+    const payload = {
       name: form.name.trim(),
       code: form.code.trim(),
       category,
       contactPerson: form.contactPerson.trim(),
+      designation: form.designation.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
       location: form.location.trim(),
-      projects: linkedProject ? [linkedProject] : [],
+      suppliedComponents: form.supply.trim(),
+      paymentType: form.paymentType,
+      advancePercentage: form.paymentType === 'Advance' ? advancePercentage : 0,
+      creditDays: form.paymentType === 'Credit' ? creditDays : 0,
+      paymentTerms: form.paymentTerms.trim(),
       status: form.status,
       preferred: form.preferred,
       notes: form.notes.trim()
     };
-    setCreatedVendors((current) => {
-      if (editingVendorId && current.some((vendor) => vendor.id === editingVendorId)) {
-        return current.map((vendor) => vendor.id === editingVendorId ? nextVendor : vendor);
+
+    try {
+      const editingSavedVendor = savedVendors.some((vendor) => vendor.id === editingVendorId);
+      const saved = editingVendorId && editingSavedVendor
+        ? await updateVendor(editingVendorId, payload)
+        : await createVendor(payload);
+      setSavedVendors((current) => {
+        if (editingSavedVendor) return current.map((vendor) => vendor.id === saved.id ? saved : vendor);
+        return [...current, saved];
+      });
+      if (linkedProject && !linkedProject.bom.some((item) => item.vendor?.trim().toLowerCase() === saved.name.trim().toLowerCase())) {
+        showToast({ tone: 'success', title: 'Vendor saved', message: 'Project assignment is shown when the vendor is used in a project BOM.' });
+      } else {
+        showToast({ tone: 'success', title: editingSavedVendor ? 'Vendor updated' : 'Vendor added' });
       }
-      return [
-        ...current,
-        nextVendor
-      ];
-    });
-    closeForm();
+      closeForm();
+    } catch (error) {
+      showToast({
+        tone: 'error',
+        title: 'Unable to save vendor',
+        message: error instanceof Error ? error.message : 'Please try again.'
+      });
+    }
   }
 
   return (
@@ -205,12 +286,14 @@ export function VendorsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1060px] w-full border-collapse text-left">
+          <table className="min-w-[1380px] w-full border-collapse text-left">
             <thead>
               <tr className="bg-[#f7faff] text-sm font-bold text-[#40577f]">
                 <th className="w-12 rounded-l-lg px-4 py-3">#</th>
                 <th className="w-[245px] px-4 py-3">Vendor / Company</th>
                 <th className="w-[150px] px-4 py-3">Category</th>
+                <th className="w-[220px] px-4 py-3">Components</th>
+                <th className="w-[150px] px-4 py-3">Payment</th>
                 <th className="w-[170px] px-4 py-3">Contact Person</th>
                 <th className="w-[210px] px-4 py-3">Contact</th>
                 <th className="w-[135px] px-4 py-3">Projects</th>
@@ -233,6 +316,13 @@ export function VendorsPage() {
                   </td>
                   <td className="px-4 py-4"><span className="vendor-category">{vendor.category}</span></td>
                   <td className="px-4 py-4">
+                    <p className="line-clamp-2 text-sm font-semibold text-[#20385f]">{vendor.suppliedComponents || vendor.notes || '--'}</p>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="text-sm font-bold text-[#20385f]">{paymentSummary(vendor)}</p>
+                    {vendor.paymentTerms ? <p className="mt-1 line-clamp-2 text-xs font-medium text-[#53688d]">{vendor.paymentTerms}</p> : null}
+                  </td>
+                  <td className="px-4 py-4">
                     <p className="font-bold text-[#20385f]">{vendor.contactPerson || '--'}</p>
                     <p className="text-sm font-medium text-[#53688d]">{vendor.designation || 'Contact person'}</p>
                   </td>
@@ -252,11 +342,16 @@ export function VendorsPage() {
                       code: vendor.code || '',
                       category: vendor.category,
                       contactPerson: vendor.contactPerson,
+                      designation: vendor.designation || '',
                       phone: vendor.phone || '',
                       email: vendor.email || '',
                       location: vendor.location || '',
-                      supply: vendor.notes || vendor.category,
+                      supply: vendor.suppliedComponents || vendor.notes || vendor.category,
                       projectId: vendor.projects[0]?.id || '',
+                      paymentType: vendor.paymentType,
+                      advancePercentage: String(vendor.advancePercentage || ''),
+                      creditDays: String(vendor.creditDays || ''),
+                      paymentTerms: vendor.paymentTerms || '',
                       preferred: vendor.preferred,
                       status: vendor.status,
                       notes: vendor.notes || ''
@@ -269,7 +364,7 @@ export function VendorsPage() {
           {!filteredVendors.length ? (
             <div className="px-4 py-12 text-center">
               <Store className="mx-auto text-[#7a8aa8]" size={34} />
-              <p className="mt-3 font-bold text-[#333333]">No vendors found</p>
+              <p className="mt-3 font-bold text-[#333333]">{vendorsLoading ? 'Loading vendors...' : 'No vendors found'}</p>
               <p className="mt-1 text-sm text-[#53688d]">Vendors will appear here from project BOMs or when you add one.</p>
             </div>
           ) : null}
@@ -303,6 +398,9 @@ export function VendorsPage() {
                 <FormField label="Contact Person" required className="md:col-span-2">
                   <input required value={form.contactPerson} onChange={(event) => updateForm('contactPerson', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="Enter contact person name" />
                 </FormField>
+                <FormField label="Designation" className="md:col-span-2">
+                  <input value={form.designation} onChange={(event) => updateForm('designation', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="e.g. Sales Manager" />
+                </FormField>
                 <FormField label="Phone Number" className="md:col-span-2">
                   <input value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="+91 98765 43210" />
                 </FormField>
@@ -315,7 +413,7 @@ export function VendorsPage() {
               </FormSection>
 
               <FormSection title="R&D Information">
-                <FormField label="What do they supply?" required className="md:col-span-3">
+                <FormField label="Components / Materials Supplied" required className="md:col-span-3">
                   <textarea required value={form.supply} onChange={(event) => updateForm('supply', event.target.value)} className="field min-h-[52px] resize-none px-3 py-1.5 text-sm" placeholder="E.g. Borosilicate glass tubes, bottles, components..." />
                 </FormField>
                 <FormField label="Assigned Projects" className="md:col-span-3">
@@ -323,6 +421,24 @@ export function VendorsPage() {
                     <option value="">Select projects</option>
                     {projects.map((project) => <option key={project.id} value={project.id}>{project.productCode} - {project.name}</option>)}
                   </select>
+                </FormField>
+                <FormField label="Payment Type" required className="md:col-span-2">
+                  <select required value={form.paymentType} onChange={(event) => updateForm('paymentType', event.target.value as VendorPaymentType)} className="field h-9 px-3 py-1.5 text-sm">
+                    <option value="Advance">Advance</option>
+                    <option value="Credit">Credit</option>
+                  </select>
+                </FormField>
+                {form.paymentType === 'Advance' ? (
+                  <FormField label="Advance Percentage" required className="md:col-span-2">
+                    <input type="number" min="0" max="100" value={form.advancePercentage} onChange={(event) => updateForm('advancePercentage', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="e.g. 30" />
+                  </FormField>
+                ) : (
+                  <FormField label="Credit Days" required className="md:col-span-2">
+                    <input type="number" min="1" value={form.creditDays} onChange={(event) => updateForm('creditDays', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="e.g. 45" />
+                  </FormField>
+                )}
+                <FormField label="Payment Terms" className="md:col-span-2">
+                  <input value={form.paymentTerms} onChange={(event) => updateForm('paymentTerms', event.target.value)} className="field h-9 px-3 py-1.5 text-sm" placeholder="50% before dispatch..." />
                 </FormField>
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-[#d8e2f2] bg-[#f8fbff] px-3 text-sm font-semibold text-[#20385f] md:col-span-3">
                   <input type="checkbox" checked={form.preferred} onChange={(event) => updateForm('preferred', event.target.checked)} className="h-4 w-4 rounded border-[#b8c8dd] text-[#00494B]" />

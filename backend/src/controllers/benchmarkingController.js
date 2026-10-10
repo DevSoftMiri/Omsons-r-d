@@ -21,6 +21,15 @@ function makeRows(count, columns) {
   }));
 }
 
+function makeBlankTable(name = 'Benchmarking Table', columnCount = 5, rowCount = 5) {
+  const columns = makeColumns(columnCount);
+  return {
+    name,
+    columns,
+    rows: makeRows(rowCount, columns)
+  };
+}
+
 async function findProject(identifier) {
   const query = mongoose.isValidObjectId(identifier) ? { _id: identifier } : { productCode: identifier };
   const project = await Project.findOne(query);
@@ -33,11 +42,18 @@ async function findProject(identifier) {
 }
 
 async function getOrCreateBenchmarking(projectId) {
-  return Benchmarking.findOneAndUpdate(
+  const benchmarking = await Benchmarking.findOneAndUpdate(
     { project: projectId },
-    { $setOnInsert: { project: projectId, tables: [], reviewStatus: 'draft' } },
+    { $setOnInsert: { project: projectId, tables: [makeBlankTable()], reviewStatus: 'draft' } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
+
+  if (!benchmarking.tables.length) {
+    benchmarking.tables.push(makeBlankTable());
+    await benchmarking.save();
+  }
+
+  return benchmarking;
 }
 
 function hasMeaningfulData(benchmarking) {
