@@ -6,8 +6,10 @@ import { BenchmarkingTable } from '../../../components/benchmarking/Benchmarking
 import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
 import type { BenchmarkingTableData, SelectedCell } from '../../../components/benchmarking/types';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { readProductSpecifications } from '../../../services/productSpecificationsService';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 
@@ -18,28 +20,29 @@ type StoredValidation = {
   lastSaved: string;
 };
 
-const defaultTables = [
-  makeTable('Key Features', [
-    ['Key Features', 'Checkbox', 'Results'],
-    ['• Advanced microprocessor-based auto-tuning PID controller for precise temperature control', '', 'Pass'],
-    ['• High thermal stability up to ±0.5°C with reliable performance', '', 'Fail'],
-    ['• Fine temperature control with 0.1°C resolution', '', ''],
-    ['• PT100 RTD sensor for accurate temperature measurement', '', '']
-  ]),
-  makeTable('Validation', [
-    ['Test Name', 'Required Parameter', 'Tolerance', 'Observed Parameter', 'Results'],
-    ['Capacity', '2L', 'Range 1.95-2.05 L', '2L', 'Pass'],
-    ['Power Consumption', '200W', 'Range 195-205 W', '180W', 'Fail'],
-    ['Temperature Range', 'Ambient +5°C to 99°C', '', '', '']
-  ])
-];
+function makeDefaultTables(projectCode: string) {
+  const specifications = readProductSpecifications(projectCode).rows.filter((row) => row.parameter.trim() || row.specification.trim());
+  return [
+    makeTable('Key Features', [
+      ['Key Features', 'Checkbox', 'Results'],
+      ['• Advanced microprocessor-based auto-tuning PID controller for precise temperature control', '', 'Pass'],
+      ['• High thermal stability up to ±0.5°C with reliable performance', '', 'Fail'],
+      ['• Fine temperature control with 0.1°C resolution', '', ''],
+      ['• PT100 RTD sensor for accurate temperature measurement', '', '']
+    ]),
+    makeTable('Validation', [
+      ['Test Name', 'Required Parameter', 'Tolerance', 'Observed Parameter', 'Results'],
+      ...specifications.map((row) => [row.parameter, row.specification, '', '', ''])
+    ])
+  ];
+}
 
 export function TestingValidation() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
   const storageKey = `testing-validation:${project.productCode}`;
-  const initial = readStored(storageKey);
+  const initial = readStored(storageKey, project.productCode);
   const [tables, setTables] = useState(initial.tables);
   const [lastSaved, setLastSaved] = useState(initial.lastSaved);
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
@@ -127,6 +130,7 @@ export function TestingValidation() {
     <div className="mx-auto min-w-0 max-w-full space-y-4 overflow-hidden text-sm 2xl:max-w-[1500px]">
       <TopCrumbs title={project.name} code={project.productCode} />
       <ProjectStageHeader project={project} currentStage="Testing & Validation" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Testing & Validation" mode="controls" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -175,6 +179,7 @@ export function TestingValidation() {
 
       <AddTableModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreate={createTable} />
       <DeleteTableDialog table={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteTable} />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Testing & Validation" mode="blocks" />
     </div>
   );
 }
@@ -197,8 +202,8 @@ function TopCrumbs({ title, code }: { title: string; code: string }) {
   );
 }
 
-function readStored(key: string): StoredValidation {
-  const fallback = { tables: defaultTables, lastSaved: new Date().toISOString() };
+function readStored(key: string, projectCode: string): StoredValidation {
+  const fallback = { tables: makeDefaultTables(projectCode), lastSaved: new Date().toISOString() };
   const saved = localStorage.getItem(key);
   if (!saved) return fallback;
   try {

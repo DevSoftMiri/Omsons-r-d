@@ -5,6 +5,7 @@ import { AddTableModal } from '../../../components/benchmarking/AddTableModal';
 import { BenchmarkingTable } from '../../../components/benchmarking/BenchmarkingTable';
 import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import type { BenchmarkingTableData, BenchmarkingWorkbook, SelectedCell } from '../../../components/benchmarking/types';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
@@ -183,6 +184,7 @@ export function Benchmarking() {
       </div>
 
       <ProjectStageHeader project={project} currentStage="Benchmarking" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Benchmarking" mode="controls" />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -243,6 +245,7 @@ export function Benchmarking() {
 
       <AddTableModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreate={createTable} />
       <DeleteTableDialog table={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteTable} />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Benchmarking" mode="blocks" />
     </div>
   );
 }

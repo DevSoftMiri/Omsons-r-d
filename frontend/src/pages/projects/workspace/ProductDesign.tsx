@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { downloadFile, NO_FILE_AVAILABLE, resolveFileUrl } from '../../../utils/fileActions';
@@ -130,6 +131,7 @@ export function ProductDesign() {
     <div className="mx-auto max-w-[1500px] space-y-2.5 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
       <ProjectStageHeader project={project} currentStage="Product Design" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Product Design" mode="controls" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -232,6 +234,7 @@ export function ProductDesign() {
       {preview ? <PreviewModal design={preview} onClose={() => setPreview(null)} /> : null}
       {deleteFile ? <DeleteDialog design={deleteFile} onCancel={() => setDeleteFile(null)} onDelete={() => removeDesign(deleteFile.id)} /> : null}
       {showLinkModal ? <LinkAttachmentModal linked={linked} onClose={() => setShowLinkModal(false)} onSave={(items) => { setLinked(items); setShowLinkModal(false); }} /> : null}
+      <StageResponseBuilder projectCode={project.productCode} stageName="Product Design" mode="blocks" />
     </div>
   );
 }

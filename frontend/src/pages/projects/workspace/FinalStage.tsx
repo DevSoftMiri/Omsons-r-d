@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useAppDispatch } from '../../../hooks';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
@@ -194,6 +195,7 @@ export function FinalStage() {
         currentStage="Final Stage"
         statusOverride={approved ? 'Completed' : undefined}
       />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Final Stage" mode="controls" />
 
       <section>
         <h2 className="text-2xl font-bold">Final Stage</h2>
@@ -404,6 +406,7 @@ export function FinalStage() {
           showToast={showToast}
         />
       ) : null}
+      <StageResponseBuilder projectCode={project.productCode} stageName="Final Stage" mode="blocks" />
       {showDocument ? (
         <DocumentModal
           onClose={() => setShowDocument(false)}

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Check, ChevronRight, FileText, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
@@ -83,12 +84,14 @@ export function Reporting() {
       </div>
 
       <ProjectStageHeader project={project} currentStage="Reporting" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Reporting" mode="controls" />
 
       <section>
         <h2 className="text-2xl font-bold">Reporting</h2>
         <p className="mt-1.5 text-sm text-slate-600">Record daily work updates, hours, and submission status for this project.</p>
         {message ? <p className="mt-2 text-sm font-semibold text-primary">{message}</p> : null}
       </section>
+      <StageResponseBuilder projectCode={project.productCode} stageName="Reporting" mode="blocks" />
 
       <section className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <form className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft" onSubmit={submitReport}>

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
@@ -140,6 +141,7 @@ export function Programming() {
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} />
       <ProjectStageHeader project={project} currentStage="Programming" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Programming" mode="controls" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -274,6 +276,7 @@ export function Programming() {
       {drawerMode ? <ProgramDrawer mode={drawerMode} program={activeProgram} onClose={() => setDrawerMode(null)} onEdit={() => setDrawerMode('edit')} onSave={saveProgram} showToast={showToast} /> : null}
       {deleteProgram ? <DeleteDialog program={deleteProgram} onCancel={() => setDeleteProgram(null)} onDelete={() => removeProgram(deleteProgram.id)} /> : null}
       {showReferences ? <ReferenceModal linked={references} onClose={() => setShowReferences(false)} onSave={(items) => { setReferences(items); setShowReferences(false); }} /> : null}
+      <StageResponseBuilder projectCode={project.productCode} stageName="Programming" mode="blocks" />
     </div>
   );
 }

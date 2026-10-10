@@ -31,7 +31,7 @@ const projectSchema = new mongoose.Schema(
     teamMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
     status: { type: String, enum: ['Running', 'On Hold', 'Completed', 'Delayed'], default: 'Running' },
-    currentStage: { type: String, default: 'Prerequisites' },
+    currentStage: { type: String, default: 'Product Specifications' },
     stages: { type: [stageSchema], default: [] },
     design: {
       description: String,

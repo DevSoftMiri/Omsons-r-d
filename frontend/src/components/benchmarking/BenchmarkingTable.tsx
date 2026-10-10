@@ -13,7 +13,8 @@ export function BenchmarkingTable({
   onChangeTable,
   onImportCsv,
   onExportCsv,
-  onDeleteTable
+  onDeleteTable,
+  editableColumnLabels = false
 }: {
   index: number;
   table: BenchmarkingTableData;
@@ -23,6 +24,7 @@ export function BenchmarkingTable({
   onImportCsv: (table: BenchmarkingTableData, file: File) => void;
   onExportCsv: (table: BenchmarkingTableData) => void;
   onDeleteTable: (table: BenchmarkingTableData) => void;
+  editableColumnLabels?: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(table.name);
@@ -80,6 +82,13 @@ export function BenchmarkingTable({
     onChangeTable({
       ...table,
       columns: table.columns.map((column) => column.id === columnId ? { ...column, width } : column)
+    });
+  }
+
+  function updateColumnLabel(columnId: string, label: string) {
+    onChangeTable({
+      ...table,
+      columns: table.columns.map((column) => column.id === columnId ? { ...column, label } : column)
     });
   }
 
@@ -150,6 +159,8 @@ export function BenchmarkingTable({
         onPasteCells={pasteCells}
         onResizeColumn={resizeColumn}
         onSelectCell={onSelectCell}
+        editableColumnLabels={editableColumnLabels}
+        onColumnLabelChange={updateColumnLabel}
       />
       <div className="mt-2 flex justify-end text-slate-500">
         <MoreVertical size={18} />

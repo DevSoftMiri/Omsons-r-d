@@ -1,16 +1,19 @@
 import type { CoreStageName, Project, Stage, StageName } from '../types';
 
 export const coreStageRoutes: Record<CoreStageName, string> = {
-  Prerequisites: 'prerequisites',
+  'Product Specifications': 'product-specifications',
+  'Research Data': 'research-data',
   Benchmarking: 'benchmarking',
-  Attachments: 'attachments',
-  BOM: 'bom',
   'Electrical BOM': 'electrical-bom',
-  'Mechanical BOM': 'mechanical-bom',
-  'Product Design': 'product-design',
+  'Mechanical Product Design': 'mechanical-product-design',
+  'Electrical Product Design': 'electrical-product-design',
+  'High Level BOM': 'high-level-bom',
   Programming: 'programming',
-  Reporting: 'reporting',
+  'PAT test': 'pat-test',
+  Prototyping: 'prototyping',
   'Testing & Validation': 'testing-validation',
+  'Mechanical BOM': 'mechanical-bom',
+  'Product Documents': 'product-documents',
   'Final Stage': 'final-stage'
 };
 

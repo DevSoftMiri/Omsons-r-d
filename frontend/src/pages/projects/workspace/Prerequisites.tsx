@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import type { Project } from '../../../types';
@@ -217,12 +218,14 @@ export function Prerequisites() {
       </div>
 
       <ProjectStageHeader project={project} currentStage="Prerequisites" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Prerequisites" mode="controls" />
 
       <section>
         <h2 className="text-2xl font-bold tracking-normal">Prerequisites</h2>
         <p className="mt-1.5 text-sm text-slate-600">Upload the required R&D starting documents for this product.</p>
         {message ? <p className="mt-2 text-sm font-semibold text-amber-700">{message}</p> : null}
       </section>
+      <StageResponseBuilder projectCode={project.productCode} stageName="Prerequisites" mode="blocks" />
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

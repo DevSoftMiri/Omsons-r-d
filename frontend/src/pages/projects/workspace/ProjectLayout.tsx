@@ -2,6 +2,7 @@ import { ArrowLeft, LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
 import { ProjectSidebar } from '../../../components/ProjectSidebar';
+import { StageSectionOrder } from '../../../components/stageSections/StageSectionOrder';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { fetchProject } from '../../../services/projectService';
 import { logout, upsertProject } from '../../../store';
@@ -69,6 +70,7 @@ export function ProjectLayout() {
 
   const activeChildRoute = location.pathname.split('/').pop() || '';
   const lockedStage = project.stages.find((stage) => stage.name !== 'Final Stage' && stage.status === 'Locked' && getStageRoute(stage).split('/').pop() === activeChildRoute);
+  const activeStage = project.stages.find((stage) => getStageRoute(stage, project).split('/').pop() === activeChildRoute);
   if (lockedStage) {
     return <Navigate to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`} replace />;
   }
@@ -110,7 +112,7 @@ export function ProjectLayout() {
               </button>
             </header>
             <div className="p-2 lg:px-2.5 lg:py-2">
-              <Outlet />
+              {activeStage ? <StageSectionOrder projectCode={project.productCode} stageName={activeStage.name}><Outlet /></StageSectionOrder> : <Outlet />}
             </div>
           </div>
         </div>

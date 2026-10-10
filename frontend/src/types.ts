@@ -1,14 +1,17 @@
 export type CoreStageName =
-  | 'Prerequisites'
+  | 'Product Specifications'
+  | 'Research Data'
   | 'Benchmarking'
-  | 'Attachments'
-  | 'BOM'
   | 'Electrical BOM'
-  | 'Mechanical BOM'
-  | 'Product Design'
+  | 'Mechanical Product Design'
+  | 'Electrical Product Design'
+  | 'High Level BOM'
   | 'Programming'
-  | 'Reporting'
+  | 'PAT test'
+  | 'Prototyping'
   | 'Testing & Validation'
+  | 'Mechanical BOM'
+  | 'Product Documents'
   | 'Final Stage';
 
 export type StageName = CoreStageName | string;

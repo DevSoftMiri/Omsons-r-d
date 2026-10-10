@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import { downloadFile, NO_FILE_AVAILABLE, resolveFileUrl } from '../../../utils/fileActions';
@@ -131,6 +132,7 @@ export function Attachments() {
       </div>
 
       <ProjectStageHeader project={project} currentStage="Attachments" />
+      <StageResponseBuilder projectCode={project.productCode} stageName="Attachments" mode="controls" />
 
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -275,6 +277,7 @@ export function Attachments() {
       </section>
 
       {previewFile ? <PreviewModal file={previewFile} onClose={() => setPreviewFile(null)} /> : null}
+      <StageResponseBuilder projectCode={project.productCode} stageName="Attachments" mode="blocks" />
     </div>
   );
 }

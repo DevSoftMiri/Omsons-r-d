@@ -26,6 +26,8 @@ export function SpreadsheetGrid({
   onDeleteRow,
   onDeleteColumn,
   onResizeColumn,
+  editableColumnLabels = false,
+  onColumnLabelChange,
 }: {
   table: BenchmarkingTableData;
   selectedCell: SelectedCell | null;
@@ -39,6 +41,8 @@ export function SpreadsheetGrid({
   onDeleteRow: (rowId: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onResizeColumn: (columnId: string, width: number) => void;
+  editableColumnLabels?: boolean;
+  onColumnLabelChange?: (columnId: string, label: string) => void;
 }) {
   function columnWidth(width?: number) {
     if (!Number.isFinite(width)) return DEFAULT_COLUMN_WIDTH;
@@ -69,7 +73,8 @@ export function SpreadsheetGrid({
   }
 
   function cellClass(rowIndex: number, columnId: string, value: string) {
-    const header = table.rows[0]?.cells[columnId]?.trim().toLowerCase();
+    const column = table.columns.find((candidate) => candidate.id === columnId);
+    const header = (column?.label || table.rows[0]?.cells[columnId] || '').trim().toLowerCase();
     const normalized = value.trim().toLowerCase();
     if (rowIndex > 0 && header === 'results') {
       if (normalized === 'pass') return 'bg-emerald-100 text-emerald-800';
@@ -141,7 +146,16 @@ export function SpreadsheetGrid({
                 className="relative h-8 overflow-hidden border border-slate-200 bg-slate-100 px-2 text-center text-xs font-semibold text-slate-500"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <span>{columnLetter(index)}</span>
+                  {editableColumnLabels ? (
+                    <input
+                      className="h-6 min-w-0 flex-1 rounded border border-transparent bg-white/70 px-1 text-center text-xs font-semibold text-slate-700 outline-none focus:border-primary"
+                      value={column.label || ''}
+                      onChange={(event) => onColumnLabelChange?.(column.id, event.target.value)}
+                      placeholder={columnLetter(index)}
+                    />
+                  ) : (
+                    <span>{columnLetter(index)}</span>
+                  )}
                   {table.columns.length > 1 ? (
                     <button
                       className="grid h-5 w-5 place-items-center text-slate-400 hover:text-rose-600"

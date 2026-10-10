@@ -155,6 +155,13 @@ const projectsSlice = createSlice({
       stage.checklist = action.payload.checklist ?? stage.checklist;
       refreshProjectWorkflow(project);
     },
+    updateStageDetails(state, action: PayloadAction<{ projectId: string; stageId: string; notes?: string; checklist?: { id: string; label: string; completed: boolean }[] }>) {
+      const project = state.projects.find((item) => item.id === action.payload.projectId);
+      const stage = project?.stages.find((item) => item.id === action.payload.stageId);
+      if (!project || !stage) return;
+      stage.notes = action.payload.notes ?? stage.notes;
+      stage.checklist = action.payload.checklist ?? stage.checklist;
+    },
     deleteCustomStage(state, action: PayloadAction<{ projectId: string; stageId: string }>) {
       const project = state.projects.find((item) => item.id === action.payload.projectId);
       if (!project) return;
@@ -191,7 +198,7 @@ function refreshProjectWorkflow(project: Project) {
 }
 
 export const { login, logout } = authSlice.actions;
-export const { selectProject, setProjects, upsertProject, removeProject, createProject, completeStage, addCustomStage, updateCustomStage, deleteCustomStage, moveCustomStage } = projectsSlice.actions;
+export const { selectProject, setProjects, upsertProject, removeProject, createProject, completeStage, addCustomStage, updateCustomStage, updateStageDetails, deleteCustomStage, moveCustomStage } = projectsSlice.actions;
 
 export const store = configureStore({
   reducer: {

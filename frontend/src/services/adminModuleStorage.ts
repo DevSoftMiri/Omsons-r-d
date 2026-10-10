@@ -142,9 +142,7 @@ export function saveSettings(settings: AppSettings) {
 }
 
 export function readActiveWorkflowStages(): StageName[] {
-  return readSettings().workflow
-    .filter((stage) => stage.active && stage.name !== 'Overview' && stage.name !== 'Final Stage')
-    .map((stage) => stage.name);
+  return workflowStages.filter((stage) => stage !== 'Final Stage');
 }
 
 function defaultSettings(): AppSettings {

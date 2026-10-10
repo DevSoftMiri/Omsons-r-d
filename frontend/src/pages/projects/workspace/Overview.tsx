@@ -37,16 +37,19 @@ const statusStyles: Record<Project['status'], string> = {
 };
 
 const nextActionText: Record<CoreStageName, string[]> = {
-  Prerequisites: ['Upload required certificates', 'Confirm assigned team', 'Complete prerequisite checklist'],
+  'Product Specifications': ['Review technical specifications', 'Update product summary', 'Mark specifications complete'],
+  'Research Data': ['Add research notes', 'Review findings', 'Mark research complete'],
   Benchmarking: ['Review competitor specifications', 'Paste updated benchmark data', 'Mark benchmarking complete'],
-  Attachments: ['Upload drawings and design files', 'Preview uploaded documents', 'Confirm file versions'],
-  BOM: ['Review material costs', 'Update procurement stages', 'Confirm vendor readiness'],
   'Electrical BOM': ['Review electrical components', 'Upload electrical BOM document', 'Confirm pad and soldering costs'],
-  'Mechanical BOM': ['Review mechanical parts', 'Upload mechanical BOM document', 'Confirm drawings and suppliers'],
-  'Product Design': ['Upload CAD drawing', 'Review version history', 'Mark design complete'],
+  'Mechanical Product Design': ['Add design notes', 'Review mechanical design tasks', 'Mark design complete'],
+  'Electrical Product Design': ['Add design notes', 'Review electrical design tasks', 'Mark design complete'],
+  'High Level BOM': ['Add BOM notes', 'Review high level components', 'Mark high level BOM complete'],
   Programming: ['Validate machine parameters', 'Complete PLC logic checklist', 'Run final programming validation'],
-  Reporting: ['Submit daily work report', 'Review logged hours', 'Mark reporting complete'],
+  'PAT test': ['Record PAT checks', 'Review safety results', 'Mark PAT test complete'],
+  Prototyping: ['Track prototype notes', 'Review prototype checklist', 'Mark prototyping complete'],
   'Testing & Validation': ['Record validation test', 'Attach test report', 'Mark testing complete'],
+  'Mechanical BOM': ['Review mechanical parts', 'Upload mechanical BOM document', 'Confirm drawings and suppliers'],
+  'Product Documents': ['Add document notes', 'Review final documents', 'Mark documents complete'],
   'Final Stage': ['Confirm testing status', 'Review production readiness', 'Mark project complete']
 };
 

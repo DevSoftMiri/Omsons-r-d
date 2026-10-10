@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { addCustomStage, deleteCustomStage, updateCustomStage, upsertProject } from '../../../store';
 import { canCompleteStage } from '../../../utils/stages';
 import { useToast } from '../../../components/ToastProvider';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
@@ -144,43 +145,16 @@ export function CustomStage() {
           </div>
         </div>
       </section>
+      <StageResponseBuilder projectCode={project.productCode} stageName={activeStage.name} mode="controls" />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-bold">Checklist</h2>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-primary">{checked} / {checklist.length} complete</span>
-          </div>
-          <div className="space-y-2">
-            {checklist.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-                <input type="checkbox" checked={item.completed} onChange={() => toggleChecklistItem(item.id)} />
-                <span className={`min-w-0 flex-1 ${item.completed ? 'text-slate-400 line-through' : 'font-semibold'}`}>{item.label}</span>
-                <button className="text-rose-600" onClick={() => removeChecklistItem(item.id)} aria-label={`Remove ${item.label}`}><Trash2 size={16} /></button>
-              </div>
-            ))}
-            {!checklist.length ? <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No checklist items yet.</p> : null}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <input className="field" value={checklistText} placeholder="Add checklist item" onChange={(event) => setChecklistText(event.target.value)} />
-            <button className="secondary-button h-11 shrink-0" onClick={addChecklistItem}><Plus size={16} />Add</button>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-            <h2 className="text-lg font-bold">Stage Notes</h2>
-            <textarea className="field mt-3 min-h-44 resize-none" value={notes} onChange={(event) => setNotes(event.target.value)} onBlur={saveStage} placeholder="Add notes for this custom stage..." />
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-            <h2 className="text-lg font-bold">Add Another Custom Stage</h2>
-            <div className="mt-3 flex gap-2">
-              <input className="field" value={newStageName} onChange={(event) => setNewStageName(event.target.value)} placeholder="Stage name" />
-              <button className="secondary-button h-11 shrink-0" onClick={addStage}><Plus size={16} />Add</button>
-            </div>
-          </div>
-        </section>
-      </div>
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <h2 className="text-lg font-bold">Add Another Custom Stage</h2>
+        <div className="mt-3 flex gap-2">
+          <input className="field" value={newStageName} onChange={(event) => setNewStageName(event.target.value)} placeholder="Stage name" />
+          <button className="secondary-button h-11 shrink-0" onClick={addStage}><Plus size={16} />Add</button>
+        </div>
+      </section>
+      <StageResponseBuilder projectCode={project.productCode} stageName={activeStage.name} mode="blocks" />
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
         <div>

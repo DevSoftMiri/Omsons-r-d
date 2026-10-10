@@ -7,6 +7,7 @@ import { BenchmarkingTable } from '../../../components/benchmarking/Benchmarking
 import { DeleteTableDialog } from '../../../components/benchmarking/DeleteTableDialog';
 import type { BenchmarkingTableData, SelectedCell } from '../../../components/benchmarking/types';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
+import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
@@ -851,6 +852,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} currentStage={currentStage} />
       <ProjectStageHeader project={project} currentStage={currentStage} />
+      <StageResponseBuilder projectCode={project.productCode} stageName={currentStage} mode="controls" />
 
       {isBaseBomStage ? (
         <>
@@ -1400,6 +1402,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         onCreate={createMechanicalTable}
       />
       <DeleteTableDialog table={deleteMechanicalTable} onCancel={() => setDeleteMechanicalTable(null)} onConfirm={confirmDeleteMechanicalTable} />
+      <StageResponseBuilder projectCode={project.productCode} stageName={currentStage} mode="blocks" />
     </div>
   );
 }
