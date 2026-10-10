@@ -25,6 +25,17 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
   const [error, setError] = useState('');
   const itemCount = project.stages.length + 1;
 
+  function renderStageName(stage: Project['stages'][number]) {
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        {stage.status === 'Completed' ? (
+          <span className="project-sidebar-dot shrink-0 rounded-full bg-emerald-500" title="Completed" />
+        ) : null}
+        <span className="truncate">{stage.name}</span>
+      </span>
+    );
+  }
+
   async function submitStage() {
     const name = stageName.trim();
     if (!name) {
@@ -140,7 +151,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
           if (!canOpen) {
             return (
               <span key={stage.id} className="project-sidebar-link flex cursor-not-allowed items-center justify-between rounded-lg px-4 font-semibold text-white/60" title="Complete the previous stage first">
-                <span className="truncate">{stage.name}</span>
+                {renderStageName(stage)}
                 <span className="flex items-center gap-2">
                   {reorderControls}
                   <span className={`project-sidebar-dot rounded-full ${statusColor[stage.status]}`} title={stage.status} />
@@ -150,7 +161,7 @@ export function ProjectSidebar({ project, onNavigate }: { project: Project; onNa
           }
           return (
             <NavLink key={stage.id} to={getStageRoute(stage)} onClick={onNavigate} className={({ isActive }) => `project-sidebar-link flex items-center justify-between rounded-lg px-4 font-semibold ${isActive ? 'bg-primary text-white' : locked ? 'text-white/70 hover:bg-white/10' : 'text-white hover:bg-white/10'}`}>
-              <span className="truncate">{stage.name}</span>
+              {renderStageName(stage)}
               <span className="flex items-center gap-2">
                 {reorderControls}
                 <span className={`project-sidebar-dot rounded-full ${statusColor[stage.status]}`} title={stage.status} />

@@ -207,7 +207,7 @@ function ProjectCard({ project, compact = false }: { project: Project; compact?:
         </div>
       </div>
 
-      <div className="mt-5 grid gap-y-4" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(project.stages.length, 1), 9)}, minmax(0, 1fr))` }}>
+      <div className="project-stage-track mt-5 grid min-w-0 max-w-full gap-y-4 overflow-hidden" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(project.stages.length, 1), 9)}, minmax(0, 1fr))` }}>
         {project.stages.map((stage, index) => {
           const state = stageState(stage);
           return (
