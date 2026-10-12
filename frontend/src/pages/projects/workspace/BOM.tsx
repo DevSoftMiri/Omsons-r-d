@@ -1,5 +1,5 @@
 import type { ChangeEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CalendarDays, Check, ChevronRight, CircuitBoard, Coins, Columns3, Download, Edit2, FileText, Grid2X2, Maximize2, Minimize2, PackagePlus, Paperclip, PenLine, Plus, ReceiptText, RotateCcw, Search, ShoppingCart, Truck, Trash2, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AddTableModal } from '../../../components/benchmarking/AddTableModal';
@@ -161,13 +161,16 @@ const defaultMechanicalFormulaTarget = 'builtin:totalCost';
 
 const defaultMechanicalRows: MechanicalBomRow[] = [];
 
-export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electrical BOM' | 'Mechanical BOM' }) {
+export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electrical BOM' | 'High Level BOM' | 'Mechanical BOM' }) {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
   const isBaseBomStage = currentStage === 'BOM';
   const isElectricalStage = currentStage === 'Electrical BOM';
+  const isHighLevelBomStage = currentStage === 'High Level BOM';
   const isMechanicalStage = currentStage === 'Mechanical BOM';
+  const showElectricalBom = isElectricalStage || isHighLevelBomStage;
+  const showMechanicalBom = isMechanicalStage || isHighLevelBomStage;
   const storageKey = `bom:${project.productCode}`;
   const storedBom = useMemo(() => readStoredBom(storageKey, project.bom), [storageKey, project.bom]);
   const [rows, setRows] = useState<BomRow[]>(() => storedBom.rows);
@@ -203,6 +206,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   const [deleteMechanicalTable, setDeleteMechanicalTable] = useState<BenchmarkingTableData | null>(null);
   const [editingBomCell, setEditingBomCell] = useState<EditingBomCell>(null);
   const [fullscreenBomTable, setFullscreenBomTable] = useState<null | 'base' | 'electrical' | 'mechanical'>(null);
+  const electricalBomRef = useRef<HTMLElement>(null);
+  const mechanicalBomRef = useRef<HTMLElement>(null);
   const [electricalFormulaDraft, setElectricalFormulaDraft] = useState<FormulaBuilderDraft>(() => ({
     target: defaultElectricalFormulaTarget,
     formula: getElectricalFormulaDraft(defaultElectricalColumnSettings, [], defaultElectricalFormulaTarget)
@@ -211,6 +216,32 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     target: defaultMechanicalFormulaTarget,
     formula: getMechanicalFormulaDraft(defaultMechanicalColumnSettings, [], defaultMechanicalFormulaTarget)
   }));
+
+  const toggleBomFullscreen = async (kind: 'electrical' | 'mechanical') => {
+    const section = kind === 'electrical' ? electricalBomRef.current : mechanicalBomRef.current;
+    if (!section) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await section.requestFullscreen();
+      }
+    } catch {
+      showToast({ tone: 'error', title: 'Fullscreen unavailable', message: 'Your browser could not open this BOM in fullscreen mode.' });
+    }
+  };
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      if (document.fullscreenElement === electricalBomRef.current) setFullscreenBomTable('electrical');
+      else if (document.fullscreenElement === mechanicalBomRef.current) setFullscreenBomTable('mechanical');
+      else setFullscreenBomTable(null);
+    };
+
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreenState);
+  }, []);
 
   useEffect(() => {
     setSaveState('Saving...');
@@ -283,6 +314,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   const hasMechanicalData = mechanicalRows.some((row) => bomRowHasData(row)) || mechanicalTables.some(tableHasData);
   const canComplete = isElectricalStage
     ? hasElectricalData
+    : isHighLevelBomStage
+      ? hasElectricalData && hasMechanicalData
     : isMechanicalStage
       ? hasMechanicalData
     : rows.length > 0 && rows.every((row) => row.itemName && row.category && row.unit && row.quantityPerUnit > 0);
@@ -485,6 +518,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   function resetElectricalBom() {
+    if (!window.confirm('Are you sure you want to reset the Electrical BOM? All electrical rows, custom columns, and formulas will be removed.')) return;
     setElectricalRows(defaultElectricalRows);
     setElectricalColumnSettings(defaultElectricalColumnSettings);
     setElectricalCustomColumns([]);
@@ -492,6 +526,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       target: defaultElectricalFormulaTarget,
       formula: getElectricalFormulaDraft(defaultElectricalColumnSettings, [], defaultElectricalFormulaTarget)
     });
+    showToast({ tone: 'success', title: 'Electrical BOM reset', message: 'Electrical rows, columns, and formulas were reset.' });
   }
 
   function updateElectricalTable(table: BenchmarkingTableData) {
@@ -509,6 +544,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     }));
     setElectricalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
     setShowElectricalTableModal(false);
+    showToast({ tone: 'success', title: 'Electrical table created', message: `${values.name} was added.` });
   }
 
   function confirmDeleteElectricalTable() {
@@ -549,6 +585,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     }));
     setMechanicalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
     setShowMechanicalTableModal(false);
+    showToast({ tone: 'success', title: 'Mechanical table created', message: `${values.name} was added.` });
   }
 
   function confirmDeleteMechanicalTable() {
@@ -649,6 +686,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   function resetMechanicalBom() {
+    if (!window.confirm('Are you sure you want to reset the Mechanical BOM? All mechanical rows, custom columns, and formulas will be removed.')) return;
     setMechanicalRows(defaultMechanicalRows);
     setMechanicalColumnSettings(defaultMechanicalColumnSettings);
     setMechanicalCustomColumns([]);
@@ -656,6 +694,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       target: defaultMechanicalFormulaTarget,
       formula: getMechanicalFormulaDraft(defaultMechanicalColumnSettings, [], defaultMechanicalFormulaTarget)
     });
+    showToast({ tone: 'success', title: 'Mechanical BOM reset', message: 'Mechanical rows, columns, and formulas were reset.' });
   }
 
   function removeSelected() {
@@ -711,6 +750,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   function resetBom() {
+    if (!window.confirm('Are you sure you want to reset the complete BOM? All BOM rows, tables, custom columns, formulas, and notes will be reset.')) return;
     const seeded = seedBomRows(project.bom);
     setRows(seeded);
     setElectricalRows(defaultElectricalRows);
@@ -734,6 +774,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     setActiveCategory('All Items');
     setStatusFilter('All');
     setQuery('');
+    showToast({ tone: 'success', title: 'BOM reset', message: 'BOM rows, tables, columns, and notes were reset.' });
   }
 
   function handleCompleteStage() {
@@ -741,6 +782,11 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       ? [
         !hasElectricalData ? 'Electrical BOM item or custom table data' : ''
       ].filter(Boolean)
+      : isHighLevelBomStage
+        ? [
+          !hasElectricalData ? 'Electrical BOM item or custom table data' : '',
+          !hasMechanicalData ? 'Mechanical BOM item or custom table data' : ''
+        ].filter(Boolean)
       : isMechanicalStage
         ? [
           !hasMechanicalData ? 'Mechanical BOM item or custom table data' : ''
@@ -985,7 +1031,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         </>
       ) : null}
 
-      {isElectricalStage ? <section className={`${fullscreenBomTable === 'electrical' ? 'fixed inset-0 z-[70] flex flex-col rounded-none p-4' : 'rounded-lg'} overflow-hidden border border-slate-200 bg-white shadow-soft`}>
+      {showElectricalBom ? <section ref={electricalBomRef} className={`${fullscreenBomTable === 'electrical' ? 'fixed inset-0 z-[70] flex flex-col rounded-none p-4' : 'rounded-lg'} overflow-hidden border border-slate-200 bg-white shadow-soft`}>
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-white via-slate-50 to-cyan-50/60 p-4">
           <div>
             <h3 className="text-2xl font-black tracking-tight text-slate-900">Electrical BOM</h3>
@@ -994,7 +1040,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           <div className="flex flex-wrap justify-end gap-2">
             <button
               className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900"
-              onClick={() => setFullscreenBomTable((current) => current === 'electrical' ? null : 'electrical')}
+              onClick={() => toggleBomFullscreen('electrical')}
             >
               {fullscreenBomTable === 'electrical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {fullscreenBomTable === 'electrical' ? 'Exit Full Screen' : 'Full Screen'}
@@ -1164,7 +1210,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         </div>
       </section> : null}
 
-      {isElectricalStage ? electricalTables.map((table, index) => (
+      {showElectricalBom ? electricalTables.map((table, index) => (
         <BenchmarkingTable
           key={table._id}
           index={index}
@@ -1178,13 +1224,20 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         />
       )) : null}
 
-      {isMechanicalStage ? <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
+      {showMechanicalBom ? <section ref={mechanicalBomRef} className={`${fullscreenBomTable === 'mechanical' ? 'fixed inset-0 z-[70] flex flex-col rounded-none bg-white p-4' : 'rounded-lg'} overflow-hidden border border-slate-200 shadow-soft`}>
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-white via-slate-50 to-cyan-50/60 p-4">
           <div>
             <h3 className="text-2xl font-black tracking-tight text-slate-900">Mechanical BOM</h3>
             <p className="mt-1 text-sm text-slate-500">Manage mechanical parts, drawings, costing, sourcing and related BOM documents.</p>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            <button
+              className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900"
+              onClick={() => toggleBomFullscreen('mechanical')}
+            >
+              {fullscreenBomTable === 'mechanical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {fullscreenBomTable === 'mechanical' ? 'Exit Full Screen' : 'Full Screen'}
+            </button>
             <button className="primary-button h-10 gap-2 shadow-md shadow-cyan-950/10" onClick={addMechanicalRow}><Plus size={16} />Add Mechanical Item</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={addMechanicalColumn}><Plus size={16} />Add Column</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={() => setShowMechanicalTableModal(true)}><Grid2X2 size={16} />Create New Table</button>
@@ -1208,8 +1261,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
             onClear={clearMechanicalFormula}
           />
         </div>
-        <div className="mx-4 mb-4 overflow-hidden rounded-lg border border-slate-200">
-          <div className="overflow-x-auto">
+        <div className={`mx-4 mb-4 overflow-hidden rounded-lg border border-slate-200 ${fullscreenBomTable === 'mechanical' ? 'min-h-0 flex-1' : ''}`}>
+          <div className={`${fullscreenBomTable === 'mechanical' ? 'h-full' : ''} overflow-auto`}>
           <table className="table-fixed border-collapse text-left text-xs" style={{ width: mechanicalTableWidth, minWidth: mechanicalTableWidth, maxWidth: mechanicalTableWidth }}>
             <colgroup>
               {mechanicalColumnSettings.map((column) => (
@@ -1350,7 +1403,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         </div>
       </section> : null}
 
-      {isMechanicalStage ? mechanicalTables.map((table, index) => (
+      {showMechanicalBom ? mechanicalTables.map((table, index) => (
         <BenchmarkingTable
           key={table._id}
           index={index}
@@ -1370,7 +1423,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid {isElectricalStage ? 'electrical BOM' : isMechanicalStage ? 'mechanical BOM' : 'BOM'} item to complete this stage.</p> : null}
+          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid {isElectricalStage ? 'electrical BOM' : isHighLevelBomStage ? 'electrical and mechanical BOM' : isMechanicalStage ? 'mechanical BOM' : 'BOM'} item to complete this stage.</p> : null}
           <button className={`primary-button h-10 min-w-60 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark {currentStage} Complete</button>
         </div>
       </section>

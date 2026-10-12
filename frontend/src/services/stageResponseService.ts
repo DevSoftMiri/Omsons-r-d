@@ -114,7 +114,7 @@ function normalizeBlock(value: unknown): StageResponseBlock | null {
   const now = new Date().toISOString();
   const base = {
     id: String(block.id),
-    title: String(block.title || defaultTitle(block.type)),
+    title: String(block.title ?? defaultTitle(block.type)),
     createdAt: String(block.createdAt || now),
     updatedAt: String(block.updatedAt || now)
   };

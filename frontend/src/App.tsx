@@ -54,7 +54,7 @@ export function App() {
         <Route path="electrical-bom" element={<BOM currentStage="Electrical BOM" />} />
         <Route path="mechanical-product-design" element={<StandardStage stageName="Mechanical Product Design" />} />
         <Route path="electrical-product-design" element={<StandardStage stageName="Electrical Product Design" />} />
-        <Route path="high-level-bom" element={<StandardStage stageName="High Level BOM" />} />
+        <Route path="high-level-bom" element={<BOM currentStage="High Level BOM" />} />
         <Route path="mechanical-bom" element={<BOM currentStage="Mechanical BOM" />} />
         <Route path="product-design" element={<ProductDesign />} />
         <Route path="programming" element={<Programming />} />

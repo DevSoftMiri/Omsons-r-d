@@ -143,7 +143,10 @@ export function Programming() {
       <ProjectStageHeader project={project} currentStage="Programming" />
       <StageResponseBuilder projectCode={project.productCode} stageName="Programming" mode="controls" />
 
-      <section className="flex flex-wrap items-end justify-between gap-4">
+      <section
+        data-stage-section-ignore="true"
+        className="flex flex-wrap items-end justify-between gap-4"
+      >
         <div>
           <h2 className="text-2xl font-bold">Programming</h2>
           <p className="mt-1.5 max-w-4xl text-sm text-slate-600">Manage machine programs, process parameters and production instructions for this product.</p>

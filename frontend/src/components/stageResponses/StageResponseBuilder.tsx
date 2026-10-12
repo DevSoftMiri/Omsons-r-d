@@ -73,6 +73,7 @@ export function StageResponseBuilder({
     if (type === 'text') persist([...blocks, { ...base, type, title: 'Text Area', value: '' }], base.id);
     if (type === 'checklist') persist([...blocks, { ...base, type, title: 'Checklist', items: [] }], base.id);
     if (type === 'file') persist([...blocks, { ...base, type, title: 'Files' }], base.id);
+    showToast({ tone: 'success', title: `${type[0].toUpperCase()}${type.slice(1)} added`, message: 'You can edit it below.' });
   }
 
   useEffect(() => {
@@ -86,7 +87,10 @@ export function StageResponseBuilder({
   }
 
   function deleteBlock(blockId: string) {
+    const block = blocks.find((candidate) => candidate.id === blockId);
+    if (!window.confirm(`Are you sure you want to delete ${block?.title || 'this section'}?`)) return;
     persist(blocks.filter((block) => block.id !== blockId));
+    showToast({ tone: 'success', title: 'Section deleted', message: 'The section was removed from this stage.' });
   }
 
   function handleDrop(event: DragEvent<HTMLElement>, targetBlockId: string) {
@@ -181,10 +185,10 @@ export function StageResponseBuilder({
     <div data-stage-section-ignore={mode === 'controls' ? 'true' : undefined}>
         {
         <div className="flex flex-wrap justify-end gap-2">
-          <button className="secondary-button h-10 text-primary" onClick={() => addBlock('table')}><Table2 size={16} />Add Table</button>
-          <button className="secondary-button h-10 text-primary" onClick={() => addBlock('text')}><Type size={16} />Add Text Area</button>
-          <button className="secondary-button h-10 text-primary" onClick={() => addBlock('checklist')}><CheckSquare size={16} />Add Checklist</button>
-          <button className="secondary-button h-10 text-primary" onClick={() => addBlock('file')}><FileUp size={16} />Upload File</button>
+          <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('table')}><Table2 size={16} />Add Table</button>
+          <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('text')}><Type size={16} />Add Text Area</button>
+          <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('checklist')}><CheckSquare size={16} />Add Checklist</button>
+          <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('file')}><FileUp size={16} />Upload File</button>
         </div>
         }
 
@@ -270,7 +274,7 @@ function BlockHeader({
       </button>
       <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-xs font-bold text-slate-500">{index + 1}</span>
       <input className="field h-9 max-w-sm bg-white font-bold" value={block.title} onChange={(event) => onChange({ ...block, title: event.target.value })} />
-      <button className="ml-auto grid h-9 w-9 place-items-center rounded-md text-rose-600 hover:bg-rose-50" onClick={onDelete} title="Delete block">
+      <button type="button" className="ml-auto grid h-9 w-9 place-items-center rounded-md text-rose-600 hover:bg-rose-50" onClick={onDelete} title="Delete block">
         <Trash2 size={16} />
       </button>
     </div>
@@ -291,14 +295,18 @@ function ChecklistBlock({ block, onChange }: { block: StageChecklistBlock; onCha
         <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
           <input type="checkbox" checked={item.completed} onChange={() => onChange({ ...block, items: block.items.map((candidate) => candidate.id === item.id ? { ...candidate, completed: !candidate.completed } : candidate) })} />
           <input className="min-w-0 flex-1 bg-transparent font-semibold outline-none" value={item.label} onChange={(event) => onChange({ ...block, items: block.items.map((candidate) => candidate.id === item.id ? { ...candidate, label: event.target.value } : candidate) })} />
-          <button className="text-rose-600" onClick={() => onChange({ ...block, items: block.items.filter((candidate) => candidate.id !== item.id) })}><Trash2 size={15} /></button>
+          <button type="button" className="text-rose-600" title="Remove checklist item" onClick={() => onChange({ ...block, items: block.items.filter((candidate) => candidate.id !== item.id) })}><Trash2 size={15} /></button>
         </div>
       ))}
       <div className="flex gap-2">
         <input className="field bg-white" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
-          if (event.key === 'Enter') addItem();
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            addItem();
+          }
         }} />
-        <button className="secondary-button h-11 shrink-0" onClick={addItem}><Plus size={16} />Add</button>
+        <button type="button" className="secondary-button h-11 shrink-0" onClick={addItem}><Plus size={16} />Add</button>
       </div>
     </div>
   );
