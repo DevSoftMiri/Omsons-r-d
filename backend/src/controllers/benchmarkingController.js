@@ -77,16 +77,9 @@ function refreshStageLocks(project) {
 }
 
 function serializeCsv(table) {
-  return table.rows
-    .map((row) =>
-      table.columns
-        .map((column) => {
-          const value = row.cells.get(column.id) || '';
-          return `"${String(value).replace(/"/g, '""')}"`;
-        })
-        .join(',')
-    )
-    .join('\n');
+  const rows = table.rows.map(row => table.columns.map(column => row.cells.get(column.id) || ''));
+  if (table.columns.some(column => column.label !== undefined)) rows.unshift(table.columns.map(column => column.label || ''));
+  return rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 
 function parseCsv(text) {

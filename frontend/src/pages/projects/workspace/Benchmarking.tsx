@@ -14,9 +14,10 @@ import {
   createBenchmarkingTable,
   deleteBenchmarkingTable,
   fetchBenchmarking,
-  importBenchmarkingCsv,
   updateBenchmarkingTable
 } from '../../../services/benchmarkingService';
+import type { WorkBook } from 'xlsx';
+import { readSpreadsheet, importWorksheet } from '../../../components/benchmarking/spreadsheetImport';
 import { updateProjectStage } from '../../../services/projectService';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
@@ -37,6 +38,10 @@ export function Benchmarking() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [message, setMessage] = useState('');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; table: BenchmarkingTableData } | null>(null);
+  const [sheetName, setSheetName] = useState('');
+  const saveInFlight = useRef<Promise<void>>(Promise.resolve());
   const saveTimer = useRef<number | null>(null);
   const dirtyTables = useRef<Set<string>>(new Set());
 
@@ -71,6 +76,7 @@ export function Benchmarking() {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(async () => {
       const tablesToSave = tablesSnapshot.filter((candidate) => dirtyTables.current.has(candidate._id));
+      const operation = (async () => {
       try {
         let updated = workbook;
         for (const tableToSave of tablesToSave) {
@@ -85,6 +91,9 @@ export function Benchmarking() {
         setSaveStatus('failed');
         setMessage(error instanceof Error ? error.message : 'Save failed');
       }
+      })();
+      saveInFlight.current = operation;
+      await operation;
     }, 700);
   }
 
@@ -123,21 +132,60 @@ export function Benchmarking() {
     }
   }
 
-  async function importCsv(table: BenchmarkingTableData, file: File) {
+  async function saveImportedSheet(source: WorkBook, name: string, table: BenchmarkingTableData) {
     try {
-      const text = await file.text();
-      setWorkbook(normalizeWorkbook(await importBenchmarkingCsv(project.productCode, table._id, text)));
+      const imported = importWorksheet(source, name, table);
+      const result = await updateBenchmarkingTable(project.productCode, imported);
+      setWorkbook(normalizeWorkbook(result));
+      setSelectedCell(null);
       setSaveStatus('saved');
       setLastSaved(new Date().toISOString());
+      setMessage('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Import failed');
-      setSaveStatus('failed');
+    } finally {
+      setSheetPicker(null);
+      setImporting(false);
+    }
+  }
+
+  async function importCsv(table: BenchmarkingTableData, file: File) {
+    if (importing) return;
+    setImporting(true);
+    setMessage('');
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const pendingIds = new Set(dirtyTables.current);
+    try {
+      await saveInFlight.current;
+      // Flush unsaved edits before replacing a table, including edits in other tables.
+      for (const candidate of workbook.tables) {
+        if (pendingIds.has(candidate._id)) {
+          await updateBenchmarkingTable(project.productCode, candidate);
+        }
+      }
+      dirtyTables.current.clear();
+      setLastSaved(new Date().toISOString());
+      setSaveStatus('saved');
+      const source = await readSpreadsheet(file);
+      if (!source.SheetNames.length) throw new Error('This workbook contains no worksheets.');
+      if (source.SheetNames.length > 1) {
+        setSheetName(source.SheetNames[0]);
+        setSheetPicker({ source, table });
+      } else {
+        await saveImportedSheet(source, source.SheetNames[0], table);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Import failed');
+      if (dirtyTables.current.size) setSaveStatus('failed');
+      setImporting(false);
     }
   }
 
   function exportCsv(table: BenchmarkingTableData) {
-    const csv = table.rows
-      .map((row) => table.columns.map((column) => `"${(row.cells[column.id] || '').replace(/"/g, '""')}"`).join(','))
+    const data = table.rows.map(row => table.columns.map(column => row.cells[column.id] || ''));
+    if (table.columns.some(column => column.label !== undefined)) data.unshift(table.columns.map(column => column.label || ''));
+    const csv = data
+      .map(row => row.map(value => `"${value.replace(/"/g, '""')}"`).join(','))
       .join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const anchor = document.createElement('a');
@@ -174,7 +222,8 @@ export function Benchmarking() {
   }
 
   return (
-    <div className="mx-auto min-w-0 max-w-full space-y-4 overflow-hidden 2xl:max-w-[1500px]">
+    <>
+    <fieldset disabled={importing} className="mx-auto min-w-0 max-w-full space-y-4 overflow-hidden 2xl:max-w-[1500px]">
       <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-500">
         <Link to="/projects" className="hover:text-primary">Projects</Link>
         <ChevronRight size={15} />
@@ -253,7 +302,30 @@ export function Benchmarking() {
         </div>
         {!canComplete ? <p className="mt-2 text-right text-sm text-slate-500">Create at least one table, enter data, and save changes before completing.</p> : null}
       </section>
-    </div>
+    </fieldset>
+    {importing ? <p className="mt-3 text-sm text-slate-600" role="status">{sheetPicker ? 'Choose a worksheet to continue.' : 'Importing spreadsheet?'}</p> : null}
+    {sheetPicker ? (
+      <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4">
+        <section role="dialog" aria-modal="true" aria-labelledby="worksheet-title" className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <h2 id="worksheet-title" className="text-xl font-bold">Choose worksheet</h2>
+          <p className="mt-2 text-sm text-slate-600">The selected worksheet will replace the contents of {sheetPicker.table.name}.</p>
+          <label className="mt-4 block text-sm font-semibold">Worksheet
+            <select className="field mt-2" value={sheetName} onChange={event => setSheetName(event.target.value)}>
+              {sheetPicker.source.SheetNames.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
+          <div className="mt-5 flex justify-end gap-2">
+            <button className="secondary-button" onClick={() => { setSheetPicker(null); setImporting(false); }}>Cancel</button>
+            <button className="primary-button" onClick={() => {
+              const selection = sheetPicker;
+              setSheetPicker(null);
+              void saveImportedSheet(selection.source, sheetName, selection.table);
+            }}>Import worksheet</button>
+          </div>
+        </section>
+      </div>
+    ) : null}
+    </>
   );
 }
 

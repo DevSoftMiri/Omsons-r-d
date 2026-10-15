@@ -34,7 +34,7 @@ export function evaluateCell(table: BenchmarkingTableData, rowIndex: number, col
   const column = table.columns[columnIndexValue];
   if (!row || !column) return '';
   const raw = row.cells[column.id] || '';
-  if (!raw.startsWith('=')) return raw;
+  if (!raw.startsWith('=') || row.literalCells?.includes(column.id)) return raw;
   const key = `${rowIndex}:${columnIndexValue}`;
   if (stack.has(key)) return '#CYCLE!';
   stack.add(key);

@@ -77,7 +77,7 @@ export function SpreadsheetGrid({
     const column = table.columns.find((candidate) => candidate.id === columnId);
     const header = (column?.label || table.rows[0]?.cells[columnId] || '').trim().toLowerCase();
     const normalized = value.trim().toLowerCase();
-    if (rowIndex > 0 && header === 'results') {
+    if ((column?.label !== undefined || rowIndex > 0) && header === 'results') {
       if (normalized === 'pass') return 'bg-emerald-50 text-emerald-800';
       if (normalized === 'fail') return 'bg-rose-50 text-rose-800';
       if (normalized === 'retest') return 'bg-amber-50 text-amber-800';
@@ -180,7 +180,7 @@ export function SpreadsheetGrid({
                       placeholder={columnLetter(index)}
                     />
                   ) : (
-                    <span>{columnLetter(index)}</span>
+                    <span>{column.label || columnLetter(index)}</span>
                   )}
                   {table.columns.length > 1 ? (
                     <button
@@ -237,8 +237,15 @@ export function SpreadsheetGrid({
                     key={column.id}
                     className={`overflow-hidden border border-slate-200 p-0 align-top ${colorClass}`}
                   >
+                    <div className="relative min-h-9">
+                      {/* The mirror sizes the cell through normal CSS layout, without measuring or observing the grid. */}
+                      <div
+                        aria-hidden="true"
+                        className={`invisible min-h-9 whitespace-pre-wrap break-words px-2 py-2 text-xs ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold' : ''}`}
+                      >{`${selected ? rawValue : value} `}</div>
                     <textarea
-                      className={`block h-9 w-full resize-none whitespace-normal break-words bg-transparent px-2 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${rowIndex === 0 ? 'font-extrabold text-slate-800' : ''} ${selected ? 'bg-primary/[.06] ring-2 ring-inset ring-primary' : ''}`}
+                      className={`absolute inset-0 block h-full w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent px-2 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold text-slate-800' : ''} ${selected ? 'bg-primary/[.06] ring-2 ring-inset ring-primary' : ''}`}
+                      aria-label={`Cell ${columnLetter(columnIndex)}${rowIndex + 1}`}
                       data-column-index={columnIndex}
                       data-row-index={rowIndex}
                       data-spreadsheet-table={table._id}
@@ -257,6 +264,7 @@ export function SpreadsheetGrid({
                       onKeyDown={(event) => handleKeyDown(event, rowIndex, columnIndex)}
                       onPaste={(event) => handlePaste(event, row.id, column.id)}
                     />
+                    </div>
                   </td>
                 );
               })}

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const benchmarkingColumnSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
+    label: { type: String },
     width: { type: Number, min: 40, max: 520 }
   },
   { _id: false }
@@ -11,7 +12,8 @@ const benchmarkingColumnSchema = new mongoose.Schema(
 const benchmarkingRowSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
-    cells: { type: Map, of: String, default: {} }
+    cells: { type: Map, of: String, default: {} },
+    literalCells: { type: [String], default: undefined }
   },
   { _id: false }
 );

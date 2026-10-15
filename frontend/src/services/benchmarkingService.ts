@@ -7,6 +7,7 @@ export interface BenchmarkingColumn {
 export interface BenchmarkingRow {
   id: string;
   cells: Record<string, string>;
+  literalCells?: string[];
 }
 
 export interface BenchmarkingTableData {

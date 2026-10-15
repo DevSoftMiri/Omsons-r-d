@@ -37,7 +37,7 @@ export function BenchmarkingTable({
   function updateCell(rowId: string, columnId: string, value: string) {
     onChangeTable({
       ...table,
-      rows: table.rows.map((row) => row.id === rowId ? { ...row, cells: { ...row.cells, [columnId]: value } } : row)
+      rows: table.rows.map((row) => row.id === rowId ? { ...row, literalCells: row.literalCells?.filter(id => id !== columnId), cells: { ...row.cells, [columnId]: value } } : row)
     });
   }
 
@@ -106,7 +106,10 @@ export function BenchmarkingTable({
       if (!targetRow) return;
       pasteRow.forEach((value, pasteColumnIndex) => {
         const targetColumn = table.columns[columnStart + pasteColumnIndex];
-        if (targetColumn) targetRow.cells[targetColumn.id] = value;
+        if (targetColumn) {
+          targetRow.cells[targetColumn.id] = value;
+          targetRow.literalCells = targetRow.literalCells?.filter(id => id !== targetColumn.id);
+        }
       });
     });
 
@@ -181,7 +184,7 @@ export function BenchmarkingTable({
 
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
-      {content}
+      {!fullscreen ? content : null}
       {fullscreen ? (
         <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">

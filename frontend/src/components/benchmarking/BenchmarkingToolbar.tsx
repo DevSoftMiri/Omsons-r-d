@@ -21,7 +21,7 @@ export function BenchmarkingToolbar({
       <label className="secondary-button cursor-pointer text-primary">
         <Upload size={16} />
         Import from Excel
-        <input className="hidden" type="file" accept=".csv,text/csv" onChange={onImport} />
+        <input className="hidden" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onImport} />
       </label>
       <button className="secondary-button text-primary" onClick={onExport}><Download size={16} />Export to Excel</button>
       <button className="secondary-button text-rose-600" onClick={onDelete}><Trash2 size={16} />Delete Table</button>
