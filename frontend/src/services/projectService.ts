@@ -232,3 +232,15 @@ export async function reorderProjectStages(projectId: string, stages: StageName[
   });
   return normalizeProject(await parseResponse<any>(response));
 }
+
+export async function fetchProjectCreationOptions() {
+  const response = await fetch(`${API_BASE}/projects/creation-options`, { headers: authHeaders() });
+  return parseResponse<import('./authService').StaffAccount[]>(response);
+}
+
+export async function updateProjectDetails(projectId: string, payload: Pick<Project, 'name' | 'category' | 'description' | 'startDate' | 'targetDate' | 'priority'>) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload)
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}

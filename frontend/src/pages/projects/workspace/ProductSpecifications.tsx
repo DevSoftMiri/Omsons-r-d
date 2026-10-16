@@ -1,3 +1,5 @@
+import { ExcelTableActions } from '../../../components/benchmarking/ExcelTableActions';
+import { dataTable, tableRecords } from '../../../components/benchmarking/structuredTableExcel';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -96,7 +98,12 @@ export function ProductSpecifications() {
             <h2 className="text-lg font-bold">Technical Specifications</h2>
             <p className="mt-1 text-sm text-slate-500">Manual entries here feed the Testing & Validation required parameters.</p>
           </div>
-          <button className="secondary-button h-10" onClick={addRow}><Plus size={16} />Add Row</button>
+          <div className="flex flex-wrap gap-2"><ExcelTableActions table={dataTable('Technical Specifications', ['Parameter', 'Specification'], rows.map(row => [row.parameter, row.specification]))} onImport={table => {
+            const records = tableRecords(table, ['Parameter', 'Specification']);
+            if (!records.length) throw new Error('This worksheet has no specification rows.');
+            setRows(records.map(record => ({ id: `spec-${crypto.randomUUID()}`, parameter: record.parameter, specification: record.specification })));
+          }} />
+          <button className="secondary-button h-10" onClick={addRow}><Plus size={16} />Add Row</button></div>
         </div>
 
         <div className="w-full overflow-x-auto rounded-lg border border-slate-200">

@@ -100,12 +100,17 @@ export const createBenchmarkingTable = asyncHandler(async (req, res) => {
   const benchmarking = await getOrCreateBenchmarking(project._id);
   const columnCount = Math.max(1, Math.min(Number(req.body.initialColumns) || 5, 50));
   const rowCount = Math.max(1, Math.min(Number(req.body.initialRows) || 5, 200));
+  const imported = req.body.importedTable;
+  if (imported && (!Array.isArray(imported.columns) || !Array.isArray(imported.rows) || !imported.columns.length || !imported.rows.length || imported.columns.length * imported.rows.length > 100000)) {
+    res.status(400);
+    throw new Error('Imported table must contain between 1 and 100,000 cells.');
+  }
   const columns = makeColumns(columnCount);
 
   benchmarking.tables.push({
     name: req.body.name || `Table ${benchmarking.tables.length + 1}`,
-    columns,
-    rows: makeRows(rowCount, columns)
+    columns: req.body.importedTable?.columns || columns,
+    rows: req.body.importedTable?.rows || makeRows(rowCount, columns)
   });
 
   await benchmarking.save();

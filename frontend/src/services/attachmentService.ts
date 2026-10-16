@@ -55,6 +55,7 @@ export async function fetchProjectAttachments(projectId: string, stage = 'Attach
 }
 
 export async function uploadProjectAttachment(projectId: string, stage: string, file: File) {
+  if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds the 10 MB upload limit.`);
   if (!hasBackendAuth()) {
     const url = URL.createObjectURL(file);
     const attachment: ProjectAttachment = {
@@ -76,12 +77,18 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
   formData.append('file', file);
   formData.append('stage', stage);
 
-  const response = await fetch(`${API_BASE}/projects/${projectId}/attachments/upload`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: formData
-  });
-  return parseResponse<ProjectAttachment>(response);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  try {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/attachments/upload`, {
+      method: 'POST', headers: authHeaders(), body: formData, signal: controller.signal
+    });
+    return await parseResponse<ProjectAttachment>(response);
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Upload timed out. Please check the attachment list before trying again.');
+    throw error;
+  } finally { clearTimeout(timer); }
+
 }
 
 export async function deleteProjectAttachment(projectId: string, stage: string, attachmentId: string) {

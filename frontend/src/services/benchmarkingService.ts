@@ -6,8 +6,10 @@ export interface BenchmarkingColumn {
 
 export interface BenchmarkingRow {
   id: string;
+  height?: number;
   cells: Record<string, string>;
   literalCells?: string[];
+  cellBold?: Record<string, boolean>;
 }
 
 export interface BenchmarkingTableData {
@@ -159,7 +161,7 @@ export async function fetchBenchmarking(projectId: string) {
   return parseResponse<BenchmarkingWorkbook>(response);
 }
 
-export async function createBenchmarkingTable(projectId: string, payload: { name: string; initialColumns: number; initialRows: number }) {
+export async function createBenchmarkingTable(projectId: string, payload: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
   if (!hasBackendAuth()) {
     const workbook = readLocalWorkbook(projectId);
     const columns = Array.from({ length: payload.initialColumns }, () => ({ id: makeId('col') }));
@@ -172,7 +174,7 @@ export async function createBenchmarkingTable(projectId: string, payload: { name
     }));
     return writeLocalWorkbook(projectId, {
       ...workbook,
-      tables: [...workbook.tables, { _id: makeId('table'), name: payload.name, columns, rows }]
+      tables: [...workbook.tables, { ...(payload.importedTable || { columns, rows }), _id: makeId('table'), name: payload.name }]
     });
   }
 

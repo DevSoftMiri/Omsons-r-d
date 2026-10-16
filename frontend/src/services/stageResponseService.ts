@@ -148,7 +148,10 @@ function normalizeTable(table: Partial<BenchmarkingTableData> | undefined, fallb
     })),
     rows: table.rows.map((row) => ({
       id: row.id || makeStageResponseId('row'),
-      cells: { ...(row.cells || {}) }
+      cells: { ...(row.cells || {}) },
+      literalCells: row.literalCells ? [...row.literalCells] : undefined,
+      cellBold: row.cellBold ? { ...row.cellBold } : undefined,
+      height: row.height
     })),
     createdAt: table.createdAt,
     updatedAt: table.updatedAt

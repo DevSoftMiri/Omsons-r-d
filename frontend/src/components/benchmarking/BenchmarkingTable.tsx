@@ -1,6 +1,7 @@
+import { ExcelTableActions } from './ExcelTableActions';
 import { Edit3, Maximize2, MoreVertical, X } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BenchmarkingToolbar } from './BenchmarkingToolbar';
 import { SpreadsheetGrid } from './SpreadsheetGrid';
 import type { BenchmarkingTableData, SelectedCell } from './types';
@@ -10,7 +11,7 @@ export function BenchmarkingTable({
   table,
   selectedCell,
   onSelectCell,
-  onChangeTable,
+  onChangeTable: persistTable,
   onImportCsv,
   onExportCsv,
   onDeleteTable,
@@ -33,6 +34,22 @@ export function BenchmarkingTable({
   useEffect(() => {
     setDraftName(table.name);
   }, [table.name]);
+
+  const history = useRef<{ past: BenchmarkingTableData[]; future: BenchmarkingTableData[] }>({ past: [], future: [] });
+  function onChangeTable(next: BenchmarkingTableData) {
+    history.current.past.push(table);
+    const historyLimit = Math.max(2, Math.min(100, Math.floor(200000 / Math.max(1, table.rows.length * table.columns.length))));
+    while (history.current.past.length > historyLimit) history.current.past.shift();
+    history.current.future = [];
+    persistTable(next);
+  }
+  function travel(redo: boolean) {
+    const source = redo ? history.current.future : history.current.past;
+    const next = source.pop();
+    if (!next) return;
+    (redo ? history.current.past : history.current.future).push(table);
+    persistTable(next);
+  }
 
   function updateCell(rowId: string, columnId: string, value: string) {
     onChangeTable({
@@ -155,6 +172,7 @@ export function BenchmarkingTable({
             <Maximize2 size={16} />
           </button>
           <BenchmarkingToolbar
+            excelActions={<ExcelTableActions table={table} onImport={onChangeTable} />}
             onAddColumn={addColumn}
             onAddRow={addRow}
             onDelete={() => onDeleteTable(table)}
@@ -167,6 +185,9 @@ export function BenchmarkingTable({
         selectedCell={selectedCell}
         table={table}
         onCellChange={updateCell}
+        onChangeTable={onChangeTable}
+        onUndo={() => travel(false)}
+        onRedo={() => travel(true)}
         onDeleteColumn={deleteColumn}
         onDeleteRow={deleteRow}
         onPasteCells={pasteCells}

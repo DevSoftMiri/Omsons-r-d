@@ -1,3 +1,5 @@
+import { ExcelTableActions } from '../../../components/benchmarking/ExcelTableActions';
+import { dataTable, tableRecords } from '../../../components/benchmarking/structuredTableExcel';
 import type { ChangeEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CalendarDays, Check, ChevronRight, CircuitBoard, Coins, Columns3, Download, Edit2, FileText, Grid2X2, Maximize2, Minimize2, PackagePlus, Paperclip, PenLine, Plus, ReceiptText, RotateCcw, Search, ShoppingCart, Truck, Trash2, Upload, X } from 'lucide-react';
@@ -309,6 +311,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   };
   const electricalSummary = getElectricalSummary(electricalRows, electricalColumnSettings, electricalCustomColumns, electricalFiles.length);
   const mechanicalSummary = getMechanicalSummary(mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, mechanicalFiles.length);
+  const combinedBomTotal = electricalSummary.totalCost + mechanicalSummary.totalCost;
   const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selected.includes(row.id));
   const hasElectricalData = electricalRows.some((row) => bomRowHasData(row)) || electricalTables.some(tableHasData);
   const hasMechanicalData = mechanicalRows.some((row) => bomRowHasData(row)) || mechanicalTables.some(tableHasData);
@@ -533,7 +536,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     setElectricalTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
   }
 
-  function createElectricalTable(values: { name: string; initialColumns: number; initialRows: number }) {
+  function createElectricalTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
     const columns = Array.from({ length: values.initialColumns }, () => ({ id: makeId('col') }));
     const rows = Array.from({ length: values.initialRows }, () => ({
       id: makeId('row'),
@@ -542,7 +545,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         return cells;
       }, {})
     }));
-    setElectricalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
+    setElectricalTables((current) => [...current, { ...(values.importedTable || { columns, rows }), _id: makeId('table'), name: values.name }]);
     setShowElectricalTableModal(false);
     showToast({ tone: 'success', title: 'Electrical table created', message: `${values.name} was added.` });
   }
@@ -574,7 +577,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     setMechanicalTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
   }
 
-  function createMechanicalTable(values: { name: string; initialColumns: number; initialRows: number }) {
+  function createMechanicalTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
     const columns = Array.from({ length: values.initialColumns }, () => ({ id: makeId('col') }));
     const rows = Array.from({ length: values.initialRows }, () => ({
       id: makeId('row'),
@@ -583,7 +586,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         return cells;
       }, {})
     }));
-    setMechanicalTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
+    setMechanicalTables((current) => [...current, { ...(values.importedTable || { columns, rows }), _id: makeId('table'), name: values.name }]);
     setShowMechanicalTableModal(false);
     showToast({ tone: 'success', title: 'Mechanical table created', message: `${values.name} was added.` });
   }
@@ -898,6 +901,11 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     <div className="mx-auto max-w-[1500px] space-y-3 text-sm">
       <TopCrumbs title={project.name} code={project.productCode} currentStage={currentStage} />
       <ProjectStageHeader project={project} currentStage={currentStage} />
+      <section aria-label="BOM cost totals" className="grid gap-3 sm:grid-cols-3">
+        <SummaryCard icon={<Coins size={28} />} tone="green" label="BOM Grand Total" value={formatCurrency(combinedBomTotal)} note="Electrical + Mechanical BOM" />
+        <SummaryCard icon={<CircuitBoard size={28} />} tone="blue" label="Electrical BOM Total" value={formatCurrency(electricalSummary.totalCost)} note={`${electricalSummary.totalItems} items`} />
+        <SummaryCard icon={<Box size={28} />} tone="blue" label="Mechanical BOM Total" value={formatCurrency(mechanicalSummary.totalCost)} note={`${mechanicalSummary.totalItems} items`} />
+      </section>
       <StageResponseBuilder projectCode={project.productCode} stageName={currentStage} mode="controls" />
 
       {isBaseBomStage ? (
@@ -908,9 +916,12 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           <p className="mt-1.5 max-w-4xl text-sm text-slate-600">Manage all raw materials, components, packaging, costs, suppliers, and references required to manufacture this product.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input id="bom-csv-import" className="sr-only" type="file" accept=".csv,text/csv" onChange={importCsv} />
-          <label className="secondary-button h-10 cursor-pointer gap-2" htmlFor="bom-csv-import"><Upload size={16} />Import CSV</label>
-          <button className="secondary-button h-10 gap-2" onClick={exportCsv}><Download size={16} />Export to Excel</button>
+          <ExcelTableActions table={dataTable('BOM', ['Item Name', 'Category', 'Specification', 'Supplier / Reference', 'Unit', 'Quantity Per Unit', 'Unit Cost', 'Reference', 'Status'], rows.map(row => [row.itemName, row.category, row.specification, row.supplier, row.unit, row.quantityPerUnit, row.unitCost ?? '', row.referenceDocument, row.status]))} onImport={table => {
+            const records = tableRecords(table, ['Item Name']);
+            const imported = records.map(record => ({ id: crypto.randomUUID(), itemName: record['item name'], category: record.category || 'Raw Material', specification: record.specification || '', supplier: record['supplier / reference'] || '', unit: record.unit || 'pcs', quantityPerUnit: Number(record['quantity per unit'] || 1), unitCost: record['unit cost'] ? Number(record['unit cost']) : null, referenceDocument: record.reference || '', status: normalizeStatus(record.status || '') }));
+            if (imported.some(row => !row.itemName.trim() || !Number.isFinite(row.quantityPerUnit) || (row.unitCost !== null && !Number.isFinite(row.unitCost)))) throw new Error('Check item names, quantities and costs in your worksheet.');
+            setRows(current => [...current, ...imported]);
+          }} />
           <button className="secondary-button h-10 gap-2" onClick={resetBom}>Reset</button>
           <button className="primary-button" onClick={() => { setEditingRow(null); setShowForm(true); }}><Plus size={18} />Add Item</button>
         </div>
@@ -1045,6 +1056,17 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {fullscreenBomTable === 'electrical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {fullscreenBomTable === 'electrical' ? 'Exit Full Screen' : 'Full Screen'}
             </button>
+            <ExcelTableActions table={dataTable('Electrical BOM', [...electricalColumnSettings.map(col => col.label), ...electricalCustomColumns.map(col => col.label)], electricalRows.map(row => [...electricalColumnSettings.map(col => row[col.key]), ...electricalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
+              const itemLabel = electricalColumnSettings.find(col => col.key === 'item')?.label || 'Item';
+              const records = tableRecords(table, [itemLabel]);
+              const imported = records.map(record => ({
+                ...Object.fromEntries(defaultElectricalColumnSettings.map(col => [col.key, ''])),
+                ...Object.fromEntries(electricalColumnSettings.map(col => [col.key, record[col.label.toLowerCase()] || ''])),
+                id: crypto.randomUUID(),
+                customCells: Object.fromEntries(electricalCustomColumns.map(col => [col.id, record[col.label.toLowerCase()] || ''])),
+              } as ElectricalBomRow));
+              setElectricalRows(current => [...current, ...imported]);
+            }} />
             <button className="primary-button h-10 gap-2 shadow-md shadow-cyan-950/10" onClick={addElectricalRow}><Plus size={16} />Add Electrical Item</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={addElectricalColumn}><Plus size={16} />Add Column</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={() => setShowElectricalTableModal(true)}><Grid2X2 size={16} />Create New Table</button>
@@ -1238,6 +1260,17 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {fullscreenBomTable === 'mechanical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {fullscreenBomTable === 'mechanical' ? 'Exit Full Screen' : 'Full Screen'}
             </button>
+            <ExcelTableActions table={dataTable('Mechanical BOM', [...mechanicalColumnSettings.map(col => col.label), ...mechanicalCustomColumns.map(col => col.label)], mechanicalRows.map(row => [...mechanicalColumnSettings.map(col => row[col.key]), ...mechanicalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
+              const itemLabel = mechanicalColumnSettings.find(col => col.key === 'item')?.label || 'Item';
+              const records = tableRecords(table, [itemLabel]);
+              const imported = records.map(record => ({
+                ...Object.fromEntries(defaultMechanicalColumnSettings.map(col => [col.key, ''])),
+                ...Object.fromEntries(mechanicalColumnSettings.map(col => [col.key, record[col.label.toLowerCase()] || ''])),
+                id: crypto.randomUUID(),
+                customCells: Object.fromEntries(mechanicalCustomColumns.map(col => [col.id, record[col.label.toLowerCase()] || ''])),
+              } as MechanicalBomRow));
+              setMechanicalRows(current => [...current, ...imported]);
+            }} />
             <button className="primary-button h-10 gap-2 shadow-md shadow-cyan-950/10" onClick={addMechanicalRow}><Plus size={16} />Add Mechanical Item</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={addMechanicalColumn}><Plus size={16} />Add Column</button>
             <button className="secondary-button h-10 gap-2 border-cyan-800/30 text-cyan-900" onClick={() => setShowMechanicalTableModal(true)}><Grid2X2 size={16} />Create New Table</button>

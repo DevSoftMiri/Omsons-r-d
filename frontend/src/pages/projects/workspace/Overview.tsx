@@ -1,3 +1,4 @@
+import { EditProjectDetails } from '../../../components/EditProjectDetails';
 import {
   ArrowRight,
   Box,
@@ -77,6 +78,7 @@ export function Overview() {
   const reportOwner = project.reportTo || 'Unassigned';
   const reportOwnerRole = project.reportToDesignation || 'Admin';
   const canManageTeam = user?.role === 'admin';
+  const canEditProject = user?.role === 'admin' || user?.role === 'staff';
 
   useEffect(() => {
     fetchStaffAccounts()
@@ -147,7 +149,8 @@ export function Overview() {
           <div className="min-w-0 flex-1 py-1">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-3xl font-bold leading-tight">{project.name}</h2>
-              {canManageTeam ? (
+              {canEditProject && <EditProjectDetails project={project} />}
+              {canEditProject ? (
                 <label className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${statusStyles[project.status]}`}>
                   <span className="h-2 w-2 rounded-full bg-current" />
                   <select className="bg-transparent font-bold outline-none" value={project.status} disabled={savingStatus} onChange={(event) => changeProjectStatus(event.target.value as Project['status'])} title="Change project status">
@@ -208,7 +211,7 @@ export function Overview() {
         <div className="mb-5 flex items-center justify-between gap-4">
           <h3 className="text-lg font-bold">Project Stage Timeline</h3>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {canManageTeam ? <button className="secondary-button h-9 text-primary" onClick={() => { setError(''); setDialog('stage'); }}><Plus size={16} />Add Stage</button> : null}
+            {canEditProject ? <button className="secondary-button h-9 text-primary" onClick={() => { setError(''); setDialog('stage'); }}><Plus size={16} />Add Stage</button> : null}
             <Link to={`../${getStageRoute(project.currentStage, project)}`} relative="path" className="inline-flex items-center gap-2 text-sm font-bold text-primary">
               View All Stages
               <ArrowRight size={16} />

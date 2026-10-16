@@ -86,9 +86,11 @@ export function Prototyping() {
       return;
     }
     try {
-      const uploaded = await Promise.all(files.map((file) => uploadProjectAttachment(project.productCode, stageName, file)));
-      setImages((current) => [...uploaded, ...current]);
-      setMessage(`${uploaded.length} image${uploaded.length > 1 ? 's' : ''} uploaded.`);
+      for (const file of files) {
+        const uploaded = await uploadProjectAttachment(project.productCode, stageName, file);
+        setImages(current => [uploaded, ...current]);
+      }
+      setMessage(`${files.length} image(s) uploaded.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Image upload failed');
     }

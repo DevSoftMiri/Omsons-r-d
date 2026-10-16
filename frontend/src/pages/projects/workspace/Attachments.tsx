@@ -83,10 +83,11 @@ export function Attachments() {
     }
 
     try {
-      const uploaded = await Promise.all(validFiles.map((file) => uploadProjectAttachment(project.productCode, 'Attachments', file)));
-      const nextFiles = uploaded.map(toAttachmentFile);
-      setFiles((current) => [...nextFiles, ...current]);
-      setMessage(`${nextFiles.length} file${nextFiles.length > 1 ? 's' : ''} uploaded.`);
+      for (const file of validFiles) {
+        const uploaded = await uploadProjectAttachment(project.productCode, 'Attachments', file);
+        setFiles(current => [toAttachmentFile(uploaded), ...current]);
+      }
+      setMessage(`${validFiles.length} file(s) uploaded.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Upload failed');
     }

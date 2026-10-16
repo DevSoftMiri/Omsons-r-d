@@ -5,11 +5,11 @@ import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { workflowStages } from '../../data/seed';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch } from '../../hooks';
 import { upsertProject } from '../../store';
-import { createProject as createProjectApi } from '../../services/projectService';
+import { fetchProjectCreationOptions, createProject as createProjectApi } from '../../services/projectService';
 import { readActiveWorkflowStages } from '../../services/adminModuleStorage';
-import { fetchStaffAccounts, type StaffAccount } from '../../services/authService';
+import { type StaffAccount } from '../../services/authService';
 import type { StageName } from '../../types';
 import { useToast } from '../../components/ToastProvider';
 import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
@@ -37,7 +37,6 @@ type ProjectFormValues = z.infer<typeof projectSchema>;
 export function CreateProject() {
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
-  const user = useAppSelector((state) => state.auth.user);
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<StaffAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -68,7 +67,7 @@ export function CreateProject() {
   useEffect(() => {
     let active = true;
     setLoadingAccounts(true);
-    fetchStaffAccounts()
+    fetchProjectCreationOptions()
       .then((items) => {
         if (!active) return;
         setAccounts(items);
@@ -113,7 +112,7 @@ export function CreateProject() {
         ...values,
         selectedStages: orderedStages,
         customStages: orderedStages.filter((stage) => !configurableStages.includes(stage)),
-        reportTo: values.reportTo || user?.id || '',
+        reportTo: values.reportTo || '',
         teamMemberIds: values.teamMemberIds
       });
       dispatch(upsertProject(project));

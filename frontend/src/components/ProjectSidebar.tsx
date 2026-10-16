@@ -118,7 +118,7 @@ export function ProjectSidebar({
           {project.category}
         </p>
       </div>
-      {user?.role === 'admin' ? (
+      {(user?.role === 'admin' || user?.role === 'staff') ? (
         <div className="mb-2">
           {adding ? (
             <div className="rounded-lg bg-white/10 p-2">
@@ -183,7 +183,7 @@ export function ProjectSidebar({
           const locked = stage.status === 'Locked';
           const canOpen = !locked || stage.name === 'Final Stage';
           const canReorder =
-            user?.role === 'admin' && stage.name !== 'Final Stage';
+            (user?.role === 'admin' || user?.role === 'staff') && stage.name !== 'Final Stage';
           const canMoveUp = canReorder && index > 0;
           const canMoveDown = canReorder && index < project.stages.length - 2;
           const reorderControls = canReorder ? (

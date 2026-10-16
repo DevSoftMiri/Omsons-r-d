@@ -1,5 +1,8 @@
+import { AddTableModal } from '../benchmarking/AddTableModal';
+import type { WorkBook } from 'xlsx';
+import { readSpreadsheet, importWorksheet } from '../benchmarking/spreadsheetImport';
 import type { ChangeEvent, DragEvent } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, FileUp, GripVertical, Plus, Table2, Trash2, Type } from 'lucide-react';
 import { BenchmarkingTable } from '../benchmarking/BenchmarkingTable';
 import type { BenchmarkingTableData, SelectedCell } from '../benchmarking/types';
@@ -27,9 +30,13 @@ export function StageResponseBuilder({
   stageName: string;
   mode?: 'all' | 'controls' | 'blocks';
 }) {
+  const [showAddTable, setShowAddTable] = useState(false);
+  const uploadBusy = useRef(false);
   const { showToast } = useToast();
   const [blocks, setBlocks] = useState<StageResponseBlock[]>(() => readStageResponses(projectCode, stageName));
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
+  const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; block: StageTableBlock; table: BenchmarkingTableData } | null>(null);
+  const [sheetName, setSheetName] = useState('');
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [newBlockId, setNewBlockId] = useState<string | null>(null);
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
@@ -130,20 +137,41 @@ export function StageResponseBuilder({
   }
 
   async function importCsv(block: StageTableBlock, table: BenchmarkingTableData, file: File) {
-    updateTable(block, makeImportedTable(table, parseCsv(await file.text())));
+    try {
+      const source = await readSpreadsheet(file);
+      if (!source.SheetNames.length) throw new Error('This workbook contains no worksheets.');
+      if (source.SheetNames.length > 1) {
+        setSheetName(source.SheetNames[0]);
+        setSheetPicker({ source, block, table });
+      } else {
+        updateTable(block, importWorksheet(source, source.SheetNames[0], table));
+        setSelectedCell(null);
+      }
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Import failed', message: error instanceof Error ? error.message : 'Unable to import spreadsheet.' });
+    }
   }
 
   async function uploadFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (!files.length) return;
-    try {
-      const uploaded = await Promise.all(files.map((file) => uploadProjectAttachment(projectCode, stageName, file)));
-      setAttachments((current) => [...uploaded, ...current]);
-      showToast({ tone: 'success', title: 'File uploaded', message: `${uploaded.length} file${uploaded.length > 1 ? 's' : ''} added.` });
-    } catch (error) {
-      showToast({ tone: 'error', title: 'Upload failed', message: error instanceof Error ? error.message : 'Could not upload file.' });
+    if (!files.length || uploadBusy.current) return;
+    if (files.some(file => file.size > 10 * 1024 * 1024)) {
+      showToast({ tone: 'error', title: 'Upload failed', message: 'Each attachment must be smaller than 10 MB.' });
+      return;
     }
+    uploadBusy.current = true;
+    let count = 0;
+    try {
+      for (const file of files) {
+        const uploaded = await uploadProjectAttachment(projectCode, stageName, file);
+        setAttachments(current => [uploaded, ...current]);
+        count++;
+      }
+      showToast({ tone: 'success', title: 'Files uploaded', message: `${count} file(s) added.` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Upload failed', message: `${count} file(s) uploaded. ${error instanceof Error ? error.message : 'Could not upload file.'}` });
+    } finally { uploadBusy.current = false; }
   }
 
   async function removeAttachment(id: string) {
@@ -157,9 +185,42 @@ export function StageResponseBuilder({
 
   const hasFileBlock = useMemo(() => blocks.some((block) => block.type === 'file'), [blocks]);
 
+  const addTableView = <AddTableModal open={showAddTable} onClose={() => setShowAddTable(false)} title="Add Table" examples="Create a blank table or fill it from an Excel file." onCreate={values => {
+    const now = new Date().toISOString();
+    const id = makeStageResponseId('table');
+    const table = values.importedTable || makeStageResponseTable(values.name, values.initialColumns, values.initialRows);
+    persist([...blocks, { id, type: 'table', title: values.name, createdAt: now, updatedAt: now, table: { ...table, _id: makeStageResponseId('table'), name: values.name } }], id);
+    setShowAddTable(false);
+  }} />;
+
+  const sheetPickerView = sheetPicker && (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/40 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="stage-sheet-picker" className="w-full max-w-md space-y-4 rounded-xl bg-white p-5">
+        <h2 id="stage-sheet-picker" className="text-lg font-bold">Choose worksheet</h2>
+        <select autoFocus aria-label="Worksheet" className="field" value={sheetName} onChange={event => setSheetName(event.target.value)}>
+          {sheetPicker.source.SheetNames.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="secondary-button" onClick={() => setSheetPicker(null)}>Cancel</button>
+          <button type="button" className="primary-button" onClick={() => {
+            try {
+              updateTable(sheetPicker.block, importWorksheet(sheetPicker.source, sheetName, sheetPicker.table));
+              setSelectedCell(null);
+              setSheetPicker(null);
+            } catch (error) {
+              showToast({ tone: 'error', title: 'Import failed', message: error instanceof Error ? error.message : 'Unable to import worksheet.' });
+            }
+          }}>Import</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (mode === 'blocks') {
     return (
       <>
+        {sheetPickerView}
+      {addTableView}
         {blocks.length ? blocks.map((block, index) => (
               <section
                 data-stage-section={`response-${block.id}`}
@@ -183,9 +244,11 @@ export function StageResponseBuilder({
 
   return (
     <div data-stage-section-ignore={mode === 'controls' ? 'true' : undefined}>
+      {sheetPickerView}
+      {addTableView}
         {
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('table')}><Table2 size={16} />Add Table</button>
+          <button type="button" className="secondary-button h-10 text-primary" onClick={() => setShowAddTable(true)}><Table2 size={16} />Add Table</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('text')}><Type size={16} />Add Text Area</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('checklist')}><CheckSquare size={16} />Add Checklist</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('file')}><FileUp size={16} />Upload File</button>
@@ -333,51 +396,4 @@ function FileBlock({ attachments, onUpload, onDelete }: { attachments: ProjectAt
       </div>
     </div>
   );
-}
-
-function makeImportedTable(table: BenchmarkingTableData, values: string[][]): BenchmarkingTableData {
-  const columns = Array.from({ length: Math.max(...values.map((row) => row.length)) }, (_, index) => ({
-    id: table.columns[index]?.id || makeStageResponseId('col'),
-    label: table.columns[index]?.label || `Column ${index + 1}`,
-    width: table.columns[index]?.width
-  }));
-  return {
-    ...table,
-    columns,
-    rows: values.map((row) => ({
-      id: makeStageResponseId('row'),
-      cells: columns.reduce<Record<string, string>>((cells, column, index) => {
-        cells[column.id] = row[index] || '';
-        return cells;
-      }, {})
-    }))
-  };
-}
-
-function parseCsv(csv: string) {
-  const rows: string[][] = [];
-  let cell = '';
-  let row: string[] = [];
-  let quoted = false;
-  for (let index = 0; index < csv.length; index += 1) {
-    const char = csv[index];
-    const next = csv[index + 1];
-    if (char === '"' && quoted && next === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') quoted = !quoted;
-    else if (char === ',' && !quoted) {
-      row.push(cell);
-      cell = '';
-    } else if ((char === '\n' || char === '\r') && !quoted) {
-      if (char === '\r' && next === '\n') index += 1;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = '';
-    } else cell += char;
-  }
-  row.push(cell);
-  if (row.some((value) => value.trim())) rows.push(row);
-  return rows.length ? rows : [['']];
 }

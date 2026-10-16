@@ -1,3 +1,5 @@
+import { ExcelTableActions } from '../../../components/benchmarking/ExcelTableActions';
+import { dataTable, tableRecords } from '../../../components/benchmarking/structuredTableExcel';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -160,6 +162,11 @@ export function Programming() {
       <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-bold">Programs ({programs.length})</h3>
+          <ExcelTableActions table={dataTable('Programs', ['Program Name', 'Process / Machine', 'Version', 'Status', 'Description'], programs.map(p => [p.name, p.processMachine, p.version, p.status, p.description]))} onImport={table => {
+            const records = tableRecords(table, ['Program Name']);
+            if (!records.length) throw new Error('This worksheet has no program rows.');
+            setPrograms(current => [...current, ...records.map(record => ({ id: crypto.randomUUID(), name: record['program name'], processMachine: record['process / machine'] || '', version: record.version || '1.0', status: (['Draft', 'Testing', 'Ready'].includes(record.status) ? record.status : 'Draft') as ProgramStatus, description: record.description || '', file: null, parameters: [], updatedAt: new Date().toISOString() }))]);
+          }} />
           <label className="relative block w-80 max-w-full">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
             <input className="field h-9 !pl-10" placeholder="Search programs..." value={query} onChange={(event) => setQuery(event.target.value)} />

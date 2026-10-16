@@ -139,6 +139,47 @@ async function deleteStoredProjectDocument(path) {
   }
 }
 
+export const requireProjectEditor = asyncHandler(async (req, res, next) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) { res.status(404); throw new Error('Project not found'); }
+  if (isStaffUser(req.user) && !isAssignedToProject(project, req.user)) {
+    res.status(403); throw new Error('Project is not assigned to this staff account');
+  }
+  next();
+});
+
+export const projectCreationOptions = asyncHandler(async (_req, res) => {
+  res.json(await User.find({ $or: [{ isActive: true }, { isActive: { $exists: false } }] })
+    .select('name email role designation isActive').sort({ name: 1 }));
+});
+
+export const updateProject = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) { res.status(404); throw new Error('Project not found'); }
+  const startDate = new Date(req.body.startDate ?? project.startDate);
+  const targetDate = new Date(req.body.targetDate ?? project.targetDate);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(targetDate.getTime()) || targetDate < startDate) {
+    res.status(400); throw new Error('Valid Start Date and End Date are required; End Date cannot be before Start Date');
+  }
+  for (const [field, min] of [['name', 3], ['category', 1], ['description', 10]]) {
+    if (req.body[field] !== undefined) {
+      if (typeof req.body[field] !== 'string' || req.body[field].trim().length < min) {
+        res.status(400); throw new Error(`${field} must contain at least ${min} characters`);
+      }
+      project[field] = req.body[field].trim();
+    }
+  }
+  if (req.body.priority !== undefined) {
+    if (!['Low', 'Medium', 'High'].includes(req.body.priority)) { res.status(400); throw new Error('Invalid priority'); }
+    project.priority = req.body.priority;
+  }
+  project.startDate = startDate;
+  project.targetDate = targetDate;
+  await applyAutomaticProjectStatus(project);
+  await project.save();
+  res.json(serializeProjectForUser(await populateProjectTeam(project), req.user));
+});
+
 export const listProjects = asyncHandler(async (req, res) => {
   const query = isStaffUser(req.user) ? { teamMembers: req.user._id } : {};
   const projects = await Project.find(query)
@@ -165,6 +206,7 @@ export const createProject = asyncHandler(async (req, res) => {
   const stageNames = normalizeStageNames(req.body);
   const reportTo = await resolveReportTo(req.body.reportTo, admin);
   const teamMembers = await resolveTeamMembers(req.body);
+  if (isStaffUser(req.user) && !teamMembers.some(id => String(id) === String(req.user._id))) teamMembers.push(req.user._id);
   const project = await Project.create({
     name: req.body.name,
     productCode: req.body.productCode || await nextProductCode(),

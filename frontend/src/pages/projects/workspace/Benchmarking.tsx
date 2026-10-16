@@ -105,7 +105,7 @@ export function Benchmarking() {
     });
   }
 
-  async function createTable(values: { name: string; initialColumns: number; initialRows: number }) {
+  async function createTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
     try {
       setWorkbook(normalizeWorkbook(await createBenchmarkingTable(project.productCode, values)));
       setShowAddModal(false);

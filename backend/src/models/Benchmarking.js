@@ -12,8 +12,10 @@ const benchmarkingColumnSchema = new mongoose.Schema(
 const benchmarkingRowSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
+    height: { type: Number, min: 36, max: 1000 },
     cells: { type: Map, of: String, default: {} },
-    literalCells: { type: [String], default: undefined }
+    literalCells: { type: [String], default: undefined },
+    cellBold: { type: Map, of: Boolean, default: undefined }
   },
   { _id: false }
 );

@@ -102,7 +102,7 @@ export function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
-      <PageTopBar title="Projects" subtitle="All product R&D projects" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel={user?.role === 'admin' ? 'Create Project' : undefined} actionHref={user?.role === 'admin' ? '/projects/create' : undefined} />
+      <PageTopBar title="Projects" subtitle="All product R&D projects" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel="Create Project" actionHref="/projects/create" />
 
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
@@ -280,9 +280,9 @@ function ProjectCardActions({ project }: { project: Project }) {
       <div className="invisible absolute right-0 top-8 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
         <Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open</Link>
         <Link className="menu-action" to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`}>View Current Stage</Link>
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
+        {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
+        {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
+        {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
         {user?.role === 'admin' ? <button className="menu-action text-rose-600" onClick={removeCurrentProject}>Delete Project</button> : null}
         <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Code</button>
       </div>

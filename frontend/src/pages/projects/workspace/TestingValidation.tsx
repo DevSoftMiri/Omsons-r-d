@@ -79,7 +79,7 @@ export function TestingValidation() {
     setTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
   }
 
-  function createTable(values: { name: string; initialColumns: number; initialRows: number }) {
+  function createTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
     const columns = Array.from({ length: values.initialColumns }, () => ({ id: makeId('col') }));
     const rows = Array.from({ length: values.initialRows }, () => ({
       id: makeId('row'),
@@ -88,7 +88,7 @@ export function TestingValidation() {
         return cells;
       }, {})
     }));
-    setTables((current) => [...current, { _id: makeId('table'), name: values.name, columns, rows }]);
+    setTables((current) => [...current, { ...(values.importedTable || { columns, rows }), _id: makeId('table'), name: values.name }]);
     setShowAddModal(false);
   }
 
