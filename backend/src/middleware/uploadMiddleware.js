@@ -14,3 +14,12 @@ export const prerequisiteUpload = multer({
     callback(null, true);
   }
 });
+
+export const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  },
+  // General project attachments, including mechanical design files, may use any format.
+  fileFilter: (_req, _file, callback) => callback(null, true)
+});

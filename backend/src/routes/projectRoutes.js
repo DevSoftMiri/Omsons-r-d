@@ -9,7 +9,7 @@ import {
   updateBenchmarkingTable
 } from '../controllers/benchmarkingController.js';
 import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
-import { updateProject, requireProjectEditor, projectCreationOptions, addProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
+import { updateProject, requireProjectEditor, projectCreationOptions, addProjectStage, deleteProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
 import {
   addPrerequisiteDocument,
   deletePrerequisiteDocument,
@@ -20,7 +20,7 @@ import {
   uploadPrerequisite
 } from '../controllers/prerequisiteController.js';
 import { authorize, protect } from '../middleware/authMiddleware.js';
-import { prerequisiteUpload } from '../middleware/uploadMiddleware.js';
+import { attachmentUpload, prerequisiteUpload } from '../middleware/uploadMiddleware.js';
 
 const router = Router();
 
@@ -39,11 +39,12 @@ router.patch('/:id/team-members', protect, authorize('Admin'), addProjectTeamMem
 router.delete('/:id/team-members/:userId', protect, authorize('Admin'), removeProjectTeamMember);
 router.patch('/:id/report-to', protect, authorize('Admin'), updateProjectReportTo);
 router.post('/:id/stages', protect, authorize('Admin', 'Staff'), requireProjectEditor, addProjectStage);
+router.delete('/:id/stages/:stageId', protect, authorize('Admin', 'Staff'), requireProjectEditor, deleteProjectStage);
 router.patch('/:id/stages/reorder', protect, authorize('Admin', 'Staff'), requireProjectEditor, reorderProjectStages);
 router.patch('/:id/status', protect, authorize('Admin', 'Staff'), requireProjectEditor, updateProjectStatus);
 router.delete('/:id', protect, authorize('Admin'), deleteProject);
 router.get('/:id/attachments', protect, listAttachments);
-router.post('/:id/attachments/upload', protect, prerequisiteUpload.single('file'), uploadAttachment);
+router.post('/:id/attachments/upload', protect, attachmentUpload.single('file'), uploadAttachment);
 router.delete('/:id/attachments/:attachmentId', protect, deleteAttachment);
 router.get('/:id/prerequisites', protect, listPrerequisites);
 router.post('/:id/prerequisites/documents', protect, authorize('Admin'), addPrerequisiteDocument);

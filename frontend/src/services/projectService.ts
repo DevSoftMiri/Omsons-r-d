@@ -224,6 +224,13 @@ export async function addProjectStage(projectId: string, name: string) {
   return normalizeProject(await parseResponse<any>(response));
 }
 
+export async function deleteProjectStage(projectId: string, stageId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/stages/${encodeURIComponent(stageId)}`, {
+    method: 'DELETE', headers: authHeaders()
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}
+
 export async function reorderProjectStages(projectId: string, stages: StageName[]) {
   const response = await fetch(`${API_BASE}/projects/${projectId}/stages/reorder`, {
     method: 'PATCH',

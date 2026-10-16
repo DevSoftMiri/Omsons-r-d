@@ -19,7 +19,8 @@ import {
 import { resolveFileUrl } from '../../utils/fileActions';
 import { useToast } from '../ToastProvider';
 
-const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp,.csv,.xlsx,.xls,.doc,.docx';
+const acceptedFileTypes = '*/*';
+const supportedFileTypesLabel = 'Any file format (max 10 MB per file)';
 
 export function StageResponseBuilder({
   projectCode,
@@ -154,16 +155,26 @@ export function StageResponseBuilder({
 
   async function uploadFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
-    event.target.value = '';
+    const input = event.currentTarget;
     if (!files.length || uploadBusy.current) return;
-    if (files.some(file => file.size > 10 * 1024 * 1024)) {
+    const existingFiles = new Set(attachments.map((attachment) => `${attachment.name}:${attachment.fileSize ?? ''}`));
+    const uniqueFiles = files.filter((file, index, selected) => {
+      const key = `${file.name}:${file.size}`;
+      return !existingFiles.has(key) && selected.findIndex((candidate) => `${candidate.name}:${candidate.size}` === key) === index;
+    });
+    input.value = '';
+    if (!uniqueFiles.length) {
+      showToast({ tone: 'error', title: 'File already uploaded', message: 'Choose a different file to add it to this stage.' });
+      return;
+    }
+    if (uniqueFiles.some(file => file.size > 10 * 1024 * 1024)) {
       showToast({ tone: 'error', title: 'Upload failed', message: 'Each attachment must be smaller than 10 MB.' });
       return;
     }
     uploadBusy.current = true;
     let count = 0;
     try {
-      for (const file of files) {
+      for (const file of uniqueFiles) {
         const uploaded = await uploadProjectAttachment(projectCode, stageName, file);
         setAttachments(current => [uploaded, ...current]);
         count++;
@@ -171,7 +182,10 @@ export function StageResponseBuilder({
       showToast({ tone: 'success', title: 'Files uploaded', message: `${count} file(s) added.` });
     } catch (error) {
       showToast({ tone: 'error', title: 'Upload failed', message: `${count} file(s) uploaded. ${error instanceof Error ? error.message : 'Could not upload file.'}` });
-    } finally { uploadBusy.current = false; }
+    } finally {
+      input.value = '';
+      uploadBusy.current = false;
+    }
   }
 
   async function removeAttachment(id: string) {
@@ -383,6 +397,7 @@ function FileBlock({ attachments, onUpload, onDelete }: { attachments: ProjectAt
         Upload File
         <input className="hidden" type="file" accept={acceptedFileTypes} multiple onChange={onUpload} />
       </label>
+      <p className="mt-2 text-xs text-slate-500">Supported formats: {supportedFileTypesLabel}. Select multiple files at once.</p>
       <div className="mt-3 grid gap-2">
         {attachments.map((attachment) => (
           <div key={attachment._id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">

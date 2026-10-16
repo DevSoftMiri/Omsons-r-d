@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2, X } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import {
   addProjectStage,
+  deleteProjectStage,
   reorderProjectStages,
 } from '../services/projectService';
 import { upsertProject } from '../store';
@@ -94,6 +95,19 @@ export function ProjectSidebar({
       setError(err instanceof Error ? err.message : 'Unable to reorder stages');
     } finally {
       setReorderingStage('');
+    }
+  }
+
+  async function removeStage(stage: Project['stages'][number]) {
+    if (stage.name === 'Final Stage' || !window.confirm(`Delete the “${stage.name}” stage? This cannot be undone.`)) return;
+    setSaving(true);
+    setError('');
+    try {
+      dispatch(upsertProject(await deleteProjectStage(project.id, stage.id)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete stage');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -211,6 +225,19 @@ export function ProjectSidebar({
                 }}
               >
                 <ArrowDown size={13} />
+              </button>
+              <button
+                className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-rose-500/20 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-30"
+                disabled={Boolean(saving) || Boolean(reorderingStage)}
+                title={`Delete ${stage.name}`}
+                aria-label={`Delete ${stage.name}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void removeStage(stage);
+                }}
+              >
+                <Trash2 size={12} />
               </button>
             </span>
           ) : null;

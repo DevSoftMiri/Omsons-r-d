@@ -328,6 +328,29 @@ export const addProjectStage = asyncHandler(async (req, res) => {
   res.json(await populateProjectTeam(project));
 });
 
+export const deleteProjectStage = asyncHandler(async (req, res) => {
+  const project = await Project.findOne(projectQuery(req.params.id));
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  const stageIndex = project.stages.findIndex((stage) => String(stage._id) === req.params.stageId);
+  if (stageIndex < 0) {
+    res.status(404);
+    throw new Error('Stage not found');
+  }
+  if (project.stages[stageIndex].name === 'Final Stage') {
+    res.status(400);
+    throw new Error('Final Stage cannot be deleted');
+  }
+
+  project.stages.splice(stageIndex, 1);
+  refreshStageLocks(project);
+  await project.save();
+  res.json(await populateProjectTeam(project));
+});
+
 export const reorderProjectStages = asyncHandler(async (req, res) => {
   const orderedStageNames = Array.isArray(req.body.stages)
     ? req.body.stages
