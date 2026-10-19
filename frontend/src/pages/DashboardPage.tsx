@@ -1,196 +1,38 @@
-import { ChevronDown, MoreHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, ChevronDown, Clock3, Folder, MoreHorizontal, PauseCircle, PlayCircle, Search } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../components/PageTopBar';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { deleteProject, fetchProjects, updateProjectStatus } from '../services/projectService';
 import { removeProject, setProjects, upsertProject } from '../store';
-import { getStageRoute } from '../utils/stages';
-import type { Project, ProjectStatus, Stage } from '../types';
+import type { Project, ProjectStatus } from '../types';
 
-function statusLabel(status: ProjectStatus) {
-  if (status === 'Delayed') return 'At Risk';
-  if (status === 'Running') return 'On Track';
-  return status;
-}
+const statuses: ProjectStatus[] = ['Running', 'Completed', 'Delayed', 'On Hold'];
+const meta = { Running: ['Active', '#f4511e', '#fff0ea'], Completed: ['Completed', '#7b8794', '#f1f3f5'], Delayed: ['Pending', '#9ca3af', '#f3f4f6'], 'On Hold': ['On Hold', '#667085', '#eef1f4'] } as const;
 
-function stageState(stage: Stage) {
-  if (stage.status === 'Completed') return 'complete';
-  if (stage.status === 'In Progress' || stage.status === 'Pending' || stage.status === 'Submitted') return 'active';
-  return 'pending';
-}
-
-function stageLabel(name: string) {
-  if (name === 'Product Design') return 'Design';
-  if (name === 'Electrical BOM') return 'Electrical';
-  if (name === 'Mechanical BOM') return 'Mechanical';
-  if (name === 'Testing & Validation') return 'Testing';
-  if (name === 'Final Stage') return 'Final';
-  return name;
-}
-
-function ProductThumb({ project }: { project: Project }) {
-  const lowerName = project.name.toLowerCase();
-  const isCup = lowerName.includes('cup') || lowerName.includes('mug');
-  const isTumbler = lowerName.includes('tumbler');
-  const isJar = lowerName.includes('jar');
-
-  return (
-    <div className="grid h-[66px] w-[70px] place-items-center rounded-lg border border-slate-200 bg-gradient-to-br from-white to-slate-100">
-      <div className={`${isCup ? 'glass-cup' : isTumbler ? 'glass-tumbler' : isJar ? 'glass-jar' : 'glass-bottle'}`} />
-    </div>
-  );
-}
-
-const statusOptions = ['All Status', 'Running', 'On Hold', 'Completed', 'Delayed'] as const;
+function percent(value: number, total: number) { return total ? Math.round(value / total * 100) : 0; }
+function ProductThumb({ project }: { project: Project }) { const name = project.name.toLowerCase(); const shape = name.includes('cup') || name.includes('mug') ? 'glass-cup' : name.includes('tumbler') ? 'glass-tumbler' : name.includes('jar') ? 'glass-jar' : 'glass-bottle'; return <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md bg-[#F5F5F5]"><div className={shape} /></div>; }
 
 export function DashboardPage() {
-  const dispatch = useAppDispatch();
-  const projects = useAppSelector((state) => state.projects.projects);
-  const user = useAppSelector((state) => state.auth.user);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
-  const [stageFilter, setStageFilter] = useState('All Stages');
-
-  useEffect(() => {
-    fetchProjects()
-      .then((items) => dispatch(setProjects(items)))
-      .catch(() => undefined);
-  }, [dispatch]);
-
-  const visibleProjects = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return projects.filter((project) => {
-      const matchesQuery = !normalizedQuery || `${project.productCode} ${project.name} ${project.currentStage}`.toLowerCase().includes(normalizedQuery);
-      const matchesStatus = statusFilter === 'All Status' || project.status === statusFilter;
-      const matchesStage = stageFilter === 'All Stages' || project.currentStage === stageFilter;
-      return matchesQuery && matchesStatus && matchesStage;
-    });
-  }, [projects, query, stageFilter, statusFilter]);
-
-  const stageOptions = useMemo(() => ['All Stages', ...Array.from(new Set(projects.flatMap((project) => project.stages.map((stage) => stage.name))))], [projects]);
-
-  return (
-    <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
-      <PageTopBar title="R&D Project Dashboard" subtitle="Glassware product development from concept to production readiness" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel={user?.role === 'admin' ? 'New Project' : undefined} actionHref={user?.role === 'admin' ? '/projects/create' : undefined} />
-
-      <section className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-[#333333]">Projects</h2>
-          <div className="flex flex-wrap gap-2">
-            <SelectLike value={stageFilter} options={stageOptions} onChange={setStageFilter} />
-            <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1380px] w-full border-collapse text-left">
-            <thead>
-              <tr className="border-y border-[#e2e8f2] bg-[#f8faff] text-sm font-bold text-[#40577f]">
-                <th className="w-12 px-4 py-3">#</th>
-                <th className="w-[270px] px-4 py-3">Project</th>
-                <th className="w-[720px] px-4 py-3">Current Stage</th>
-                <th className="w-[240px] px-4 py-3">Stage Progress</th>
-                <th className="w-[160px] px-4 py-3">Status</th>
-                <th className="w-20 px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleProjects.map((project, index) => (
-                <tr key={project.id} className="group border-b border-[#e2e8f2] transition hover:bg-[#f8fbff]">
-                  <td className="px-4 py-4 align-middle text-base font-medium text-[#3f5580]">{index + 1}</td>
-                  <td className="px-4 py-4 align-middle">
-                    <Link to={`/projects/${project.productCode}/overview`} className="flex items-center gap-4">
-                      <ProductThumb project={project} />
-                      <span>
-                        <span className="block text-base font-bold text-[#333333]">{project.productCode}</span>
-                        <span className="mt-1 block text-base font-medium text-[#344b76]">{project.name}</span>
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-4 align-middle">
-                    <div className="grid gap-y-4" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(project.stages.length, 1), 9)}, minmax(0, 1fr))` }}>
-                      {project.stages.map((stage, stageIndex) => {
-                        const state = stageState(stage);
-                        return (
-                          <div key={stage.id} className="stage-step">
-                            <div className={`stage-dot ${state}`}>
-                              {state === 'complete' ? '✓' : state === 'active' ? <span /> : null}
-                            </div>
-                            {stageIndex < project.stages.length - 1 && <div className={`stage-line ${state === 'complete' ? 'complete' : ''}`} />}
-                            <p className={`stage-label ${state === 'active' ? 'active' : ''}`} title={stage.name}>{stageLabel(stage.name)}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 align-middle">
-                    <p className="mb-2 text-base font-bold text-[#333333]">{project.progress}%</p>
-                    <div className="h-2.5 w-52 rounded-full bg-[#dfe5ed]">
-                      <div className="h-2.5 rounded-full bg-[#00494B]" style={{ width: `${Math.min(project.progress, 100)}%` }} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 align-middle">
-                    <span className={`dashboard-status ${project.status.toLowerCase().replace(' ', '-')}`}>{statusLabel(project.status)}</span>
-                  </td>
-                  <td className="px-4 py-4 text-right align-middle">
-                    <ProjectActions project={project} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!visibleProjects.length ? (
-            <div className="border-b border-[#e2e8f2] px-4 py-10 text-center">
-              <p className="font-bold text-[#333333]">No projects found</p>
-              <p className="mt-1 text-sm text-[#53688d]">Create a project to see it on the dashboard.</p>
-            </div>
-          ) : null}
-        </div>
-      </section>
-    </div>
-  );
+  const dispatch = useAppDispatch(); const projects = useAppSelector((s) => s.projects.projects); const user = useAppSelector((s) => s.auth.user);
+  const [query, setQuery] = useState(''); const [statusFilter, setStatusFilter] = useState('All Status'); const [department, setDepartment] = useState('All Departments');
+  const departments: string[] = useMemo(() => ['All Departments', ...Array.from(new Set(projects.map((p) => p.category || p.currentStage)))], [projects]);
+  useEffect(() => { fetchProjects().then((items) => dispatch(setProjects(items))).catch(() => undefined); }, [dispatch]);
+  const counts = useMemo(() => Object.fromEntries(['Running', 'Completed', 'Delayed', 'On Hold'].map((s) => [s, projects.filter((p) => p.status === s).length])) as Record<ProjectStatus, number>, [projects]);
+  const filtered = useMemo(() => { const text = query.toLowerCase().trim(); return projects.filter((p) => (!text || `${p.name} ${p.productCode} ${p.currentStage} ${p.reportTo}`.toLowerCase().includes(text)) && (statusFilter === 'All Status' || p.status === statusFilter) && (department === 'All Departments' || (p.category || p.currentStage) === department)); }, [projects, query, statusFilter, department]);
+  const average = projects.length ? Math.round(projects.reduce((sum, p) => sum + p.progress, 0) / projects.length) : 0;
+  const activeAverage = counts.Running ? Math.round(projects.filter((p) => p.status === 'Running').reduce((sum, p) => sum + p.progress, 0) / counts.Running) : 0;
+  const departmentRows = useMemo(() => Array.from(new Set(projects.map((p) => p.category || p.currentStage))).map((name) => { const rows = projects.filter((p) => (p.category || p.currentStage) === name); return { name, count: rows.length, progress: Math.round(rows.reduce((s, p) => s + p.progress, 0) / rows.length) }; }).sort((a, b) => b.count - a.count).slice(0, 4), [projects]);
+  return <main className="min-h-screen bg-[#F5F5F5] px-4 py-4 text-[#202124] sm:px-6 lg:px-8"><style>{`@media (min-width: 700px) { main > section:nth-of-type(2) { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr) !important; } } @media (max-width: 699px) { main > section:nth-of-type(2) { grid-template-columns: minmax(0, 1fr) !important; } } main > section:nth-of-type(2) > div:nth-child(2) > div:nth-child(3) { display: none; } main > section:nth-of-type(3) table th:nth-child(2), main > section:nth-of-type(3) table td:nth-child(2) { display: none; } main > section:nth-of-type(3) > div:first-child > div:nth-child(2) > label:nth-of-type(2) { display: none; } main > section:nth-of-type(3) > div:first-child > div:last-child { gap: 28px; } main > section:nth-of-type(3) > div:first-child > div:last-child button { border-radius: 0; border-left: 0; border-right: 0; border-top: 0; background: transparent; padding-left: 0; padding-right: 0; } main > section:nth-of-type(3) > div:first-child > div:last-child button[class*="border-[#FF5A1F]"] { border-bottom-color: #FFB08F !important; border-bottom-width: 3px !important; }`}</style>
+    <PageTopBar title="Projects" subtitle="All product R&D projects" searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search projects..." actionLabel={user?.role === 'admin' ? 'Create Project' : undefined} actionHref={user?.role === 'admin' ? '/projects/create' : undefined} />
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric label="Total projects" value={projects.length} detail="All projects" color="#FF5A1F" dark icon={<Folder size={18} />} />{statuses.map((s) => <Metric key={s} label={meta[s][0]} value={counts[s]} detail={`${percent(counts[s], projects.length)}% of projects`} color={meta[s][1]} icon={s === 'Running' ? <PlayCircle size={18} /> : s === 'Completed' ? <CheckCircle2 size={18} /> : s === 'Delayed' ? <Clock3 size={18} /> : <PauseCircle size={18} />} />)}</section>
+    <section className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.25fr]"><Panel title="Project status" count={`${projects.length} projects`}><div className="mt-4 flex h-2 overflow-hidden rounded-full bg-[#E5E5E5]">{statuses.map((s) => <div key={s} style={{ width: `${percent(counts[s], projects.length)}%`, backgroundColor: meta[s][1] }} />)}</div><div className="mt-3">{statuses.map((s) => <div key={s} className="flex min-h-10 items-center justify-between border-b border-[#E5E5E5] py-2 text-sm"><span className="flex items-center gap-2 font-medium text-[#333333]"><i className="h-2 w-2 rounded-full" style={{ backgroundColor: meta[s][1] }} />{meta[s][0]}</span><span className="flex items-center gap-8 text-[#737373]"><strong className="font-medium text-[#333333]">{counts[s]}</strong><span className="w-9 text-right">{percent(counts[s], projects.length)}%</span></span></div>)}</div></Panel><Panel title="Project progress" count={`${projects.length} projects`}><div className="mt-3 flex items-center gap-6"><div className="grid shrink-0 place-items-center rounded-full" style={{ width: 132, height: 132, minWidth: 132, borderRadius: '50%', background: `conic-gradient(#FF5A1F ${average}%, #E5E5E5 0)` }}><div className="grid place-items-center rounded-full bg-white text-center leading-none" style={{ width: 100, height: 100, minWidth: 100, borderRadius: '50%' }}><strong style={{ fontSize: 28, lineHeight: 1, color: '#202124' }}>{average}%</strong><span style={{ marginTop: 7, fontSize: 11, lineHeight: 1, whiteSpace: 'nowrap', color: '#737373', fontWeight: 600 }}>Average progress</span></div></div><div className="min-w-0 flex-1 space-y-2 text-sm"><Fact label="Average progress (active projects)" value={`${activeAverage}%`} /><Fact label="Completion rate" value={`${percent(counts.Completed, projects.length)}%`} /><Fact label="Pending or on hold" value={counts.Delayed + counts['On Hold']} /></div></div><div className="mt-5 border-t border-[#E5E5E5] pt-4"><p className="text-xs font-bold uppercase tracking-[0.08em] text-[#333333]">Progress by department</p>{departmentRows.length ? departmentRows.map((row) => <div key={row.name} className="mt-3"><div className="flex items-center justify-between gap-3 text-sm"><span className="truncate font-medium text-[#333333]">{row.name}</span><span className="whitespace-nowrap text-[#737373]">{row.count} {row.count === 1 ? 'project' : 'projects'} · {row.progress}%</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#E5E5E5]"><div className="h-full rounded-full bg-[#FF5A1F]" style={{ width: `${row.progress}%` }} /></div></div>) : <p className="mt-2 text-sm text-[#737373]">No department data available.</p>}</div></Panel></section>
+    <section className="mt-5 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(32,33,36,0.04)]"><div className="border-b border-[#E5E5E5] p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-bold text-[#333333]">Projects</h2><span className="text-sm text-[#737373]">Showing {filtered.length} of {projects.length} projects</span></div><div className="mt-4 flex flex-wrap items-center gap-3"><label className="flex h-11 min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-[#E5E5E5] px-3 text-[#737373] sm:flex-none"><Search size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full text-sm outline-none" placeholder="Search name, code or lead" /></label><Filter value={department} options={departments} onChange={setDepartment} /><Filter value={statusFilter} options={['All Status', ...statuses]} onChange={setStatusFilter} /><button className="text-sm font-semibold text-[#FF5A1F]" onClick={() => { setQuery(''); setDepartment('All Departments'); setStatusFilter('All Status'); }}>Clear filters</button></div><div className="mt-4 flex flex-wrap gap-6 border-b border-[#E5E5E5]">{['All Status', ...statuses].map((s) => { const status = s as ProjectStatus; return <button key={s} onClick={() => setStatusFilter(s)} className={`border-b-2 px-0 pb-2 text-sm font-semibold ${statusFilter === s ? 'border-[#FF5A1F] text-[#FF5A1F]' : 'border-transparent text-[#737373]'}`}>{s === 'All Status' ? `All ${projects.length}` : `${meta[status][0]} ${counts[status]}`}</button>; })}</div></div><div className="overflow-x-auto"><table className="min-w-[900px] w-full text-left text-sm"><thead className="bg-[#F5F5F5] text-[11px] font-bold uppercase tracking-wide text-[#737373]"><tr><th className="px-5 py-3">Project</th><th className="px-5 py-3">Department</th><th className="px-5 py-3">Lead</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Progress</th><th className="px-5 py-3">Due date</th><th /></tr></thead><tbody>{filtered.slice(0, 10).map((p) => <ProjectRow key={p.id} project={p} userRole={user?.role} />)}</tbody></table>{!filtered.length ? <div className="px-4 py-8 text-center text-sm text-[#718096]">No projects found.</div> : null}</div></section>
+  </main>;
 }
 
-function SelectLike<T extends string>({ value, options, onChange }: { value: T; options: readonly T[]; onChange: (value: T) => void }) {
-  return (
-    <label className="relative">
-      <select value={value} onChange={(event) => onChange(event.target.value as T)} className="h-11 min-w-[150px] appearance-none rounded-lg border border-[#cad7eb] bg-white px-4 pr-10 text-sm font-semibold text-[#18315e]">
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-3.5 text-[#284b7c]" size={18} />
-    </label>
-  );
-}
-
-function ProjectActions({ project }: { project: Project }) {
-  const dispatch = useAppDispatch();
-  const user = useAppSelector((state) => state.auth.user);
-  async function setStatus(status: Project['status']) {
-    dispatch(upsertProject(await updateProjectStatus(project.id, status)));
-  }
-
-  async function removeCurrentProject() {
-    const confirmed = window.confirm(`Delete project ${project.productCode}?\n\nThis will permanently delete the project and its related database records.`);
-    if (!confirmed) return;
-    await deleteProject(project.id);
-    dispatch(removeProject(project.id));
-  }
-
-  return (
-    <div className="group relative inline-block text-left">
-      <button className="inline-grid h-9 w-9 place-items-center rounded-full text-[#1d3767] transition hover:bg-[#edf4ff]" title="Project actions">
-        <MoreHorizontal size={24} />
-      </button>
-      <div className="invisible absolute right-0 top-10 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 text-left opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
-        <Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open Project</Link>
-        <Link className="menu-action" to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`}>View Current Stage</Link>
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
-        {user?.role === 'admin' ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}
-        {user?.role === 'admin' ? <button className="menu-action text-rose-600" onClick={removeCurrentProject}>Delete Project</button> : null}
-        <button className="menu-action" onClick={() => navigator.clipboard?.writeText(project.productCode)}>Copy Project Code</button>
-      </div>
-    </div>
-  );
-}
+function Metric({ label, value, detail, color, icon, dark = false }: { label: string; value: number; detail: string; color: string; icon: ReactNode; dark?: boolean }) { return <div className={`relative min-w-0 rounded-xl border border-[#E5E5E5] px-5 py-3 shadow-sm ${dark ? 'bg-[#333333] text-white' : 'bg-white text-[#202124]'}`} style={{ minHeight: 96 }}><div className={`absolute right-4 top-3 grid h-10 w-10 place-items-center rounded-xl ${dark ? 'bg-[#FF5A1F] text-white' : ''}`} style={dark ? undefined : { backgroundColor: color === '#f4511e' ? '#FFF0E8' : '#F1F2F3', color }}>{icon}</div><p className={`text-sm font-semibold ${dark ? 'text-white' : 'text-[#202124]'}`}>{label}</p><p className="mt-1.5 text-[28px] font-bold leading-none">{value}</p><p className={`mt-1.5 text-sm ${dark ? 'text-white/75' : 'text-[#737373]'}`}>{detail}</p></div>; }
+function Panel({ title, count, children }: { title: string; count: string; children: ReactNode }) { return <div className="rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-[0_1px_3px_rgba(32,33,36,0.04)]"><div className="flex items-center justify-between"><h2 className="text-base font-bold text-[#333333]">{title}</h2><span className="text-xs text-[#737373]">{count}</span></div>{children}</div>; }
+function Fact({ label, value }: { label: string; value: string | number }) { return <div className="flex items-center justify-between gap-3 border-b border-[#eef1f4] pb-1.5" style={{ fontSize: 12, lineHeight: 1.25 }}><span className="truncate text-[#718096]">{label}</span><strong className="shrink-0 text-[#2d3748]">{value}</strong></div>; }
+function Filter<T extends string>({ value, options, onChange }: { value: T; options: readonly T[]; onChange: (value: T) => void }) { return <label className="relative"><select value={value} onChange={(e) => onChange(e.target.value as T)} className="h-11 min-w-[145px] appearance-none rounded-lg border border-[#E5E5E5] bg-white px-3 pr-9 text-sm text-[#333333]">{options.map((option) => <option key={option}>{option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-3.5 text-[#737373]" size={16} /></label>; }
+function ProjectRow({ project, userRole }: { project: Project; userRole?: string }) { const dispatch = useAppDispatch(); const color = meta[project.status][1]; async function setStatus(status: ProjectStatus) { dispatch(upsertProject(await updateProjectStatus(project.id, status))); } async function remove() { if (!window.confirm(`Delete project ${project.productCode}?`)) return; await deleteProject(project.id); dispatch(removeProject(project.id)); } return <tr className="border-t border-[#E5E5E5] hover:bg-[#FFF9F6]"><td className="px-5 py-3"><Link to={`/projects/${project.productCode}/overview`} className="flex items-center gap-3"><ProductThumb project={project} /><span><strong className="block text-sm font-semibold text-[#202124]">{project.name}</strong><span className="text-xs text-[#737373]">{project.productCode}</span></span></Link></td><td className="px-5 py-3 text-sm text-[#737373]">{project.category || project.currentStage}</td><td className="px-5 py-3 text-sm text-[#737373]">{project.reportTo || '--'}</td><td className="px-5 py-3"><span className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ backgroundColor: meta[project.status][2], color }}><i className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />{meta[project.status][0]}</span></td><td className="px-5 py-3"><div className="flex items-center gap-2"><span className="w-8 text-sm text-[#737373]">{project.progress}%</span><div className="h-2 w-32 rounded-full bg-[#E5E5E5]"><div className="h-full rounded-full bg-[#FF5A1F]" style={{ width: `${Math.min(project.progress, 100)}%` }} /></div></div></td><td className="whitespace-nowrap px-5 py-3 text-sm text-[#737373]">{project.targetDate ? new Date(project.targetDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '--'}</td><td className="px-5 py-3 text-right"><div className="group relative inline-block"><button className="rounded-full p-1 text-[#737373] hover:bg-[#FFF0E8]"><MoreHorizontal size={18} /></button><div className="invisible absolute right-0 top-7 z-20 w-40 rounded-lg border border-[#E5E5E5] bg-white p-1 text-left shadow-lg group-hover:visible"><Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open Project</Link>{userRole === 'admin' ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Active</button> : null}{userRole === 'admin' ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}{userRole === 'admin' ? <button className="menu-action text-rose-600" onClick={remove}>Delete Project</button> : null}</div></div></td></tr>; }
