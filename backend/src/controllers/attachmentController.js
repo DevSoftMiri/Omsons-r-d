@@ -32,6 +32,7 @@ export const listAttachments = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const filter = { project: project._id };
   if (req.query.stage) filter.stage = req.query.stage;
+  if (req.query.sectionId) filter.sectionId = req.query.sectionId;
   const attachments = await Attachment.find(filter).sort({ updatedAt: -1 });
   res.json(attachments);
 });
@@ -39,13 +40,15 @@ export const listAttachments = asyncHandler(async (req, res) => {
 export const uploadAttachment = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const stage = req.body.stage || req.query.stage || 'Attachments';
+  const sectionId = req.body.sectionId || undefined;
 
   if (!req.file) {
     res.status(400);
     throw new Error('File is required');
   }
 
-  const path = `projects/${project._id}/${safeStage(stage)}/${Date.now()}-${safeFileName(req.file.originalname)}`;
+  const sectionPath = sectionId ? `/${safeStage(sectionId)}` : '';
+  const path = `projects/${project._id}/${safeStage(stage)}${sectionPath}/${Date.now()}-${safeFileName(req.file.originalname)}`;
   const upload = await uploadProjectDocument({
     path,
     buffer: req.file.buffer,
@@ -55,6 +58,7 @@ export const uploadAttachment = asyncHandler(async (req, res) => {
   const attachment = await Attachment.create({
     project: project._id,
     stage,
+    sectionId,
     name: req.file.originalname,
     mimeType: req.file.mimetype,
     fileSize: req.file.size,

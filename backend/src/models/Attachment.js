@@ -4,6 +4,7 @@ const attachmentSchema = new mongoose.Schema(
   {
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     stage: String,
+    sectionId: String,
     name: String,
     mimeType: String,
     fileSize: Number,

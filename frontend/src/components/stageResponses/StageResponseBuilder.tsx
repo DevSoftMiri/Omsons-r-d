@@ -33,6 +33,10 @@ export function StageResponseBuilder({
 }) {
   const [showAddTable, setShowAddTable] = useState(false);
   const uploadBusy = useRef(false);
+  // Keep duplicate detection synchronous while uploads are in flight. React state
+  // updates are async, so relying on `attachments` alone can accept a file again
+  // before the previous upload has been reflected in the list.
+  const uploadingFileKeys = useRef(new Set<string>());
   const { showToast } = useToast();
   const [blocks, setBlocks] = useState<StageResponseBlock[]>(() => readStageResponses(projectCode, stageName));
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
@@ -43,7 +47,8 @@ export function StageResponseBuilder({
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
 
   useEffect(() => {
-    setBlocks(readStageResponses(projectCode, stageName));
+    const savedBlocks = readStageResponses(projectCode, stageName);
+    setBlocks(savedBlocks);
     let active = true;
     fetchProjectAttachments(projectCode, stageName)
       .then((items) => {
@@ -153,16 +158,28 @@ export function StageResponseBuilder({
     }
   }
 
-  async function uploadFiles(event: ChangeEvent<HTMLInputElement>) {
+  async function uploadFiles(event: ChangeEvent<HTMLInputElement>, sectionId: string) {
     const files = Array.from(event.target.files || []);
     const input = event.currentTarget;
-    if (!files.length || uploadBusy.current) return;
-    const existingFiles = new Set(attachments.map((attachment) => `${attachment.name}:${attachment.fileSize ?? ''}`));
-    const uniqueFiles = files.filter((file, index, selected) => {
-      const key = `${file.name}:${file.size}`;
-      return !existingFiles.has(key) && selected.findIndex((candidate) => `${candidate.name}:${candidate.size}` === key) === index;
-    });
+    // Clear the native input before starting the async upload. This lets the
+    // user select the same input again after every upload, including when the
+    // browser gives the input a new FileList instance.
     input.value = '';
+    if (!files.length || uploadBusy.current) return;
+    const existingFiles = new Set(
+      attachments.flatMap((attachment) =>
+        attachment.fileSize == null
+          ? [attachment.name]
+          : [attachmentKey(attachment)],
+      ),
+    );
+    const uniqueFiles = files.filter((file, index, selected) => {
+      const key = fileKey(file);
+      return !existingFiles.has(key)
+        && !existingFiles.has(file.name)
+        && !uploadingFileKeys.current.has(key)
+        && selected.findIndex((candidate) => fileKey(candidate) === key) === index;
+    });
     if (!uniqueFiles.length) {
       showToast({ tone: 'error', title: 'File already uploaded', message: 'Choose a different file to add it to this stage.' });
       return;
@@ -172,10 +189,12 @@ export function StageResponseBuilder({
       return;
     }
     uploadBusy.current = true;
+    const uploadKeys = uniqueFiles.map(fileKey);
+    uploadKeys.forEach((key) => uploadingFileKeys.current.add(key));
     let count = 0;
     try {
       for (const file of uniqueFiles) {
-        const uploaded = await uploadProjectAttachment(projectCode, stageName, file);
+        const uploaded = await uploadProjectAttachment(projectCode, stageName, file, sectionId);
         setAttachments(current => [uploaded, ...current]);
         count++;
       }
@@ -183,9 +202,17 @@ export function StageResponseBuilder({
     } catch (error) {
       showToast({ tone: 'error', title: 'Upload failed', message: `${count} file(s) uploaded. ${error instanceof Error ? error.message : 'Could not upload file.'}` });
     } finally {
-      input.value = '';
+      uploadKeys.forEach((key) => uploadingFileKeys.current.delete(key));
       uploadBusy.current = false;
     }
+  }
+
+  function fileKey(file: File) {
+    return `${file.name}:${file.size}`;
+  }
+
+  function attachmentKey(attachment: ProjectAttachment) {
+    return `${attachment.name}:${attachment.fileSize ?? ''}`;
   }
 
   async function removeAttachment(id: string) {
@@ -198,6 +225,12 @@ export function StageResponseBuilder({
   }
 
   const hasFileBlock = useMemo(() => blocks.some((block) => block.type === 'file'), [blocks]);
+  const firstFileBlockId = useMemo(() => blocks.find((block) => block.type === 'file')?.id, [blocks]);
+
+  function attachmentsForSection(sectionId: string) {
+    return attachments.filter((attachment) => attachment.sectionId === sectionId
+      || (!attachment.sectionId && sectionId === firstFileBlockId));
+  }
 
   const addTableView = <AddTableModal open={showAddTable} onClose={() => setShowAddTable(false)} title="Add Table" examples="Create a blank table or fill it from an Excel file." onCreate={values => {
     const now = new Date().toISOString();
@@ -232,7 +265,7 @@ export function StageResponseBuilder({
 
   if (mode === 'blocks') {
     return (
-      <>
+      <div className="pb-4">
         {sheetPickerView}
       {addTableView}
         {blocks.length ? blocks.map((block, index) => (
@@ -248,16 +281,16 @@ export function StageResponseBuilder({
                 {block.type === 'text' ? <textarea className="field mt-3 min-h-32 resize-y bg-white" value={block.value} onChange={(event) => updateBlock({ ...block, value: event.target.value })} /> : null}
                 {block.type === 'checklist' ? <ChecklistBlock block={block} onChange={updateBlock} /> : null}
                 {block.type === 'table' ? <div className="mt-3"><BenchmarkingTable index={index} table={block.table} selectedCell={selectedCell} onSelectCell={setSelectedCell} onChangeTable={(table) => updateTable(block, table)} onImportCsv={(table, file) => importCsv(block, table, file)} onExportCsv={exportCsv} onDeleteTable={() => deleteBlock(block.id)} editableColumnLabels /></div> : null}
-                {block.type === 'file' ? <FileBlock attachments={attachments} onDelete={removeAttachment} onUpload={uploadFiles} /> : null}
+                {block.type === 'file' ? <FileBlock attachments={attachmentsForSection(block.id)} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id)} /> : null}
               </section>
             )) : null}
-        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={uploadFiles} /> : null}
-      </>
+        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId); }} /> : null}
+      </div>
     );
   }
 
   return (
-    <div data-stage-section-ignore={mode === 'controls' ? 'true' : undefined}>
+    <div className="pb-4" data-stage-section-ignore={mode === 'controls' ? 'true' : undefined}>
       {sheetPickerView}
       {addTableView}
         {
@@ -307,7 +340,7 @@ export function StageResponseBuilder({
                 </div>
               ) : null}
               {block.type === 'file' ? (
-                <FileBlock attachments={attachments} onDelete={removeAttachment} onUpload={uploadFiles} />
+                <FileBlock attachments={attachmentsForSection(block.id)} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id)} />
               ) : null}
             </section>
           ))}
@@ -315,7 +348,7 @@ export function StageResponseBuilder({
       ) : null}
 
       {!hasFileBlock ? (
-        <input className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={uploadFiles} />
+        <input className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId); }} />
       ) : null}
     </div>
   );

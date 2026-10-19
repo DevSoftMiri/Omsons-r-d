@@ -4,6 +4,7 @@ export interface ProjectAttachment {
   _id: string;
   project?: string;
   stage: string;
+  sectionId?: string;
   name: string;
   mimeType: string;
   fileSize?: number;
@@ -54,13 +55,14 @@ export async function fetchProjectAttachments(projectId: string, stage = 'Attach
   return parseResponse<ProjectAttachment[]>(response);
 }
 
-export async function uploadProjectAttachment(projectId: string, stage: string, file: File) {
+export async function uploadProjectAttachment(projectId: string, stage: string, file: File, sectionId?: string) {
   if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds the 10 MB upload limit.`);
   if (!hasBackendAuth()) {
     const url = URL.createObjectURL(file);
     const attachment: ProjectAttachment = {
       _id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       stage,
+      sectionId,
       name: file.name,
       mimeType: file.type,
       fileSize: file.size,
@@ -76,6 +78,7 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
   const formData = new FormData();
   formData.append('file', file);
   formData.append('stage', stage);
+  if (sectionId) formData.append('sectionId', sectionId);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
