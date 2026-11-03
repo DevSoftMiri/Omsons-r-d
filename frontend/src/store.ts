@@ -3,7 +3,7 @@ import { initialProjects, workflowStages } from './data/seed';
 import type { Project, StageName } from './types';
 import { canCompleteStage, makeStage, slugifyStageName } from './utils/stages';
 
-export type UserRole = 'admin' | 'staff';
+export type UserRole = 'admin' | 'staff' | 'auditor';
 
 export interface AuthUser {
   id: string;
@@ -35,7 +35,7 @@ function loadStoredSession(): StoredAuthSession | null {
     const storedSession = window.localStorage.getItem(authStorageKey);
     if (!storedSession) return null;
     const parsedSession = JSON.parse(storedSession) as StoredAuthSession;
-    if (!parsedSession.token || !parsedSession.user?.name || !parsedSession.user.email || !['admin', 'staff'].includes(parsedSession.user.role)) return null;
+    if (!parsedSession.token || !parsedSession.user?.name || !parsedSession.user.email || !['admin', 'staff', 'auditor'].includes(parsedSession.user.role)) return null;
     return parsedSession;
   } catch {
     return null;

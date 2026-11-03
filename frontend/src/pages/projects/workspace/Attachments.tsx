@@ -27,6 +27,7 @@ type AttachmentFile = {
   id: string;
   name: string;
   description: string;
+  note?: string;
   type: string;
   size: number;
   uploadedOn: string;
@@ -367,6 +368,7 @@ function toAttachmentFile(attachment: ProjectAttachment): AttachmentFile {
     id: attachment._id,
     name,
     description: attachment.stage === 'Attachments' ? 'Uploaded project attachment' : `${attachment.stage} attachment`,
+    note: attachment.note,
     type: getAttachmentType(name, mimeType),
     size: attachment.fileSize || 0,
     uploadedOn: attachment.createdAt || attachment.updatedAt || new Date().toISOString(),

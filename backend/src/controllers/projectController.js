@@ -100,7 +100,7 @@ async function populateProjectTeam(project) {
 }
 
 function isStaffUser(user) {
-  return user?.role === 'Staff';
+  return user?.role === 'Staff' || user?.role === 'Auditor';
 }
 
 function isAssignedToProject(project, user) {
@@ -256,7 +256,7 @@ export const getProject = asyncHandler(async (req, res) => {
 });
 
 export const listProjectTeamCandidates = asyncHandler(async (_req, res) => {
-  const users = await User.find({ role: 'Staff', $or: [{ isActive: true }, { isActive: { $exists: false } }] })
+  const users = await User.find({ role: { $in: ['Staff', 'Auditor'] }, $or: [{ isActive: true }, { isActive: { $exists: false } }] })
     .select('name email role designation isActive')
     .sort({ name: 1 });
   res.json(users);
@@ -266,7 +266,7 @@ export const addProjectTeamMember = asyncHandler(async (req, res) => {
   const project = await Project.findOne(projectQuery(req.params.id));
   const user = await User.findOne({
     _id: req.body.userId,
-    role: 'Staff',
+    role: { $in: ['Staff', 'Auditor'] },
     $or: [{ isActive: true }, { isActive: { $exists: false } }]
   });
   if (!project || !user) {
@@ -280,7 +280,7 @@ export const addProjectTeamMember = asyncHandler(async (req, res) => {
 
 export const removeProjectTeamMember = asyncHandler(async (req, res) => {
   const project = await Project.findOne(projectQuery(req.params.id));
-  const user = await User.findOne({ _id: req.params.userId, role: 'Staff' });
+  const user = await User.findOne({ _id: req.params.userId, role: { $in: ['Staff', 'Auditor'] } });
   if (!project || !user) {
     res.status(404);
     throw new Error('Project or team member not found');

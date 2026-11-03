@@ -11,7 +11,7 @@ interface ApiUser {
   _id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Staff';
+  role: 'Admin' | 'Staff' | 'Auditor';
 }
 
 interface LoginResponse {
@@ -47,7 +47,7 @@ export interface StaffAccount {
   _id: string;
   name: string;
   email: string;
-  role: 'Staff' | 'Admin';
+  role: 'Staff' | 'Admin' | 'Auditor';
   designation?: string;
   isActive: boolean;
 }
@@ -62,11 +62,11 @@ export async function fetchStaffAccounts() {
   return parseAuthResponse<StaffAccount[]>(await fetch(`${API_BASE}/auth/staff`, { headers: authHeaders() }));
 }
 
-export async function createStaffAccount(payload: { name: string; email: string; password: string; designation: string; role: 'Staff' | 'Admin' }) {
+export async function createStaffAccount(payload: { name: string; email: string; password: string; designation: string; role: 'Staff' | 'Admin' | 'Auditor' }) {
   return parseAuthResponse<StaffAccount>(await fetch(`${API_BASE}/auth/staff`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) }));
 }
 
-export async function updateStaffAccount(userId: string, payload: { name: string; email: string; designation: string; role: 'Staff' | 'Admin'; isActive: boolean }) {
+export async function updateStaffAccount(userId: string, payload: { name: string; email: string; designation: string; role: 'Staff' | 'Admin' | 'Auditor'; isActive: boolean }) {
   return parseAuthResponse<StaffAccount>(await fetch(`${API_BASE}/auth/staff/${userId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },

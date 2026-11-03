@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronRight, FileImage, Trash2, UploadCloud } from 'lucide-react';
+import { Check, ChevronRight, FileImage, Plus, Trash2, UploadCloud } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
@@ -8,11 +8,11 @@ import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import {
-  prototypeApprovalOptions,
+  makePrototypeEntry,
   prototypeStatusOptions,
   readPrototyping,
   savePrototyping,
-  type PrototypingData
+  type PrototypeEntry
 } from '../../../services/prototypingService';
 import { resolveFileUrl } from '../../../utils/fileActions';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
@@ -26,7 +26,7 @@ export function Prototyping() {
   const { completeStage, canCompleteStage } = useStageCompletion(project);
   const { showToast } = useToast();
   const initial = readPrototyping(project.productCode);
-  const [form, setForm] = useState(initial);
+  const [entries, setEntries] = useState(initial.entries);
   const [lastSaved, setLastSaved] = useState(initial.lastSaved);
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [images, setImages] = useState<ProjectAttachment[]>([]);
@@ -56,27 +56,27 @@ export function Prototyping() {
 
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
-      const saved = savePrototyping(project.productCode, withoutLastSaved(form));
+      const saved = savePrototyping(project.productCode, { entries });
       setLastSaved(saved.lastSaved);
       setSaveState('Saved');
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [form, project.productCode]);
+  }, [entries, project.productCode]);
 
   const missingFields = useMemo(() => getMissingFields([
-    { label: 'Prototype Version', value: form.prototypeVersion },
-    { label: 'Prototype Date', value: form.prototypeDate },
-    { label: 'Prototype Status', value: form.prototypeStatus },
-    { label: 'Build Notes', value: form.buildNotes },
-    { label: 'Approval Status', value: form.approvalStatus },
+    { label: 'Prototype Entry', valid: entries.length > 0 },
+    { label: 'Prototype Date', valid: entries.every((entry) => Boolean(entry.date)) },
+    { label: 'Prototype Status', valid: entries.every((entry) => Boolean(entry.status)) },
     { label: completion.blockedBy ? `${completion.blockedBy} completed` : 'Previous stages completed', valid: completion.ok }
-  ]), [completion.blockedBy, completion.ok, form]);
+  ]), [completion.blockedBy, completion.ok, entries]);
   const canComplete = missingFields.length === 0 && saveState === 'Saved';
 
-  function updateField<K extends keyof PrototypingData>(key: K, value: PrototypingData[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+  function updateEntry(id: string, patch: Partial<PrototypeEntry>) {
+    setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, ...patch } : entry));
   }
+
+  function addEntry() { setEntries((current) => [makePrototypeEntry(), ...current]); }
 
   async function uploadImages(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []).filter((file) => acceptedImageTypes.split(',').includes(file.type));
@@ -129,33 +129,9 @@ export function Prototyping() {
       <StageResponseBuilder projectCode={project.productCode} stageName={stageName} mode="blocks" />
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Prototype Version">
-            <input className="field" value={form.prototypeVersion} onChange={(event) => updateField('prototypeVersion', event.target.value)} />
-          </Field>
-          <Field label="Prototype Date">
-            <input className="field" type="date" value={form.prototypeDate} onChange={(event) => updateField('prototypeDate', event.target.value)} />
-          </Field>
-          <Field label="Prototype Status">
-            <select className="field" value={form.prototypeStatus} onChange={(event) => updateField('prototypeStatus', event.target.value as PrototypingData['prototypeStatus'])}>
-              <option value="">Select status</option>
-              {prototypeStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </Field>
-          <Field label="Approval Status">
-            <select className="field" value={form.approvalStatus} onChange={(event) => updateField('approvalStatus', event.target.value as PrototypingData['approvalStatus'])}>
-              <option value="">Select approval</option>
-              {prototypeApprovalOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </Field>
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-2">
-        <TextAreaField label="Build Notes" value={form.buildNotes} onChange={(value) => updateField('buildNotes', value)} />
-        <TextAreaField label="Issues Found" value={form.issuesFound} onChange={(value) => updateField('issuesFound', value)} />
-        <TextAreaField label="Improvements Required" value={form.improvementsRequired} onChange={(value) => updateField('improvementsRequired', value)} />
-        <TextAreaField label="Engineer Remarks" value={form.engineerRemarks} onChange={(value) => updateField('engineerRemarks', value)} />
+        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Prototype Entries</h2><p className="text-sm text-slate-500">Record each prototype iteration with its date and outcome.</p></div><button className="primary-button h-10" onClick={addEntry}><Plus size={16} />Add Prototype Entry</button></div>
+        <div className="space-y-4">{entries.map((entry, index) => <article key={entry.id} className="rounded-lg border border-slate-200 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Prototype Entry {entries.length - index}</h3><button className="text-sm font-semibold text-rose-600" onClick={() => setEntries((current) => current.filter((item) => item.id !== entry.id))}>Remove</button></div><div className="grid gap-3 md:grid-cols-2"><Field label="Date"><input className="field" type="date" value={entry.date} onChange={(event) => updateEntry(entry.id, { date: event.target.value })} /></Field><Field label="Status"><select className="field" value={entry.status} onChange={(event) => updateEntry(entry.id, { status: event.target.value as PrototypeEntry['status'] })}><option value="">Select status</option>{prototypeStatusOptions.map((option) => <option key={option}>{option}</option>)}</select></Field><TextAreaField label="Issue" value={entry.issue} onChange={(value) => updateEntry(entry.id, { issue: value })} /><TextAreaField label="Root Cause" value={entry.rootCause} onChange={(value) => updateEntry(entry.id, { rootCause: value })} /><TextAreaField label="Changes Made" value={entry.changesMade} onChange={(value) => updateEntry(entry.id, { changesMade: value })} /><TextAreaField label="Remarks" value={entry.remarks} onChange={(value) => updateEntry(entry.id, { remarks: value })} /></div></article>)}</div>
+        {!entries.length ? <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No prototype entries yet.</p> : null}
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
@@ -255,11 +231,6 @@ function TextAreaField({ label, value, onChange }: { label: string; value: strin
       </label>
     </section>
   );
-}
-
-function withoutLastSaved(data: PrototypingData): Omit<PrototypingData, 'lastSaved'> {
-  const { lastSaved: _lastSaved, ...values } = data;
-  return values;
 }
 
 function formatDateTime(value: string) {

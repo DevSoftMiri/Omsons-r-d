@@ -41,9 +41,9 @@ export const createStaff = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Password must be at least 8 characters');
   }
-  if (!['Staff', 'Admin'].includes(role)) {
+  if (!['Staff', 'Admin', 'Auditor'].includes(role)) {
     res.status(400);
-    throw new Error('Role must be Staff or Admin');
+    throw new Error('Role must be Staff, Admin or Auditor');
   }
   const user = await User.create({ name: name.trim(), email: email.trim().toLowerCase(), password, role, designation: designation?.trim() || role, isActive: true });
   res.status(201).json({ _id: user._id, name: user.name, email: user.email, role: user.role, designation: user.designation, isActive: user.isActive });
@@ -57,9 +57,9 @@ export const updateStaff = asyncHandler(async (req, res) => {
   }
 
   const role = req.body.role || user.role;
-  if (!['Staff', 'Admin'].includes(role)) {
+  if (!['Staff', 'Admin', 'Auditor'].includes(role)) {
     res.status(400);
-    throw new Error('Role must be Staff or Admin');
+    throw new Error('Role must be Staff, Admin or Auditor');
   }
 
   if (req.body.name !== undefined) user.name = String(req.body.name).trim();

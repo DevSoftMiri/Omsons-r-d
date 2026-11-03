@@ -40,6 +40,7 @@ export function StageResponseBuilder({
   const { showToast } = useToast();
   const [blocks, setBlocks] = useState<StageResponseBlock[]>(() => readStageResponses(projectCode, stageName));
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
+  const [attachmentNote, setAttachmentNote] = useState('');
   const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; block: StageTableBlock; table: BenchmarkingTableData } | null>(null);
   const [sheetName, setSheetName] = useState('');
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
@@ -158,7 +159,7 @@ export function StageResponseBuilder({
     }
   }
 
-  async function uploadFiles(event: ChangeEvent<HTMLInputElement>, sectionId: string) {
+  async function uploadFiles(event: ChangeEvent<HTMLInputElement>, sectionId: string, note: string) {
     const files = Array.from(event.target.files || []);
     const input = event.currentTarget;
     // Clear the native input before starting the async upload. This lets the
@@ -194,7 +195,7 @@ export function StageResponseBuilder({
     let count = 0;
     try {
       for (const file of uniqueFiles) {
-        const uploaded = await uploadProjectAttachment(projectCode, stageName, file, sectionId);
+        const uploaded = await uploadProjectAttachment(projectCode, stageName, file, sectionId, note);
         setAttachments(current => [uploaded, ...current]);
         count++;
       }
@@ -204,6 +205,7 @@ export function StageResponseBuilder({
     } finally {
       uploadKeys.forEach((key) => uploadingFileKeys.current.delete(key));
       uploadBusy.current = false;
+      setAttachmentNote('');
     }
   }
 
@@ -281,10 +283,10 @@ export function StageResponseBuilder({
                 {block.type === 'text' ? <textarea className="field mt-3 min-h-32 resize-y bg-white" value={block.value} onChange={(event) => updateBlock({ ...block, value: event.target.value })} /> : null}
                 {block.type === 'checklist' ? <ChecklistBlock block={block} onChange={updateBlock} /> : null}
                 {block.type === 'table' ? <div className="mt-3"><BenchmarkingTable index={index} table={block.table} selectedCell={selectedCell} onSelectCell={setSelectedCell} onChangeTable={(table) => updateTable(block, table)} onImportCsv={(table, file) => importCsv(block, table, file)} onExportCsv={exportCsv} onDeleteTable={() => deleteBlock(block.id)} editableColumnLabels /></div> : null}
-                {block.type === 'file' ? <FileBlock attachments={attachmentsForSection(block.id)} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id)} /> : null}
+                {block.type === 'file' ? <FileBlock attachments={attachmentsForSection(block.id)} note={attachmentNote} onNoteChange={setAttachmentNote} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id, attachmentNote)} /> : null}
               </section>
             )) : null}
-        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId); }} /> : null}
+        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} /> : null}
       </div>
     );
   }
@@ -340,7 +342,7 @@ export function StageResponseBuilder({
                 </div>
               ) : null}
               {block.type === 'file' ? (
-                <FileBlock attachments={attachmentsForSection(block.id)} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id)} />
+                <FileBlock attachments={attachmentsForSection(block.id)} note={attachmentNote} onNoteChange={setAttachmentNote} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id, attachmentNote)} />
               ) : null}
             </section>
           ))}
@@ -348,7 +350,7 @@ export function StageResponseBuilder({
       ) : null}
 
       {!hasFileBlock ? (
-        <input className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId); }} />
+        <input className="sr-only" type="file" accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} />
       ) : null}
     </div>
   );
@@ -422,21 +424,28 @@ function ChecklistBlock({ block, onChange }: { block: StageChecklistBlock; onCha
   );
 }
 
-function FileBlock({ attachments, onUpload, onDelete }: { attachments: ProjectAttachment[]; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onDelete: (id: string) => void }) {
+function FileBlock({ attachments, note, onNoteChange, onUpload, onDelete }: { attachments: ProjectAttachment[]; note: string; onNoteChange: (note: string) => void; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onDelete: (id: string) => void }) {
   return (
     <div className="mt-3">
-      <label className="secondary-button h-10 cursor-pointer text-primary">
-        <FileUp size={16} />
-        Upload File
-        <input className="hidden" type="file" accept={acceptedFileTypes} multiple onChange={onUpload} />
-      </label>
-      <p className="mt-2 text-xs text-slate-500">Supported formats: {supportedFileTypesLabel}. Select multiple files at once.</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="secondary-button h-10 cursor-pointer text-primary">
+          <FileUp size={16} />
+          Choose File
+          <input className="hidden" type="file" accept={acceptedFileTypes} onChange={onUpload} />
+        </label>
+        <label className="min-w-64 flex-1">
+          <span className="mb-1 block text-xs font-bold text-slate-600">Note <span className="font-normal text-slate-400">(optional)</span></span>
+          <input className="field h-10 w-full bg-white" value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Add a note for this file" />
+        </label>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Supported formats: {supportedFileTypesLabel}. The note is saved with the selected file.</p>
       <div className="mt-3 grid gap-2">
         {attachments.map((attachment) => (
           <div key={attachment._id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
             <a className="min-w-0 flex-1 truncate font-semibold text-primary" href={resolveFileUrl(attachment) || undefined} target="_blank" rel="noreferrer">
               {attachment.name}
             </a>
+            {attachment.note ? <span className="max-w-sm truncate text-sm text-slate-600" title={attachment.note}>{attachment.note}</span> : null}
             <button className="text-rose-600" onClick={() => onDelete(attachment._id)}><Trash2 size={15} /></button>
           </div>
         ))}

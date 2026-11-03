@@ -17,7 +17,7 @@ type TeamRow = StaffAccount & {
   reportingProjects: Project[];
 };
 
-const roleOptions = ['All Roles', 'Admin', 'Staff', 'R&D Manager', 'R&D Engineer', 'Product Designer', 'QA Engineer'] as const;
+const roleOptions = ['All Roles', 'Admin', 'Staff', 'Auditor', 'R&D Manager', 'R&D Engineer', 'Product Designer', 'QA Engineer'] as const;
 const statusOptions = ['All Status', 'Active', 'Inactive'] as const;
 const designationOptions = ['Admin', 'Staff', 'R&D Manager', 'R&D Engineer', 'Product Designer', 'QA Engineer'];
 
@@ -253,7 +253,7 @@ export function TeamMembersPage() {
 }
 
 function AddStaffDialog({ onClose, onSaved, showToast }: { onClose: () => void; onSaved: (account: StaffAccount) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '', designation: 'Staff', role: 'Staff' as 'Staff' | 'Admin' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', designation: 'Staff', role: 'Staff' as 'Staff' | 'Admin' | 'Auditor' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -431,13 +431,13 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
   );
 }
 
-function StaffFields({ form, setForm, includePassword = false }: { form: { name: string; email: string; password?: string; designation: string; role: 'Staff' | 'Admin'; isActive?: boolean }; setForm: (form: any) => void; includePassword?: boolean }) {
-  const availableDesignations = form.role === 'Admin' ? ['Admin'] : designationOptions.filter((item) => item !== 'Admin');
+function StaffFields({ form, setForm, includePassword = false }: { form: { name: string; email: string; password?: string; designation: string; role: 'Staff' | 'Admin' | 'Auditor'; isActive?: boolean }; setForm: (form: any) => void; includePassword?: boolean }) {
+  const availableDesignations = form.role === 'Admin' ? ['Admin'] : form.role === 'Auditor' ? ['Auditor', ...designationOptions.filter((item) => !['Admin', 'Auditor'].includes(item))] : designationOptions.filter((item) => item !== 'Admin');
 
   return (
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
       <Field label="Full Name"><input className="field" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-      <Field label="Role"><select className="field" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as 'Staff' | 'Admin', designation: event.target.value === 'Admin' ? 'Admin' : form.designation === 'Admin' ? 'Staff' : form.designation })}><option value="Staff">Staff</option><option value="Admin">Admin</option></select></Field>
+      <Field label="Role"><select className="field" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as 'Staff' | 'Admin' | 'Auditor', designation: event.target.value === 'Admin' ? 'Admin' : event.target.value === 'Auditor' ? 'Auditor' : form.designation === 'Admin' || form.designation === 'Auditor' ? 'Staff' : form.designation })}><option value="Staff">Staff</option><option value="Auditor">Auditor</option><option value="Admin">Admin</option></select></Field>
       <Field label="Login Email"><input className="field" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
       <Field label="Designation"><select className="field" value={form.designation} onChange={(event) => setForm({ ...form, designation: event.target.value })}>{availableDesignations.map((item) => <option key={item}>{item}</option>)}</select></Field>
       {includePassword ? <Field label="Password"><input className="field" type="password" value={form.password || ''} onChange={(event) => setForm({ ...form, password: event.target.value })} /></Field> : null}

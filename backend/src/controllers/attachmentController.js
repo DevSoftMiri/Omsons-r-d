@@ -41,6 +41,7 @@ export const uploadAttachment = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const stage = req.body.stage || req.query.stage || 'Attachments';
   const sectionId = req.body.sectionId || undefined;
+  const note = req.body.note?.trim() || undefined;
 
   if (!req.file) {
     res.status(400);
@@ -65,7 +66,8 @@ export const uploadAttachment = asyncHandler(async (req, res) => {
     storagePath: upload.storagePath,
     url: upload.publicUrl,
     fileUrl: upload.publicUrl,
-    uploadedBy: req.user?._id
+    uploadedBy: req.user?._id,
+    note
   });
 
   res.status(201).json(attachment);

@@ -190,7 +190,7 @@ export async function deleteProject(projectId: string) {
 
 export async function fetchProjectTeamCandidates(projectId: string) {
   const response = await fetch(`${API_BASE}/projects/${projectId}/team-candidates`, { headers: authHeaders() });
-  return parseResponse<Array<{ _id: string; name: string; role: 'Staff' | 'Admin'; designation?: string; email: string; isActive?: boolean }>>(response);
+  return parseResponse<Array<{ _id: string; name: string; role: 'Staff' | 'Admin' | 'Auditor'; designation?: string; email: string; isActive?: boolean }>>(response);
 }
 
 export async function addProjectTeamMember(projectId: string, userId: string) {

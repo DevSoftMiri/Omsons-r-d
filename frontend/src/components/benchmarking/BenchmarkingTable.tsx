@@ -1,6 +1,6 @@
 import { ExcelTableActions } from './ExcelTableActions';
 import { Edit3, Maximize2, MoreVertical, X } from 'lucide-react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { BenchmarkingToolbar } from './BenchmarkingToolbar';
 import { SpreadsheetGrid } from './SpreadsheetGrid';
@@ -15,7 +15,9 @@ export function BenchmarkingTable({
   onImportCsv,
   onExportCsv,
   onDeleteTable,
-  editableColumnLabels = false
+  editableColumnLabels = false,
+  isCellEditable,
+  rowActions
 }: {
   index: number;
   table: BenchmarkingTableData;
@@ -26,6 +28,8 @@ export function BenchmarkingTable({
   onExportCsv: (table: BenchmarkingTableData) => void;
   onDeleteTable: (table: BenchmarkingTableData) => void;
   editableColumnLabels?: boolean;
+  isCellEditable?: (rowIndex: number, columnId: string) => boolean;
+  rowActions?: (rowIndex: number, rowId: string) => ReactNode;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(table.name);
@@ -194,6 +198,8 @@ export function BenchmarkingTable({
         onResizeColumn={resizeColumn}
         onSelectCell={onSelectCell}
         editableColumnLabels={editableColumnLabels}
+        isCellEditable={isCellEditable}
+        rowActions={rowActions}
         onColumnLabelChange={updateColumnLabel}
       />
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-slate-400">

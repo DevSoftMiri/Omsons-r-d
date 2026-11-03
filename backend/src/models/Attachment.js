@@ -11,6 +11,7 @@ const attachmentSchema = new mongoose.Schema(
     storagePath: String,
     url: String,
     fileUrl: String,
+    note: { type: String, trim: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }

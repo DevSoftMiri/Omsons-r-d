@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import type { ClipboardEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
+import type { ClipboardEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import type { BenchmarkingTableData, SelectedCell } from './types';
 import { evaluateCell } from './formulaUtils';
 
@@ -54,6 +54,8 @@ export function SpreadsheetGrid({
   onDeleteRow,
   onDeleteColumn,
   onResizeColumn,
+  isCellEditable,
+  rowActions,
 }: {
   table: BenchmarkingTableData;
   selectedCell: SelectedCell | null;
@@ -70,6 +72,8 @@ export function SpreadsheetGrid({
   onDeleteRow: (rowId: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onResizeColumn: (columnId: string, width: number) => void;
+  isCellEditable?: (rowIndex: number, columnId: string) => boolean;
+  rowActions?: (rowIndex: number, rowId: string) => ReactNode;
   editableColumnLabels?: boolean;
   onColumnLabelChange?: (columnId: string, label: string) => void;
 }) {
@@ -84,6 +88,10 @@ export function SpreadsheetGrid({
   }
   function saveRowHeight(rowId: string, height: number | undefined) {
     onChangeTable({ ...table, rows: table.rows.map(row => row.id === rowId ? { ...row, height } : row) });
+  }
+
+  function canEdit(row: number, column: number) {
+    return isCellEditable?.(row, table.columns[column].id) ?? true;
   }
 
   function columnWidth(width?: number) {
@@ -189,6 +197,10 @@ export function SpreadsheetGrid({
     }) });
   }
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>, row: number, column: number) {
+    if (!canEdit(row, column)) {
+      event.preventDefault();
+      return;
+    }
     if (event.nativeEvent.isComposing) return;
     const ctrl = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
@@ -327,6 +339,7 @@ export function SpreadsheetGrid({
           {table.columns.map((column) => (
             <col key={column.id} style={{ width: columnWidth(column.width), minWidth: columnWidth(column.width), maxWidth: columnWidth(column.width) }} />
           ))}
+          {rowActions ? <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} /> : null}
         </colgroup>
         <thead>
           <tr>
@@ -374,6 +387,7 @@ export function SpreadsheetGrid({
                 />
               </th>
             ))}
+            {rowActions ? <th className="h-9 border border-[#B3C9CA] bg-white px-2 py-2.5 text-center font-extrabold text-black">Test Report</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -475,6 +489,7 @@ export function SpreadsheetGrid({
                       data-spreadsheet-table={table._id}
                       rows={1}
                       value={isEditing ? rawValue : value}
+                      readOnly={!canEdit(rowIndex, columnIndex)}
                       onChange={(event) =>
                         onCellChange(row.id, column.id, event.target.value)
                       }
@@ -498,7 +513,7 @@ export function SpreadsheetGrid({
                         if (!event.shiftKey) setAnchor([rowIndex, columnIndex]);
                         setExtent([rowIndex, columnIndex]);
                       }}
-                      onDoubleClick={() => setEditing({ row: rowIndex, column: columnIndex, original: rawValue })}
+                      onDoubleClick={() => { if (canEdit(rowIndex, columnIndex)) setEditing({ row: rowIndex, column: columnIndex, original: rawValue }); }}
                       onCopy={(event) => clipboard(event, rowIndex, columnIndex, false)}
                       onCut={(event) => clipboard(event, rowIndex, columnIndex, true)}
                       onBlur={() => setEditing(null)}
@@ -516,6 +531,7 @@ export function SpreadsheetGrid({
                   </td>
                 );
               })}
+              {rowActions ? <td className="border border-[#B3C9CA] bg-white p-2 align-middle">{rowActions(rowIndex, row.id)}</td> : null}
             </tr>
           ); })}
           </tbody>

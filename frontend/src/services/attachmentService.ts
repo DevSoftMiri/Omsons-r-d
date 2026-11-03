@@ -11,6 +11,7 @@ export interface ProjectAttachment {
   storagePath?: string;
   url?: string;
   fileUrl?: string;
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -55,7 +56,7 @@ export async function fetchProjectAttachments(projectId: string, stage = 'Attach
   return parseResponse<ProjectAttachment[]>(response);
 }
 
-export async function uploadProjectAttachment(projectId: string, stage: string, file: File, sectionId?: string) {
+export async function uploadProjectAttachment(projectId: string, stage: string, file: File, sectionId?: string, note?: string) {
   if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds the 10 MB upload limit.`);
   if (!hasBackendAuth()) {
     const url = URL.createObjectURL(file);
@@ -68,6 +69,7 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
       fileSize: file.size,
       url,
       fileUrl: url,
+      note: note?.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -79,6 +81,7 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
   formData.append('file', file);
   formData.append('stage', stage);
   if (sectionId) formData.append('sectionId', sectionId);
+  if (note?.trim()) formData.append('note', note.trim());
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);

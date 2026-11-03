@@ -10,8 +10,12 @@ import { StageResponseBuilder } from '../../../components/stageResponses/StageRe
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { readProductSpecifications } from '../../../services/productSpecificationsService';
+import { fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
+import { resolveFileUrl } from '../../../utils/fileActions';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
+import { calculateValidationResult } from './validationResult';
+import { useAppSelector } from '../../../hooks';
 
 type StoredValidation = {
   tables: BenchmarkingTableData[];
@@ -41,14 +45,17 @@ export function TestingValidation() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
+  const userRole = useAppSelector((state) => state.auth.user?.role);
+  const canEditTestValues = userRole === 'auditor';
   const storageKey = `testing-validation:${project.productCode}`;
   const initial = readStored(storageKey, project.productCode);
-  const [tables, setTables] = useState(initial.tables);
+  const [tables, setTables] = useState(initial.tables.map(applyValidationResults));
   const [lastSaved, setLastSaved] = useState(initial.lastSaved);
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BenchmarkingTableData | null>(null);
+  const [testReports, setTestReports] = useState<ProjectAttachment[]>([]);
   const didMount = useRef(false);
 
   useEffect(() => {
@@ -68,6 +75,14 @@ export function TestingValidation() {
     return () => window.clearTimeout(timeout);
   }, [storageKey, tables]);
 
+  useEffect(() => {
+    let active = true;
+    fetchProjectAttachments(project.productCode, 'Testing & Validation')
+      .then((attachments) => { if (active) setTestReports(attachments); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [project.productCode]);
+
   const hasMeaningfulData = useMemo(
     () => tables.some((table) => table.rows.slice(1).some((row) => Object.values(row.cells).some((value) => value.trim()))),
     [tables]
@@ -76,7 +91,17 @@ export function TestingValidation() {
   const canComplete = tables.length >= 2 && hasMeaningfulData && !hasFailingResult && saveState === 'Saved';
 
   function updateTable(table: BenchmarkingTableData) {
-    setTables((current) => current.map((candidate) => candidate._id === table._id ? table : candidate));
+    setTables((current) => current.map((candidate) => candidate._id === table._id ? applyValidationResults(table) : candidate));
+  }
+
+  async function attachTestReport(rowId: string, file: File) {
+    try {
+      const report = await uploadProjectAttachment(project.productCode, 'Testing & Validation', file, rowId);
+      setTestReports((current) => [report, ...current.filter((item) => item.sectionId !== rowId)]);
+      showToast({ tone: 'success', title: 'Test report attached', message: 'The report is now linked to this test.' });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Attachment failed', message: error instanceof Error ? error.message : 'Unable to attach test report.' });
+    }
   }
 
   function createTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
@@ -137,7 +162,7 @@ export function TestingValidation() {
           <h2 className="text-2xl font-bold">Testing & Validation</h2>
           <p className="mt-1.5 text-sm text-slate-600">Maintain customizable validation tables, test checks, observed parameters and result status for this product.</p>
         </div>
-        <button className="primary-button h-10" onClick={() => setShowAddModal(true)}><Plus size={18} />Add Table</button>
+        {canEditTestValues ? <button className="primary-button h-10" onClick={() => setShowAddModal(true)}><Plus size={18} />Add Table</button> : null}
       </section>
 
       {tables.map((table, index) => (
@@ -151,14 +176,16 @@ export function TestingValidation() {
           onExportCsv={exportCsv}
           onImportCsv={importCsv}
           onSelectCell={setSelectedCell}
+          isCellEditable={(rowIndex, columnId) => canEditTestValues && !isValidationResultColumn(table, rowIndex, columnId)}
+          rowActions={canEditTestValues && table.name.trim().toLowerCase() === 'validation' ? (rowIndex, rowId) => rowIndex === 0 ? <span className="font-extrabold text-black">Test Report</span> : <TestReportAction report={testReports.find((item) => item.sectionId === rowId)} onAttach={(file) => attachTestReport(rowId, file)} /> : undefined}
         />
       ))}
 
-      <button className="w-full rounded-lg border border-dashed border-blue-200 bg-white p-8 text-center text-primary shadow-soft" onClick={() => setShowAddModal(true)}>
+      {canEditTestValues ? <button className="w-full rounded-lg border border-dashed border-blue-200 bg-white p-8 text-center text-primary shadow-soft" onClick={() => setShowAddModal(true)}>
         <Plus className="mx-auto" size={38} />
         <span className="mt-2 block font-bold">Add Another Custom Table</span>
         <span className="mt-1 block text-sm text-slate-500">Create additional validation sheets with custom fields</span>
-      </button>
+      </button> : null}
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
@@ -177,9 +204,22 @@ export function TestingValidation() {
         </div>
       </section>
 
-      <AddTableModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreate={createTable} />
+      {canEditTestValues ? <AddTableModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreate={createTable} /> : null}
       <DeleteTableDialog table={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteTable} />
       <StageResponseBuilder projectCode={project.productCode} stageName="Testing & Validation" mode="blocks" />
+    </div>
+  );
+}
+
+function TestReportAction({ report, onAttach }: { report?: ProjectAttachment; onAttach: (file: File) => void }) {
+  const url = resolveFileUrl(report);
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <label className="inline-flex cursor-pointer items-center justify-center rounded-md bg-primary px-2 py-1 text-[11px] font-bold text-white hover:bg-primary/90">
+        {report ? 'Replace Report' : 'Attach Test Report'}
+        <input className="hidden" type="file" accept="*/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttach(file); event.target.value = ''; }} />
+      </label>
+      {report && url ? <a className="truncate text-[11px] font-semibold text-primary underline" href={url} target="_blank" rel="noreferrer" title={report.name}>Open: {report.name}</a> : null}
     </div>
   );
 }
@@ -209,7 +249,7 @@ function readStored(key: string, projectCode: string): StoredValidation {
   try {
     const parsed = JSON.parse(saved) as Partial<StoredValidation>;
     return {
-      tables: Array.isArray(parsed.tables) && parsed.tables.length ? parsed.tables : fallback.tables,
+      tables: Array.isArray(parsed.tables) && parsed.tables.length ? parsed.tables.map(applyValidationResults) : fallback.tables,
       lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
     };
   } catch {
@@ -239,6 +279,45 @@ function hasFailResult(table: BenchmarkingTableData) {
     .filter((column) => (table.rows[0]?.cells[column.id] || '').trim().toLowerCase() === 'results')
     .map((column) => column.id);
   return table.rows.slice(1).some((row) => resultColumnIds.some((columnId) => row.cells[columnId]?.trim().toLowerCase() === 'fail'));
+}
+
+function isValidationTable(table: BenchmarkingTableData) {
+  if (table.name.trim().toLowerCase() !== 'validation' || !table.rows[0]) return false;
+  const headers = new Set(table.columns.map((column) => (column.label || table.rows[0].cells[column.id] || '').trim().toLowerCase()));
+  return ['required parameter', 'tolerance', 'observed parameter', 'results'].every((header) => headers.has(header));
+}
+
+function validationColumnIds(table: BenchmarkingTableData) {
+  const headerRow = table.rows[0];
+  const ids = { required: '', tolerance: '', observed: '', results: '' };
+  if (!headerRow) return ids;
+  table.columns.forEach((column) => {
+    const header = (column.label || headerRow.cells[column.id] || '').trim().toLowerCase();
+    if (header === 'required parameter') ids.required = column.id;
+    if (header === 'tolerance') ids.tolerance = column.id;
+    if (header === 'observed parameter') ids.observed = column.id;
+    if (header === 'results') ids.results = column.id;
+  });
+  return ids;
+}
+
+function applyValidationResults(table: BenchmarkingTableData) {
+  if (!isValidationTable(table)) return table;
+  const ids = validationColumnIds(table);
+  return {
+    ...table,
+    rows: table.rows.map((row, index) => index === 0 ? row : {
+      ...row,
+      cells: {
+        ...row.cells,
+        [ids.results]: calculateValidationResult(row.cells[ids.required] || '', row.cells[ids.tolerance] || '', row.cells[ids.observed] || '')
+      }
+    })
+  };
+}
+
+function isValidationResultColumn(table: BenchmarkingTableData, rowIndex: number, columnId: string) {
+  return rowIndex > 0 && isValidationTable(table) && validationColumnIds(table).results === columnId;
 }
 
 function parseCsv(csv: string) {
