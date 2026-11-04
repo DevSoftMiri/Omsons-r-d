@@ -1,4 +1,4 @@
-import { ChevronDown, Crown, FolderOpen, KeyRound, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, UserRound, UsersRound, X } from 'lucide-react';
+import { ChevronDown, Crown, Eye, EyeOff, FolderOpen, KeyRound, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, UserRound, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../components/PageTopBar';
@@ -302,6 +302,7 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
   const [form, setForm] = useState({ name: member.name, email: member.email, password: '', designation: member.designation || member.role, role: member.role, isActive: member.isActive });
   const [projectId, setProjectId] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -421,7 +422,18 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="font-bold text-[#333333]">Reset Password</h3>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input className="field h-10" type="password" value={newPassword} placeholder="New password" onChange={(event) => setNewPassword(event.target.value)} />
+              <div className="relative flex-1">
+                <input className="field h-10 w-full pr-10" type={showNewPassword ? 'text' : 'password'} value={newPassword} placeholder="New password" onChange={(event) => setNewPassword(event.target.value)} />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  title={showNewPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowNewPassword((visible) => !visible)}
+                >
+                  {showNewPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
               <button className="secondary-button h-10 shrink-0 justify-center text-primary" onClick={savePassword} disabled={savingPassword}><KeyRound size={15} />{savingPassword ? 'Resetting...' : 'Reset'}</button>
             </div>
           </section>

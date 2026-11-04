@@ -4,6 +4,7 @@ import { Certificate } from '../models/Certificate.js';
 import { Project } from '../models/Project.js';
 import { REQUIRED_PREREQUISITE_DOCUMENTS } from '../constants/prerequisites.js';
 import { deleteProjectDocument, uploadProjectDocument } from '../services/supabaseStorageService.js';
+import { notifyProjectUsers } from '../services/notificationService.js';
 
 function safeFileName(name) {
   return name
@@ -229,6 +230,9 @@ export const reviewPrerequisite = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Prerequisite document not found');
   }
+
+  const project = await Project.findById(certificate.project).populate('teamMembers', '_id').populate('reportTo', '_id');
+  if (project) await notifyProjectUsers({ project, actorId: req.user._id, type: 'certificate-reviewed', title: 'Certificate reviewed', message: `${certificate.type} was marked ${status}.`, link: `/projects/${project.productCode}/prerequisites` });
 
   res.json(certificate);
 });

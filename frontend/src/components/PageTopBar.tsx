@@ -1,7 +1,8 @@
-import { Bell, Plus, Search, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, Check, Loader2, Plus, Search, UserRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppSelector } from '../hooks';
+import { fetchNotifications, fetchUnreadNotificationCount, markAllNotificationsRead, markNotificationRead, type NotificationItem } from '../services/notificationService';
 
 interface PageTopBarProps {
   title: string;
@@ -17,6 +18,10 @@ interface PageTopBarProps {
 export function PageTopBar({ title, subtitle, searchValue, searchPlaceholder = 'Search...', onSearchChange, actionLabel, actionHref, onAction }: PageTopBarProps) {
   const user = useAppSelector((state) => state.auth.user);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
   const actionClass = 'inline-flex h-11 items-center gap-2 rounded-lg bg-[#00494B] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,73,75,0.18)] transition hover:bg-[#007D7D]';
   const actionContent = (
     <>
@@ -24,6 +29,49 @@ export function PageTopBar({ title, subtitle, searchValue, searchPlaceholder = '
       {actionLabel}
     </>
   );
+
+  async function refreshNotifications() {
+    if (!user || user.role === 'auditor') return;
+    setLoadingNotifications(true);
+    setNotificationError('');
+    try {
+      const [list, unread] = await Promise.all([fetchNotifications(), fetchUnreadNotificationCount()]);
+      setNotifications(list.notifications);
+      setUnreadCount(unread.count);
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : 'Unable to load notifications');
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshNotifications();
+    const timer = window.setInterval(() => void refreshNotifications(), 30000);
+    return () => window.clearInterval(timer);
+  }, [user?.id, user?.role]);
+
+  async function openNotification(notification: NotificationItem) {
+    if (!notification.read) {
+      await markNotificationRead(notification._id).catch(() => undefined);
+      setNotifications((current) => current.map((item) => item._id === notification._id ? { ...item, read: true } : item));
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+  }
+
+  async function readAll() {
+    await markAllNotificationsRead();
+    setNotifications((current) => current.map((item) => ({ ...item, read: true })));
+    setUnreadCount(0);
+  }
+
+  function formatNotificationDate(value: string) {
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    return `${Math.floor(minutes / 1440)}d ago`;
+  }
 
   return (
     <header className="mb-4 rounded-lg border-b border-[#333333] bg-[#333333] p-4 text-white">
@@ -48,12 +96,18 @@ export function PageTopBar({ title, subtitle, searchValue, searchPlaceholder = '
           <div className="relative">
             <button className="relative grid h-11 w-12 place-items-center rounded-lg border border-white/15 bg-white/10 text-white shadow-sm" title="Notifications" onClick={() => setNotificationsOpen((open) => !open)}>
               <Bell size={20} />
-              <span className="absolute right-3 top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#ff304b]" />
+              {unreadCount ? <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-[#333333] bg-[#ff304b] px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
             </button>
             {notificationsOpen ? (
-              <div className="absolute right-0 top-13 z-30 w-72 rounded-lg border border-[#d8e2f2] bg-white p-4 text-sm shadow-[0_18px_45px_rgba(21,40,80,0.16)]">
-                <p className="font-bold text-[#333333]">Notifications</p>
-                <p className="mt-2 text-[#53688d]">No notifications yet.</p>
+              <div className="absolute right-0 top-13 z-30 w-80 overflow-hidden rounded-lg border border-[#d8e2f2] bg-white text-sm shadow-[0_18px_45px_rgba(21,40,80,0.16)]">
+                <div className="flex items-center justify-between border-b border-slate-100 p-4"><p className="font-bold text-[#333333]">Notifications</p>{unreadCount ? <button className="text-xs font-bold text-primary hover:underline" onClick={() => void readAll()}>Mark all read</button> : null}</div>
+                {loadingNotifications ? <div className="flex items-center gap-2 p-4 text-[#53688d]"><Loader2 size={16} className="animate-spin" />Loading notifications...</div> : null}
+                {notificationError ? <p className="p-4 text-rose-600">{notificationError}</p> : null}
+                {!loadingNotifications && !notificationError && !notifications.length ? <p className="p-4 text-[#53688d]">No notifications yet.</p> : null}
+                {!loadingNotifications && !notificationError ? <div className="max-h-96 overflow-y-auto">{notifications.map((notification) => {
+                  const content = <div className={`border-b border-slate-100 p-3 text-left transition hover:bg-slate-50 ${notification.read ? '' : 'bg-blue-50/60'}`} onClick={() => void openNotification(notification)}><div className="flex gap-2"><div className="min-w-0 flex-1"><p className="font-bold text-[#333333]">{notification.title}</p><p className="mt-1 text-xs leading-5 text-[#53688d]">{notification.message}</p><p className="mt-1 text-[11px] font-semibold text-slate-400">{formatNotificationDate(notification.createdAt)}</p></div>{notification.read ? <Check size={15} className="shrink-0 text-emerald-600" /> : <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#ff304b]" />}</div></div>;
+                  return notification.link ? <Link key={notification._id} to={notification.link} onClick={() => void openNotification(notification)}>{content}</Link> : <div key={notification._id}>{content}</div>;
+                })}</div> : null}
               </div>
             ) : null}
           </div>

@@ -66,6 +66,8 @@ export interface AppSettings {
   };
 }
 
+export type PersonalNotificationPreferences = Pick<AppSettings['notifications'], 'projectAssignment' | 'stageCompleted' | 'stageChanged' | 'projectDeadlineApproaching' | 'projectOverdue' | 'certificateExpiring' | 'certificateExpired'>;
+
 export interface GeneratedReport {
   id: string;
   name: string;
@@ -78,6 +80,7 @@ export interface GeneratedReport {
 
 const certificatesKey = 'omsons-certificates';
 const settingsKey = 'omsons-settings';
+const personalNotificationKey = 'omsons-personal-notifications';
 const reportsKey = 'omsons-generated-reports';
 
 export const certificateTypes = [
@@ -139,6 +142,16 @@ export function readSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings) {
   writeJson(settingsKey, settings);
+}
+
+export function readPersonalNotificationPreferences(userId: string, fallback: PersonalNotificationPreferences): PersonalNotificationPreferences {
+  const saved = readJson<Record<string, PersonalNotificationPreferences>>(personalNotificationKey, {});
+  return saved[userId] ? { ...fallback, ...saved[userId] } : fallback;
+}
+
+export function savePersonalNotificationPreferences(userId: string, preferences: PersonalNotificationPreferences) {
+  const saved = readJson<Record<string, PersonalNotificationPreferences>>(personalNotificationKey, {});
+  writeJson(personalNotificationKey, { ...saved, [userId]: preferences });
 }
 
 export function readActiveWorkflowStages(): StageName[] {

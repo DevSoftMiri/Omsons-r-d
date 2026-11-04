@@ -8,6 +8,7 @@ import { Certificate } from '../models/Certificate.js';
 import { Report } from '../models/Report.js';
 import { WORKFLOW_STAGES } from '../constants/workflow.js';
 import { deleteProjectDocument } from '../services/supabaseStorageService.js';
+import { notifyProjectUsers } from '../services/notificationService.js';
 
 async function nextProductCode() {
   const count = await Project.countDocuments();
@@ -275,6 +276,7 @@ export const addProjectTeamMember = asyncHandler(async (req, res) => {
   }
   if (!project.teamMembers.some((member) => String(member) === String(user._id))) project.teamMembers.push(user._id);
   await project.save();
+  await notifyProjectUsers({ project, actorId: req.user._id, type: 'project-assigned', title: 'Project assigned', message: `You were assigned to ${project.name}.`, link: `/projects/${project.productCode}/overview` });
   res.json(await populateProjectTeam(project));
 });
 
@@ -285,6 +287,7 @@ export const removeProjectTeamMember = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Project or team member not found');
   }
+  await notifyProjectUsers({ project, actorId: req.user._id, type: 'project-removed', title: 'Project assignment removed', message: `Your assignment to ${project.name} was removed.`, link: `/projects/${project.productCode}/overview` });
   project.teamMembers = project.teamMembers.filter((member) => String(member) !== String(user._id));
   await project.save();
   res.json(await populateProjectTeam(project));
@@ -409,9 +412,11 @@ export const updateProjectStatus = asyncHandler(async (req, res) => {
     throw new Error('Project not found');
   }
 
+  const previousStatus = project.status;
   project.status = status;
   await applyAutomaticProjectStatus(project);
   await project.save();
+  if (previousStatus !== status) await notifyProjectUsers({ project, actorId: req.user._id, type: 'project-status-changed', title: 'Project status changed', message: `${project.name} is now ${status}.`, link: `/projects/${project.productCode}/overview` });
   res.json(await populateProjectTeam(project));
 });
 
@@ -468,6 +473,7 @@ export const updateStage = asyncHandler(async (req, res) => {
     throw new Error('Previous stage must be completed first');
   }
 
+  const previousStageStatus = project.stages[stageIndex].status;
   project.stages[stageIndex] = {
     ...project.stages[stageIndex],
     ...req.body,
@@ -478,5 +484,6 @@ export const updateStage = asyncHandler(async (req, res) => {
 
   refreshStageLocks(project);
   await project.save();
+  if (previousStageStatus !== project.stages[stageIndex].status) await notifyProjectUsers({ project, actorId: req.user._id, type: project.stages[stageIndex].status === 'Completed' ? 'stage-completed' : 'stage-changed', title: project.stages[stageIndex].status === 'Completed' ? 'Stage completed' : 'Stage updated', message: `${project.name}: ${project.stages[stageIndex].name} is ${project.stages[stageIndex].status}.`, link: `/projects/${project.productCode}/${project.stages[stageIndex].name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` });
   res.json(await populateProjectTeam(project));
 });

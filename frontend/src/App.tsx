@@ -76,7 +76,7 @@ export function App() {
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="certificates" element={<CertificatesPage />} />
         <Route path="reports" element={<ReportsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={user.role === 'auditor' ? <Navigate to="/dashboard" replace /> : <SettingsPage />} />
       </Route>
     </Routes>
   );

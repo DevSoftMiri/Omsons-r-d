@@ -1,14 +1,17 @@
 import { GripVertical, Pencil, Plus, Save } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageTopBar } from '../components/PageTopBar';
 import { useToast } from '../components/ToastProvider';
-import { readSettings, saveSettings, type AppSettings, type WorkflowSetting } from '../services/adminModuleStorage';
+import { readPersonalNotificationPreferences, readSettings, savePersonalNotificationPreferences, saveSettings, type AppSettings, type PersonalNotificationPreferences, type WorkflowSetting } from '../services/adminModuleStorage';
+import { useAppSelector } from '../hooks';
+import { fetchNotificationPreferences, saveNotificationPreferences } from '../services/notificationService';
 import { showMissingFieldsToast } from '../utils/requiredFields';
 
 const sections = ['General', 'Project Workflow', 'Roles & Permissions', 'Project Defaults', 'Notifications', 'Documents'];
+const staffSections = ['Personal Notifications'];
 const permissionRows = ['View Projects', 'Create Projects', 'Edit Projects', 'Delete Projects', 'Manage Team', 'Manage Vendors', 'Manage Certificates', 'Generate Reports', 'Manage Settings'];
 const roles = ['Admin', 'Manager', 'Staff'];
-const notificationLabels: Array<[keyof AppSettings['notifications'], string]> = [
+const notificationLabels: Array<[keyof PersonalNotificationPreferences, string]> = [
   ['projectAssignment', 'Project Assignment'],
   ['stageCompleted', 'Stage Completed'],
   ['stageChanged', 'Stage Changed'],
@@ -21,17 +24,32 @@ const documentTypes = ['PDF', 'DOC/DOCX', 'XLS/XLSX', 'JPG/JPEG', 'PNG'];
 
 export function SettingsPage() {
   const { showToast } = useToast();
-  const [active, setActive] = useState(sections[0]);
+  const user = useAppSelector((state) => state.auth.user);
+  const isStaff = user?.role === 'staff';
+  const [active, setActive] = useState(isStaff ? staffSections[0] : sections[0]);
   const [settings, setSettings] = useState<AppSettings>(() => readSettings());
+  const [personalNotifications, setPersonalNotifications] = useState<PersonalNotificationPreferences>(() => readPersonalNotificationPreferences(user?.id || 'unknown', readSettings().notifications));
   const [draggedStage, setDraggedStage] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState('');
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [permissions, setPermissions] = useState(() => defaultPermissions());
   const [newRole, setNewRole] = useState('');
 
+  useEffect(() => {
+    if (!isStaff) return;
+    void fetchNotificationPreferences().then(setPersonalNotifications).catch(() => undefined);
+  }, [isStaff, user?.id]);
+
   function persist(next = settings) {
     saveSettings(next);
     showToast({ tone: 'success', title: 'Settings saved' });
+  }
+
+  async function persistPersonalNotifications() {
+    if (!user) return;
+    if (isStaff) await saveNotificationPreferences(personalNotifications);
+    else savePersonalNotificationPreferences(user.id, personalNotifications);
+    showToast({ tone: 'success', title: 'Notification preferences saved' });
   }
 
   function resetUnsavedChanges() {
@@ -85,10 +103,11 @@ export function SettingsPage() {
 
       <div className="grid gap-5 lg:grid-cols-[250px_1fr]">
         <aside className="rounded-lg border border-[#dde6f2] bg-white p-3 shadow-sm">
-          {sections.map((section) => <button key={section} className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold ${active === section ? 'bg-[#eaf2ff] text-[#00494B]' : 'text-[#333333] hover:bg-[#f7faff]'}`} onClick={() => setActive(section)}>{section}</button>)}
+          {(isStaff ? staffSections : sections).map((section) => <button key={section} className={`mb-1 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold ${active === section ? 'bg-[#eaf2ff] text-[#00494B]' : 'text-[#333333] hover:bg-[#f7faff]'}`} onClick={() => setActive(section)}>{section}</button>)}
         </aside>
 
         <main className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
+          {!isStaff ? <>
           {active === 'General' ? (
             <Panel title="General Settings" onSave={() => persist()} onCancel={resetUnsavedChanges}>
               <div className="grid gap-3 md:grid-cols-2">
@@ -183,6 +202,9 @@ export function SettingsPage() {
               </div>
             </Panel>
           ) : null}
+          </> : (
+            <PersonalNotifications preferences={personalNotifications} setPreferences={setPersonalNotifications} onSave={persistPersonalNotifications} onCancel={() => void fetchNotificationPreferences().then(setPersonalNotifications)} />
+          )}
         </main>
       </div>
     </div>
@@ -191,6 +213,17 @@ export function SettingsPage() {
 
 function Panel({ title, children, onSave, onCancel }: { title: string; children: React.ReactNode; onSave: () => void; onCancel: () => void }) {
   return <section><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-bold text-[#333333]">{title}</h2><div className="flex gap-2"><button className="secondary-button h-10" onClick={onCancel}>Cancel</button><button className="primary-button h-10" onClick={onSave}><Save size={16} />Save Changes</button></div></div>{children}</section>;
+}
+
+function PersonalNotifications({ preferences, setPreferences, onSave, onCancel }: { preferences: PersonalNotificationPreferences; setPreferences: (preferences: PersonalNotificationPreferences) => void; onSave: () => void; onCancel: () => void }) {
+  return (
+    <Panel title="Personal Notifications" onSave={onSave} onCancel={onCancel}>
+      <p className="mb-4 text-sm font-medium text-[#53688d]">Choose which project and certificate updates you want to receive. These preferences apply only to your account.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {notificationLabels.map(([key, label]) => <SettingToggle key={key} label={label} checked={preferences[key]} onChange={(checked) => setPreferences({ ...preferences, [key]: checked })} />)}
+      </div>
+    </Panel>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

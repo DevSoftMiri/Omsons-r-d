@@ -11,6 +11,8 @@ const certificateSchema = new mongoose.Schema(
     publicUrl: String,
     fileUrl: String,
     status: { type: String, enum: ['Missing', 'Uploaded', 'Approved', 'Rejected'], default: 'Missing' },
+    issueDate: Date,
+    expiryDate: Date,
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     reviewNotes: String,

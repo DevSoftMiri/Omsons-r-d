@@ -18,7 +18,11 @@ const brandImageUrl = '/omsonsnewlogo.jpeg';
 export function AppLayout() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const visibleNavItems = navItems.filter((item) => user?.role === 'admin' || item.href !== '/team');
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === '/team') return user?.role === 'admin';
+    if (item.href === '/settings') return user?.role === 'admin' || user?.role === 'staff';
+    return true;
+  });
 
   return (
     <div className="main-app-compact min-h-screen bg-[#f4f8ff] text-ink">
