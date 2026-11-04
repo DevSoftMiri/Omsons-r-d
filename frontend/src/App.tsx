@@ -24,6 +24,7 @@ import { Programming } from './pages/projects/workspace/Programming';
 import { Prototyping } from './pages/projects/workspace/Prototyping';
 import { ProjectLayout } from './pages/projects/workspace/ProjectLayout';
 import { Reporting } from './pages/projects/workspace/Reporting';
+import { ResearchData } from './pages/projects/workspace/ResearchData';
 import { StandardStage } from './pages/projects/workspace/StandardStage';
 import { TestingValidation } from './pages/projects/workspace/TestingValidation';
 
@@ -47,7 +48,7 @@ export function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="prerequisites" element={<Prerequisites />} />
         <Route path="product-specifications" element={<ProductSpecifications />} />
-        <Route path="research-data" element={<StandardStage stageName="Research Data" />} />
+        <Route path="research-data" element={<ResearchData />} />
         <Route path="benchmarking" element={<Benchmarking />} />
         <Route path="attachments" element={<Attachments />} />
         <Route path="bom" element={<BOM />} />

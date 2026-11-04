@@ -16,6 +16,10 @@ import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
 import { calculateValidationResult } from './validationResult';
 import { useAppSelector } from '../../../hooks';
+import { useAppDispatch } from '../../../hooks';
+import { fetchTestingValidation, hasTestingValidationBackend, saveTestingValidation, completeTestingValidation } from '../../../services/testingValidationService';
+import { upsertProject } from '../../../store';
+import type { Project } from '../../../types';
 
 type StoredValidation = {
   tables: BenchmarkingTableData[];
@@ -43,6 +47,7 @@ function makeDefaultTables(projectCode: string) {
 
 export function TestingValidation() {
   const { project } = useProjectWorkspace();
+  const dispatch = useAppDispatch();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
   const userRole = useAppSelector((state) => state.auth.user?.role);
@@ -50,6 +55,7 @@ export function TestingValidation() {
   const storageKey = `testing-validation:${project.productCode}`;
   const initial = readStored(storageKey, project.productCode);
   const [tables, setTables] = useState(initial.tables.map(applyValidationResults));
+  const [backendReady, setBackendReady] = useState(!hasTestingValidationBackend());
   const [lastSaved, setLastSaved] = useState(initial.lastSaved);
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
@@ -59,6 +65,26 @@ export function TestingValidation() {
   const didMount = useRef(false);
 
   useEffect(() => {
+    if (!hasTestingValidationBackend()) return;
+    let active = true;
+    fetchTestingValidation(project.productCode)
+      .then((workbook) => { if (active) { setTables((workbook.tables.length ? workbook.tables : initial.tables).map(applyValidationResults)); setLastSaved(workbook.updatedAt || initial.lastSaved); setBackendReady(true); } })
+      .catch(() => { if (active) setBackendReady(true); });
+    return () => { active = false; };
+  }, [project.productCode]);
+
+  useEffect(() => {
+    if (!backendReady) return;
+    if (hasTestingValidationBackend()) {
+      if (!canEditTestValues) return;
+      setSaveState('Saving...');
+      const timeout = window.setTimeout(() => {
+        void saveTestingValidation(project.productCode, tables)
+          .then((workbook) => { setLastSaved(workbook.updatedAt || new Date().toISOString()); setSaveState('Saved'); })
+          .catch(() => setSaveState('Saved'));
+      }, 250);
+      return () => window.clearTimeout(timeout);
+    }
     if (!didMount.current) {
       didMount.current = true;
       return;
@@ -73,7 +99,7 @@ export function TestingValidation() {
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [storageKey, tables]);
+  }, [backendReady, canEditTestValues, project.productCode, storageKey, tables]);
 
   useEffect(() => {
     let active = true;
@@ -148,7 +174,9 @@ export function TestingValidation() {
       saveState !== 'Saved' ? 'Saved changes' : ''
     ].filter(Boolean);
     if (showMissingFieldsToast(showToast, missing)) return;
-    completeStage('Testing & Validation');
+    if (hasTestingValidationBackend()) {
+      void completeTestingValidation(project.productCode).then((result) => dispatch(upsertProject(result.project as Project))).catch((error) => showToast({ tone: 'error', title: 'Could not complete stage', message: error instanceof Error ? error.message : 'Unable to complete Testing & Validation.' }));
+    } else completeStage('Testing & Validation');
   }
 
   return (
@@ -178,6 +206,7 @@ export function TestingValidation() {
           onSelectCell={setSelectedCell}
           isCellEditable={(rowIndex, columnId) => canEditTestValues && !isValidationResultColumn(table, rowIndex, columnId)}
           rowActions={canEditTestValues && table.name.trim().toLowerCase() === 'validation' ? (rowIndex, rowId) => rowIndex === 0 ? <span className="font-extrabold text-black">Test Report</span> : <TestReportAction report={testReports.find((item) => item.sectionId === rowId)} onAttach={(file) => attachTestReport(rowId, file)} /> : undefined}
+          readOnly={!canEditTestValues}
         />
       ))}
 

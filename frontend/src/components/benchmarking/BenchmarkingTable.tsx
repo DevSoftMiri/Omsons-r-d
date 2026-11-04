@@ -17,7 +17,8 @@ export function BenchmarkingTable({
   onDeleteTable,
   editableColumnLabels = false,
   isCellEditable,
-  rowActions
+  rowActions,
+  readOnly = false
 }: {
   index: number;
   table: BenchmarkingTableData;
@@ -30,6 +31,7 @@ export function BenchmarkingTable({
   editableColumnLabels?: boolean;
   isCellEditable?: (rowIndex: number, columnId: string) => boolean;
   rowActions?: (rowIndex: number, rowId: string) => ReactNode;
+  readOnly?: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(table.name);
@@ -165,7 +167,7 @@ export function BenchmarkingTable({
               }
             }} autoFocus />
           ) : (
-            <button className="inline-flex min-w-0 items-center gap-2 rounded-md px-1 py-1 font-bold text-slate-800 transition hover:bg-slate-100 hover:text-primary" onClick={() => setRenaming(true)}>
+          <button disabled={readOnly} className="inline-flex min-w-0 items-center gap-2 rounded-md px-1 py-1 font-bold text-slate-800 transition hover:bg-slate-100 hover:text-primary disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-800" onClick={() => setRenaming(true)}>
               <span className="truncate">{table.name}</span>
               <Edit3 size={15} />
             </button>
@@ -175,32 +177,32 @@ export function BenchmarkingTable({
           <button className="icon-button h-9 w-9 text-primary transition hover:bg-sky-50" onClick={() => setFullscreen(true)} title="Open full-window table" aria-label="Open full-window table">
             <Maximize2 size={16} />
           </button>
-          <BenchmarkingToolbar
+          {!readOnly ? <BenchmarkingToolbar
             excelActions={<ExcelTableActions table={table} onImport={onChangeTable} />}
             onAddColumn={addColumn}
             onAddRow={addRow}
             onDelete={() => onDeleteTable(table)}
             onExport={() => onExportCsv(table)}
             onImport={importFile}
-          />
+          /> : <p className="text-xs font-semibold text-slate-500">Read-only: only auditors can edit this section.</p>}
         </div>
       </div>
       <SpreadsheetGrid
         selectedCell={selectedCell}
         table={table}
         onCellChange={updateCell}
-        onChangeTable={onChangeTable}
+        onChangeTable={readOnly ? () => undefined : onChangeTable}
         onUndo={() => travel(false)}
         onRedo={() => travel(true)}
-        onDeleteColumn={deleteColumn}
-        onDeleteRow={deleteRow}
+        onDeleteColumn={readOnly ? () => undefined : deleteColumn}
+        onDeleteRow={readOnly ? () => undefined : deleteRow}
         onPasteCells={pasteCells}
-        onResizeColumn={resizeColumn}
+        onResizeColumn={readOnly ? () => undefined : resizeColumn}
         onSelectCell={onSelectCell}
         editableColumnLabels={editableColumnLabels}
         isCellEditable={isCellEditable}
         rowActions={rowActions}
-        onColumnLabelChange={updateColumnLabel}
+        onColumnLabelChange={readOnly ? () => undefined : updateColumnLabel}
       />
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-slate-400">
         <span>{table.rows.length} rows &middot; {table.columns.length} columns &middot; Formulas supported</span>
