@@ -13,6 +13,7 @@ import { StageResponseBuilder } from '../../../components/stageResponses/StageRe
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
+import { fetchBomWorkspace, updateBomWorkspace } from '../../../services/projectService';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
@@ -173,8 +174,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   const isMechanicalStage = currentStage === 'Mechanical BOM';
   const showElectricalBom = isElectricalStage || isHighLevelBomStage;
   const showMechanicalBom = isMechanicalStage || isHighLevelBomStage;
-  const storageKey = `bom:${project.productCode}`;
-  const storedBom = useMemo(() => readStoredBom(storageKey, project.bom), [storageKey, project.bom]);
+  const storedBom = useMemo(() => readStoredBom(project.bom), [project.bom]);
   const [rows, setRows] = useState<BomRow[]>(() => storedBom.rows);
   const [activeCategory, setActiveCategory] = useState('All Items');
   const [statusFilter, setStatusFilter] = useState<'All' | BomStatus>('All');
@@ -186,7 +186,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   const [notes, setNotes] = useState(() => storedBom.notes);
   const [lastSaved, setLastSaved] = useState(() => storedBom.lastSaved);
   const [baseColumnWidths, setBaseColumnWidths] = useState<Record<BaseBomColumnKey, number>>(() => storedBom.baseColumnWidths);
-  const [saveState, setSaveState] = useState<'Saved' | 'Saving...'>('Saved');
+  const [saveState, setSaveState] = useState<'Saved' | 'Saving...' | 'Save failed'>('Saved');
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [referenceFiles, setReferenceFiles] = useState<ProjectAttachment[]>([]);
   const [electricalRows, setElectricalRows] = useState<ElectricalBomRow[]>(() => storedBom.electricalRows);
   const [electricalColumnSettings, setElectricalColumnSettings] = useState<Array<BomColumnSetting<ElectricalBomColumnKey>>>(() => storedBom.electricalColumnSettings);
@@ -246,15 +247,61 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }, []);
 
   useEffect(() => {
+    let active = true;
+    fetchBomWorkspace(project.productCode)
+      .then(async ({ data, updatedAt }) => {
+        if (!active) return;
+        if (!data) {
+          const legacyData = readLegacyBomData(project.productCode);
+          if (legacyData) {
+            const migrated = await updateBomWorkspace(project.productCode, legacyData);
+            localStorage.removeItem(`bom:${project.productCode}`);
+            data = migrated.data;
+            updatedAt = migrated.updatedAt;
+          }
+        }
+        if (data) {
+          const saved = data as Partial<ReturnType<typeof readStoredBom>>;
+          if (Array.isArray(saved.rows)) setRows(saved.rows);
+          if (saved.baseColumnWidths) setBaseColumnWidths(readBaseColumnWidths(saved.baseColumnWidths));
+          if (Array.isArray(saved.electricalRows)) setElectricalRows(saved.electricalRows);
+          if (Array.isArray(saved.electricalColumnSettings)) setElectricalColumnSettings(mergeColumnSettings(defaultElectricalColumnSettings, saved.electricalColumnSettings));
+          if (Array.isArray(saved.electricalCustomColumns)) setElectricalCustomColumns(saved.electricalCustomColumns);
+          if (Array.isArray(saved.mechanicalRows)) setMechanicalRows(saved.mechanicalRows);
+          if (Array.isArray(saved.mechanicalColumnSettings)) setMechanicalColumnSettings(mergeColumnSettings(defaultMechanicalColumnSettings, saved.mechanicalColumnSettings));
+          if (Array.isArray(saved.mechanicalCustomColumns)) setMechanicalCustomColumns(saved.mechanicalCustomColumns);
+          if (Array.isArray(saved.electricalTables)) setElectricalTables(saved.electricalTables);
+          if (Array.isArray(saved.mechanicalTables)) setMechanicalTables(saved.mechanicalTables);
+          if (typeof saved.notes === 'string') setNotes(saved.notes);
+        }
+        if (updatedAt) setLastSaved(updatedAt);
+        setWorkspaceLoaded(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setWorkspaceLoaded(true);
+        setSaveState('Save failed');
+      });
+    return () => {
+      active = false;
+    };
+  }, [project.productCode]);
+
+  useEffect(() => {
+    if (!workspaceLoaded) return;
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
       const timestamp = new Date().toISOString();
-      localStorage.setItem(storageKey, JSON.stringify({ rows, baseColumnWidths, electricalRows, electricalColumnSettings, electricalCustomColumns, mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, electricalTables, mechanicalTables, notes, lastSaved: timestamp }));
-      setLastSaved(timestamp);
-      setSaveState('Saved');
+      const data = { rows, baseColumnWidths, electricalRows, electricalColumnSettings, electricalCustomColumns, mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, electricalTables, mechanicalTables, notes, lastSaved: timestamp };
+      updateBomWorkspace(project.productCode, data)
+        .then(({ updatedAt }) => {
+          setLastSaved(updatedAt);
+          setSaveState('Saved');
+        })
+        .catch(() => setSaveState('Save failed'));
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [baseColumnWidths, electricalColumnSettings, electricalCustomColumns, electricalRows, electricalTables, mechanicalColumnSettings, mechanicalCustomColumns, mechanicalRows, mechanicalTables, notes, rows, storageKey]);
+  }, [baseColumnWidths, electricalColumnSettings, electricalCustomColumns, electricalRows, electricalTables, mechanicalColumnSettings, mechanicalCustomColumns, mechanicalRows, mechanicalTables, notes, project.productCode, rows, workspaceLoaded]);
 
   useEffect(() => {
     let active = true;
@@ -2147,16 +2194,6 @@ function makeSpreadsheetTable(name: string, values: string[][]): BenchmarkingTab
   };
 }
 
-function isLegacyElectricalSample(rows: ElectricalBomRow[]) {
-  const sampleItems = ['Buzzer', 'Connector 2Pin', 'Connector 3Pin', 'Connector 5Pin', 'Connector 6Pin', 'Connector 8Pin'];
-  return rows.length === sampleItems.length && rows.every((row, index) => row.item === sampleItems[index]);
-}
-
-function isLegacyMechanicalSample(rows: MechanicalBomRow[]) {
-  const sampleItems = ['AC PowerCord', 'Power Socket with Fuse', 'Earth Wire', 'PCB', 'Thermocouple', 'External Temperature', 'Probe Connector', 'Fiberglass Sleeve'];
-  return rows.length === sampleItems.length && rows.every((row, index) => row.item === sampleItems[index]);
-}
-
 function mergeColumnSettings<Key extends string>(
   defaults: Array<BomColumnSetting<Key>>,
   saved: unknown
@@ -2183,7 +2220,7 @@ function readBaseColumnWidths(saved: unknown): Record<BaseBomColumnKey, number> 
   return widths;
 }
 
-function readStoredBom(key: string, seedItems: Parameters<typeof seedBomRows>[0]) {
+function readStoredBom(seedItems: Parameters<typeof seedBomRows>[0]) {
   const fallback = {
     rows: seedBomRows(seedItems),
     baseColumnWidths: defaultBaseBomColumnWidths,
@@ -2198,31 +2235,19 @@ function readStoredBom(key: string, seedItems: Parameters<typeof seedBomRows>[0]
     notes: defaultNotes,
     lastSaved: new Date().toISOString()
   };
-  const saved = localStorage.getItem(key);
-  if (!saved) return fallback;
+  return fallback;
+}
+
+function readLegacyBomData(projectCode: string): Record<string, unknown> | null {
+  const saved = localStorage.getItem(`bom:${projectCode}`);
+  if (!saved) return null;
   try {
-    const parsed = JSON.parse(saved) as Partial<typeof fallback>;
-    const electricalRows = Array.isArray(parsed.electricalRows) ? parsed.electricalRows : fallback.electricalRows;
-    const electricalColumnSettings = mergeColumnSettings(defaultElectricalColumnSettings, parsed.electricalColumnSettings);
-    const electricalCustomColumns = Array.isArray(parsed.electricalCustomColumns) ? parsed.electricalCustomColumns : fallback.electricalCustomColumns;
-    const mechanicalColumnSettings = mergeColumnSettings(defaultMechanicalColumnSettings, parsed.mechanicalColumnSettings);
-    const mechanicalCustomColumns = Array.isArray(parsed.mechanicalCustomColumns) ? parsed.mechanicalCustomColumns : fallback.mechanicalCustomColumns;
-    return {
-      rows: Array.isArray(parsed.rows) ? parsed.rows : fallback.rows,
-      baseColumnWidths: readBaseColumnWidths(parsed.baseColumnWidths),
-      electricalRows: isLegacyElectricalSample(electricalRows) ? fallback.electricalRows : electricalRows.map((row) => withCustomCells(row, electricalCustomColumns)),
-      electricalColumnSettings,
-      electricalCustomColumns,
-      mechanicalRows: Array.isArray(parsed.mechanicalRows) && !isLegacyMechanicalSample(parsed.mechanicalRows) ? parsed.mechanicalRows.map((row) => withCustomCells(row, mechanicalCustomColumns)) : fallback.mechanicalRows,
-      mechanicalColumnSettings,
-      mechanicalCustomColumns,
-      electricalTables: Array.isArray(parsed.electricalTables) ? parsed.electricalTables : fallback.electricalTables,
-      mechanicalTables: Array.isArray(parsed.mechanicalTables) ? parsed.mechanicalTables : fallback.mechanicalTables,
-      notes: typeof parsed.notes === 'string' ? parsed.notes : fallback.notes,
-      lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
-    };
+    const parsed: unknown = JSON.parse(saved);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
   } catch {
-    return fallback;
+    return null;
   }
 }
 

@@ -10,6 +10,7 @@ import {
 } from '../controllers/benchmarkingController.js';
 import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
 import { updateProject, requireProjectEditor, projectCreationOptions, addProjectStage, deleteProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
+import { getBomWorkspace, updateBomWorkspace } from '../controllers/bomWorkspaceController.js';
 import {
   addPrerequisiteDocument,
   deletePrerequisiteDocument,
@@ -28,6 +29,8 @@ router.route('/').get(protect, listProjects).post(protect, authorize('Admin', 'S
 router.get('/creation-options', protect, authorize('Admin', 'Staff'), projectCreationOptions);
 router.patch('/:id', protect, authorize('Admin', 'Staff'), requireProjectEditor, updateProject);
 router.get('/:id/benchmarking', protect, getBenchmarking);
+router.get('/:id/bom-workspace', protect, getBomWorkspace);
+router.put('/:id/bom-workspace', protect, updateBomWorkspace);
 router.post('/:id/benchmarking/tables', protect, createBenchmarkingTable);
 router.patch('/:id/benchmarking/tables/:tableId', protect, updateBenchmarkingTable);
 router.delete('/:id/benchmarking/tables/:tableId', protect, deleteBenchmarkingTable);

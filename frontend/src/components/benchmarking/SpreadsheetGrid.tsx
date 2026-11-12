@@ -332,7 +332,7 @@ export function SpreadsheetGrid({
         <span>Rows {currentPage * rowsPerPage + 1}-{Math.min((currentPage + 1) * rowsPerPage, table.rows.length)} of {table.rows.length}</span>
         <button type="button" className="secondary-button" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next rows</button>
       </div>}
-      <div className="w-full max-w-full overflow-auto rounded-lg border border-[#00494B]">
+      <div className="max-h-[65vh] w-full max-w-full overflow-auto rounded-lg border border-[#00494B]">
         <table className="table-fixed border-collapse text-left text-xs" style={{ width: tableWidth, minWidth: tableWidth, maxWidth: tableWidth }}>
         <colgroup>
           <col style={{ width: 48, minWidth: 48, maxWidth: 48 }} />
@@ -341,7 +341,7 @@ export function SpreadsheetGrid({
           ))}
           {rowActions ? <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} /> : null}
         </colgroup>
-        <thead>
+        <thead className="sticky top-0 z-20">
           <tr>
             <th className="h-9 w-12 border border-[#B3C9CA] bg-white px-1.5 py-2.5 text-center font-extrabold text-black" />
             {table.columns.map((column, index) => (

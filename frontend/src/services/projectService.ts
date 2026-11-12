@@ -135,6 +135,22 @@ export async function fetchProject(projectId: string) {
   return normalizeProject(project);
 }
 
+export async function fetchBomWorkspace(projectId: string) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/bom-workspace`, {
+    headers: authHeaders()
+  });
+  return parseResponse<{ data: unknown | null; updatedAt: string | null }>(response);
+}
+
+export async function updateBomWorkspace(projectId: string, data: unknown) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}/bom-workspace`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ data })
+  });
+  return parseResponse<{ data: unknown; updatedAt: string }>(response);
+}
+
 export async function createProject(payload: ProjectCreatePayload) {
   const response = await fetch(`${API_BASE}/projects`, {
     method: 'POST',
