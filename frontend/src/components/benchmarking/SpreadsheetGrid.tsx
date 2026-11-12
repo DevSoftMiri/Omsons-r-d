@@ -341,7 +341,7 @@ export function SpreadsheetGrid({
           ))}
           {rowActions ? <col style={{ width: 180, minWidth: 180, maxWidth: 180 }} /> : null}
         </colgroup>
-        <thead className="sticky top-0 z-20">
+        <thead className="sticky top-0 z-20 bg-white">
           <tr>
             <th className="h-9 w-12 border border-[#B3C9CA] bg-white px-1.5 py-2.5 text-center font-extrabold text-black" />
             {table.columns.map((column, index) => (

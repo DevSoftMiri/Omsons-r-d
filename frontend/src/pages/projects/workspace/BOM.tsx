@@ -1145,7 +1145,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           />
         </div>
         <div className={`mx-4 mb-4 overflow-hidden rounded-lg border border-slate-200 ${fullscreenBomTable === 'electrical' ? 'min-h-0 flex-1' : ''}`}>
-          <div className={`${fullscreenBomTable === 'electrical' ? 'h-full' : ''} overflow-auto`}>
+          <div className={`${fullscreenBomTable === 'electrical' ? 'h-full' : 'max-h-[65vh]'} overflow-auto`}>
           <table className="table-fixed border-collapse text-left text-xs" style={{ width: electricalTableWidth, minWidth: electricalTableWidth, maxWidth: electricalTableWidth }}>
             <colgroup>
               {electricalColumnSettings.map((column) => (
@@ -1156,7 +1156,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               ))}
               <col style={{ width: 92, minWidth: 92, maxWidth: 92 }} />
             </colgroup>
-            <thead>
+            <thead className="sticky top-0 z-20">
               <tr className="bg-slate-50 text-slate-600 shadow-sm">
                 {electricalColumnSettings.map((column) => (
                   <th key={column.key} className={`relative overflow-hidden border border-slate-200 px-2 py-2.5 font-extrabold ${column.className?.includes('text-center') ? 'text-center' : ''}`}>
@@ -1195,18 +1195,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {electricalRows.map((row, rowIndex) => (
                 <tr key={row.id} className="odd:bg-white even:bg-slate-50/40 hover:bg-cyan-50/40">
                   {electricalColumnSettings.map((column, columnIndex) => {
-                    const rawValue = row[column.key] || column.formula || '';
+                    const rawValue = column.formula || row[column.key] || '';
                     const result = resolveBomFormula(rawValue, makeElectricalFormulaContext(row, electricalColumnSettings, electricalCustomColumns, rowIndex));
                     const editing = editingBomCell?.stage === 'electrical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === String(column.key);
                     return (
-                      <td key={column.key} className={`border border-slate-200 p-0 ${column.formula && !row[column.key] ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
+                      <td key={column.key} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
                         <input
-                          className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula && !row[column.key] ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
+                          className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="electrical"
                           data-column-index={columnIndex}
                           data-row-index={rowIndex}
                           title={result.error ? 'Invalid formula' : rawValue.startsWith('=') ? rawValue : undefined}
                           value={editing || !rawValue.startsWith('=') ? rawValue : result.value}
+                          readOnly={Boolean(column.formula)}
                           onBlur={() => setEditingBomCell(null)}
                           onChange={(event) => updateElectricalRow(row.id, column.key, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'electrical', rowId: row.id, columnKey: String(column.key) })}
@@ -1216,19 +1217,20 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                     );
                   })}
                   {electricalCustomColumns.map((column, customColumnIndex) => {
-                    const rawValue = row.customCells?.[column.id] || column.formula || '';
+                    const rawValue = column.formula || row.customCells?.[column.id] || '';
                     const result = resolveBomFormula(rawValue, makeElectricalFormulaContext(row, electricalColumnSettings, electricalCustomColumns, rowIndex));
                     const editing = editingBomCell?.stage === 'electrical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === column.id;
                     const columnIndex = electricalColumnSettings.length + customColumnIndex;
                     return (
-                      <td key={column.id} className={`border border-slate-200 p-0 ${column.formula && !row.customCells?.[column.id] ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
+                      <td key={column.id} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
                         <input
-                          className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.formula && !row.customCells?.[column.id] ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
+                          className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="electrical"
                           data-column-index={columnIndex}
                           data-row-index={rowIndex}
                           title={result.error ? 'Invalid formula' : rawValue.startsWith('=') ? rawValue : undefined}
                           value={editing || !rawValue.startsWith('=') ? rawValue : result.value}
+                          readOnly={Boolean(column.formula)}
                           onBlur={() => setEditingBomCell(null)}
                           onChange={(event) => updateElectricalCustomCell(row.id, column.id, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'electrical', rowId: row.id, columnKey: column.id })}
@@ -1349,7 +1351,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           />
         </div>
         <div className={`mx-4 mb-4 overflow-hidden rounded-lg border border-slate-200 ${fullscreenBomTable === 'mechanical' ? 'min-h-0 flex-1' : ''}`}>
-          <div className={`${fullscreenBomTable === 'mechanical' ? 'h-full' : ''} overflow-auto`}>
+          <div className={`${fullscreenBomTable === 'mechanical' ? 'h-full' : 'max-h-[65vh]'} overflow-auto`}>
           <table className="table-fixed border-collapse text-left text-xs" style={{ width: mechanicalTableWidth, minWidth: mechanicalTableWidth, maxWidth: mechanicalTableWidth }}>
             <colgroup>
               {mechanicalColumnSettings.map((column) => (
@@ -1360,7 +1362,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               ))}
               <col style={{ width: 72, minWidth: 72, maxWidth: 72 }} />
             </colgroup>
-            <thead>
+            <thead className="sticky top-0 z-20">
               <tr className="bg-slate-50 text-slate-600 shadow-sm">
                 {mechanicalColumnSettings.map((column) => (
                   <th key={column.key} className={`relative overflow-hidden border border-slate-200 px-1.5 py-2.5 text-center font-extrabold leading-tight ${column.className?.includes('text-center') ? 'text-center' : ''}`}>
@@ -1399,18 +1401,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {mechanicalRows.map((row, rowIndex) => (
                 <tr key={row.id} className="odd:bg-white even:bg-slate-50/40 hover:bg-cyan-50/40">
                   {mechanicalColumnSettings.map((column, columnIndex) => {
-                    const rawValue = row[column.key] || column.formula || '';
+                    const rawValue = column.formula || row[column.key] || '';
                     const result = resolveBomFormula(rawValue, makeMechanicalFormulaContext(row, mechanicalColumnSettings, mechanicalCustomColumns, rowIndex));
                     const editing = editingBomCell?.stage === 'mechanical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === String(column.key);
                     return (
-                      <td key={column.key} className={`border border-slate-200 p-0 ${column.formula && !row[column.key] ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
+                      <td key={column.key} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
                         <input
-                          className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula && !row[column.key] ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
+                          className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="mechanical"
                           data-column-index={columnIndex}
                           data-row-index={rowIndex}
                           title={result.error ? 'Invalid formula' : rawValue.startsWith('=') ? rawValue : undefined}
                           value={editing || !rawValue.startsWith('=') ? rawValue : result.value}
+                          readOnly={Boolean(column.formula)}
                           onBlur={() => setEditingBomCell(null)}
                           onChange={(event) => updateMechanicalRow(row.id, column.key, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'mechanical', rowId: row.id, columnKey: String(column.key) })}
@@ -1420,19 +1423,20 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                     );
                   })}
                   {mechanicalCustomColumns.map((column, customColumnIndex) => {
-                    const rawValue = row.customCells?.[column.id] || column.formula || '';
+                    const rawValue = column.formula || row.customCells?.[column.id] || '';
                     const result = resolveBomFormula(rawValue, makeMechanicalFormulaContext(row, mechanicalColumnSettings, mechanicalCustomColumns, rowIndex));
                     const editing = editingBomCell?.stage === 'mechanical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === column.id;
                     const columnIndex = mechanicalColumnSettings.length + customColumnIndex;
                     return (
-                      <td key={column.id} className={`border border-slate-200 p-0 ${column.formula && !row.customCells?.[column.id] ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
+                      <td key={column.id} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
                         <input
-                          className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.formula && !row.customCells?.[column.id] ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
+                          className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="mechanical"
                           data-column-index={columnIndex}
                           data-row-index={rowIndex}
                           title={result.error ? 'Invalid formula' : rawValue.startsWith('=') ? rawValue : undefined}
                           value={editing || !rawValue.startsWith('=') ? rawValue : result.value}
+                          readOnly={Boolean(column.formula)}
                           onBlur={() => setEditingBomCell(null)}
                           onChange={(event) => updateMechanicalCustomCell(row.id, column.id, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'mechanical', rowId: row.id, columnKey: column.id })}
@@ -2012,12 +2016,12 @@ function makeElectricalFormulaContext(
   const context: Record<string, number> = {};
   seedFormulaContext(context, row, columns, customColumns, rowIndex);
   columns.forEach((column, columnIndex) => {
-    const rawValue = row[column.key] || column.formula || '';
+    const rawValue = column.formula || row[column.key] || '';
     const numeric = getFormulaNumber(rawValue, context);
     addFormulaAliases(context, column.label, column.key, `${columnLetter(columnIndex)}${rowIndex + 1}`, numeric);
   });
   customColumns.forEach((column, customIndex) => {
-    const value = row.customCells?.[column.id] || column.formula || '';
+    const value = column.formula || row.customCells?.[column.id] || '';
     const numeric = getFormulaNumber(value, context);
     addFormulaAliases(context, column.label, column.id, `${columnLetter(columns.length + customIndex)}${rowIndex + 1}`, numeric);
   });
@@ -2033,12 +2037,12 @@ function makeMechanicalFormulaContext(
   const context: Record<string, number> = {};
   seedFormulaContext(context, row, columns, customColumns, rowIndex);
   columns.forEach((column, columnIndex) => {
-    const rawValue = row[column.key] || column.formula || '';
+    const rawValue = column.formula || row[column.key] || '';
     const numeric = getFormulaNumber(rawValue, context);
     addFormulaAliases(context, column.label, column.key, `${columnLetter(columnIndex)}${rowIndex + 1}`, numeric);
   });
   customColumns.forEach((column, customIndex) => {
-    const value = row.customCells?.[column.id] || column.formula || '';
+    const value = column.formula || row.customCells?.[column.id] || '';
     const numeric = getFormulaNumber(value, context);
     addFormulaAliases(context, column.label, column.id, `${columnLetter(columns.length + customIndex)}${rowIndex + 1}`, numeric);
   });
