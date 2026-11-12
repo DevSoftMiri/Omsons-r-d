@@ -38,7 +38,7 @@ export function StageResponseBuilder({
   // before the previous upload has been reflected in the list.
   const uploadingFileKeys = useRef(new Set<string>());
   const { showToast } = useToast();
-  const [blocks, setBlocks] = useState<StageResponseBlock[]>(() => readStageResponses(projectCode, stageName));
+  const [blocks, setBlocks] = useState<StageResponseBlock[]>([]);
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
   const [attachmentNote, setAttachmentNote] = useState('');
   const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; block: StageTableBlock; table: BenchmarkingTableData } | null>(null);
@@ -48,8 +48,7 @@ export function StageResponseBuilder({
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedBlocks = readStageResponses(projectCode, stageName);
-    setBlocks(savedBlocks);
+    readStageResponses(projectCode, stageName).then(setBlocks).catch(() => undefined);
     let active = true;
     fetchProjectAttachments(projectCode, stageName)
       .then((items) => {
@@ -65,7 +64,7 @@ export function StageResponseBuilder({
     function handleResponseUpdate(event: Event) {
       const detail = (event as CustomEvent<{ projectCode: string; stageName: string; newBlockId?: string }>).detail;
       if (detail?.projectCode !== projectCode || detail.stageName !== stageName) return;
-      setBlocks(readStageResponses(projectCode, stageName));
+      void readStageResponses(projectCode, stageName).then(setBlocks);
       if (detail.newBlockId) setNewBlockId(detail.newBlockId);
     }
     window.addEventListener('stage-response-updated', handleResponseUpdate);
@@ -73,8 +72,11 @@ export function StageResponseBuilder({
   }, [projectCode, stageName]);
 
   function persist(nextBlocks: StageResponseBlock[], newBlockId?: string) {
-    const saved = saveStageResponses(projectCode, stageName, nextBlocks);
+    const saved = nextBlocks;
     setBlocks(saved);
+    void saveStageResponses(projectCode, stageName, nextBlocks).catch(() => {
+      showToast({ tone: 'error', title: 'Save failed', message: 'Stage response changes could not be saved.' });
+    });
     window.dispatchEvent(new CustomEvent('stage-response-updated', {
       detail: { projectCode, stageName, newBlockId }
     }));

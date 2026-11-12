@@ -1,5 +1,5 @@
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   Check,
@@ -27,6 +27,7 @@ import { downloadFile, NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../..
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { getStageRoute } from '../../../utils/stages';
 import { useProjectWorkspace } from './context';
+import { fetchProjectModule, updateProjectModule } from '../../../services/projectModuleService';
 
 type Decision = 'approve' | 'further-development' | 'on-hold';
 type FinalDocument = {
@@ -58,17 +59,16 @@ export function FinalStage() {
   const dispatch = useAppDispatch();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
-  const storageKey = `final-stage:${project.productCode}`;
-  const initial = readStored(storageKey);
-  const [summary, setSummary] = useState(initial.summary);
-  const [issues, setIssues] = useState(initial.issues);
-  const [decision, setDecision] = useState<Decision>(initial.decision);
-  const [documents, setDocuments] = useState(initial.documents);
-  const [approved, setApproved] = useState(initial.approved);
-  const [approvedBy, setApprovedBy] = useState(initial.approvedBy);
-  const [approvedAt, setApprovedAt] = useState(initial.approvedAt);
-  const [comments, setComments] = useState(initial.comments);
-  const [lastSaved, setLastSaved] = useState(initial.lastSaved);
+  const loaded = useRef(false);
+  const [summary, setSummary] = useState(defaultSummary);
+  const [issues, setIssues] = useState(defaultIssues);
+  const [decision, setDecision] = useState<Decision>('on-hold');
+  const [documents, setDocuments] = useState<FinalDocument[]>(seedDocuments);
+  const [approved, setApproved] = useState(false);
+  const [approvedBy, setApprovedBy] = useState('');
+  const [approvedAt, setApprovedAt] = useState('');
+  const [comments, setComments] = useState('');
+  const [lastSaved, setLastSaved] = useState('');
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [showApproval, setShowApproval] = useState(false);
   const [showDocument, setShowDocument] = useState(false);
@@ -78,11 +78,10 @@ export function FinalStage() {
 
   useEffect(() => {
     setSaveState('Saving...');
+    if (!loaded.current) return;
     const timeout = window.setTimeout(() => {
       const timestamp = new Date().toISOString();
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({
+      void updateProjectModule(project.productCode, 'final-stage', {
           summary,
           issues,
           decision,
@@ -92,10 +91,7 @@ export function FinalStage() {
           approvedAt,
           comments,
           lastSaved: timestamp,
-        }),
-      );
-      setLastSaved(timestamp);
-      setSaveState('Saved');
+        }).then(() => { setLastSaved(timestamp); setSaveState('Saved'); }).catch(() => setSaveState('Saving...'));
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [
@@ -106,9 +102,29 @@ export function FinalStage() {
     decision,
     documents,
     issues,
-    storageKey,
+    project.productCode,
     summary,
   ]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchProjectModule<FinalStageData>(project.productCode, 'final-stage').then(({ data }) => {
+      if (!active) return;
+      if (data) {
+        setSummary(data.summary || '');
+        setIssues(data.issues || '');
+        setDecision(data.decision || 'on-hold');
+        setDocuments(data.documents || []);
+        setApproved(Boolean(data.approved));
+        setApprovedBy(data.approvedBy || '');
+        setApprovedAt(data.approvedAt || '');
+        setComments(data.comments || '');
+        setLastSaved(data.lastSaved || '');
+      }
+      loaded.current = true;
+    }).catch(() => { loaded.current = true; });
+    return () => { active = false; };
+  }, [project.productCode]);
 
   const requiredStages = project.stages.filter(
     (stage) => stage.name !== 'Final Stage',
@@ -992,26 +1008,6 @@ function Meta({
       </div>
     </div>
   );
-}
-function readStored(key: string): FinalStageData {
-  const fallback = {
-    summary: defaultSummary,
-    issues: defaultIssues,
-    decision: 'approve' as Decision,
-    documents: seedDocuments,
-    approved: false,
-    approvedBy: 'R&D Manager',
-    approvedAt: new Date().toISOString().slice(0, 10),
-    comments: '',
-    lastSaved: new Date().toISOString(),
-  };
-  const saved = localStorage.getItem(key);
-  if (!saved) return fallback;
-  try {
-    return { ...fallback, ...JSON.parse(saved) };
-  } catch {
-    return fallback;
-  }
 }
 function getStageDate(_stage: Stage, index: number) {
   const base = new Date('2026-09-01T00:00:00');

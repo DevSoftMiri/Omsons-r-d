@@ -9,6 +9,7 @@ import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import {
   readProductSpecifications,
+  fetchProductSpecifications,
   saveProductSpecifications,
   type ProductSpecificationRow
 } from '../../../services/productSpecificationsService';
@@ -27,6 +28,18 @@ export function ProductSpecifications() {
   const didMount = useRef(false);
 
   useEffect(() => {
+    let active = true;
+    fetchProductSpecifications(project.productCode).then((saved) => {
+      if (!active) return;
+      setSummary(saved.summary);
+      setRows(saved.rows);
+      setLastSaved(saved.lastSaved);
+      didMount.current = true;
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [project.productCode]);
+
+  useEffect(() => {
     if (!didMount.current) {
       didMount.current = true;
       return;
@@ -34,9 +47,9 @@ export function ProductSpecifications() {
 
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
-      const saved = saveProductSpecifications(project.productCode, { summary, rows });
-      setLastSaved(saved.lastSaved);
-      setSaveState('Saved');
+      void saveProductSpecifications(project.productCode, { summary, rows })
+        .then((saved) => { setLastSaved(saved.lastSaved); setSaveState('Saved'); })
+        .catch(() => setSaveState('Saved'));
     }, 250);
 
     return () => window.clearTimeout(timeout);

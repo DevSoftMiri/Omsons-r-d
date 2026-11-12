@@ -41,7 +41,7 @@ export function StageSectionOrder({
         });
     }
 
-    function refresh() {
+    async function refresh() {
       const elements = Array.from(root.children) as HTMLElement[];
       elements.slice(0, FIXED_SECTION_COUNT).forEach((element, index) => {
         element.style.order = String(index);
@@ -58,7 +58,7 @@ export function StageSectionOrder({
 
       const sections = getSections();
       const ids = sections.map((element) => element.dataset.stageSection).filter(Boolean) as string[];
-      const saved = readStageSectionOrder(projectCode, stageName);
+      const saved = await readStageSectionOrder(projectCode, stageName);
       const order = [...saved.filter((id) => ids.includes(id)), ...ids.filter((id) => !saved.includes(id))];
 
       sections.forEach((element) => {
@@ -97,17 +97,17 @@ export function StageSectionOrder({
       return button;
     }
 
-    function moveSection(direction: 'up' | 'down', id: string) {
+    async function moveSection(direction: 'up' | 'down', id: string) {
       const sections = getSections();
       const ids = sections.map((element) => element.dataset.stageSection).filter(Boolean) as string[];
-      const saved = readStageSectionOrder(projectCode, stageName);
+      const saved = await readStageSectionOrder(projectCode, stageName);
       const order = [...saved.filter((savedId) => ids.includes(savedId)), ...ids.filter((sectionId) => !saved.includes(sectionId))];
       const index = order.indexOf(id);
       const target = direction === 'up' ? index - 1 : index + 1;
       if (index < 0 || target < 0 || target >= order.length) return;
       [order[index], order[target]] = [order[target], order[index]];
-      saveStageSectionOrder(projectCode, stageName, order);
-      refresh();
+      await saveStageSectionOrder(projectCode, stageName, order);
+      await refresh();
     }
 
     function onClick(event: MouseEvent) {
@@ -115,10 +115,10 @@ export function StageSectionOrder({
       if (!button || !root.contains(button) || button.disabled) return;
       const direction = button.dataset.stageSectionMove;
       const id = button.dataset.stageSectionId;
-      if ((direction === 'up' || direction === 'down') && id) moveSection(direction, id);
+      if ((direction === 'up' || direction === 'down') && id) void moveSection(direction, id);
     }
 
-    refresh();
+    void refresh();
     root.addEventListener('click', onClick);
     const observer = new MutationObserver(refresh);
     observer.observe(root, { childList: true });

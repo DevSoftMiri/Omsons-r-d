@@ -40,38 +40,28 @@ export function stageSectionOrderStorageKey(projectCode: string, stageName: stri
   return `stage-section-order:${projectCode}:${stageName}`;
 }
 
-export function readStageSectionOrder(projectCode: string, stageName: string): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const saved = window.localStorage.getItem(stageSectionOrderStorageKey(projectCode, stageName));
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
-  } catch {
-    return [];
-  }
+export async function readStageSectionOrder(projectCode: string, stageName: string): Promise<string[]> {
+  const { fetchProjectModule } = await import('./projectModuleService');
+  const result = await fetchProjectModule<{ order?: string[] }>(projectCode, `stage-section-order:${stageName}`);
+  return Array.isArray(result.data?.order) ? result.data.order : [];
 }
 
-export function saveStageSectionOrder(projectCode: string, stageName: string, order: string[]) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(stageSectionOrderStorageKey(projectCode, stageName), JSON.stringify(order));
-  }
+export async function saveStageSectionOrder(projectCode: string, stageName: string, order: string[]) {
+  const { updateProjectModule } = await import('./projectModuleService');
+  await updateProjectModule(projectCode, `stage-section-order:${stageName}`, { order });
   return order;
 }
 
-export function readStageResponses(projectCode: string, stageName: string): StageResponseBlock[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const saved = window.localStorage.getItem(stageResponseStorageKey(projectCode, stageName));
-    return saved ? normalizeBlocks(JSON.parse(saved)) : [];
-  } catch {
-    return [];
-  }
+export async function readStageResponses(projectCode: string, stageName: string): Promise<StageResponseBlock[]> {
+  const { fetchProjectModule } = await import('./projectModuleService');
+  const result = await fetchProjectModule<StageResponseBlock[]>(projectCode, `stage-responses:${stageName}`);
+  return Array.isArray(result.data) ? normalizeBlocks(result.data) : [];
 }
 
-export function saveStageResponses(projectCode: string, stageName: string, blocks: StageResponseBlock[]) {
-  if (typeof window === 'undefined') return blocks;
+export async function saveStageResponses(projectCode: string, stageName: string, blocks: StageResponseBlock[]) {
   const normalized = normalizeBlocks(blocks);
-  window.localStorage.setItem(stageResponseStorageKey(projectCode, stageName), JSON.stringify(normalized));
+  const { updateProjectModule } = await import('./projectModuleService');
+  await updateProjectModule(projectCode, `stage-responses:${stageName}`, normalized);
   return normalized;
 }
 

@@ -11,6 +11,7 @@ import {
   makePrototypeEntry,
   prototypeStatusOptions,
   readPrototyping,
+  fetchPrototyping,
   savePrototyping,
   type PrototypeEntry
 } from '../../../services/prototypingService';
@@ -36,6 +37,17 @@ export function Prototyping() {
 
   useEffect(() => {
     let active = true;
+    fetchPrototyping(project.productCode).then((saved) => {
+      if (!active) return;
+      setEntries(saved.entries);
+      setLastSaved(saved.lastSaved);
+      didMount.current = true;
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [project.productCode]);
+
+  useEffect(() => {
+    let active = true;
     fetchProjectAttachments(project.productCode, stageName)
       .then((attachments) => {
         if (active) setImages(attachments.filter((attachment) => attachment.mimeType?.startsWith('image/')));
@@ -56,9 +68,9 @@ export function Prototyping() {
 
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
-      const saved = savePrototyping(project.productCode, { entries });
-      setLastSaved(saved.lastSaved);
-      setSaveState('Saved');
+      void savePrototyping(project.productCode, { entries })
+        .then((saved) => { setLastSaved(saved.lastSaved); setSaveState('Saved'); })
+        .catch(() => setSaveState('Saving...'));
     }, 250);
 
     return () => window.clearTimeout(timeout);

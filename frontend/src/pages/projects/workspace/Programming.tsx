@@ -1,7 +1,7 @@
 import { ExcelTableActions } from '../../../components/benchmarking/ExcelTableActions';
 import { dataTable, tableRecords } from '../../../components/benchmarking/structuredTableExcel';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   Check,
@@ -27,6 +27,7 @@ import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
+import { fetchProjectModule, updateProjectModule } from '../../../services/projectModuleService';
 
 type ProgramStatus = 'Draft' | 'Testing' | 'Ready';
 
@@ -71,12 +72,11 @@ export function Programming() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
-  const storageKey = `programming:${project.productCode}`;
-  const initial = readStoredProgramming(storageKey);
-  const [programs, setPrograms] = useState(initial.programs);
-  const [references, setReferences] = useState(initial.references);
-  const [notes, setNotes] = useState(initial.notes);
-  const [lastSaved, setLastSaved] = useState(initial.lastSaved);
+  const loaded = useRef(false);
+  const [programs, setPrograms] = useState<Program[]>(seedPrograms);
+  const [references, setReferences] = useState<string[]>([]);
+  const [notes, setNotes] = useState(defaultNotes);
+  const [lastSaved, setLastSaved] = useState('');
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [query, setQuery] = useState('');
   const [drawerMode, setDrawerMode] = useState<'add' | 'edit' | 'view' | null>(null);
@@ -86,14 +86,28 @@ export function Programming() {
 
   useEffect(() => {
     setSaveState('Saving...');
+    if (!loaded.current) return;
     const timeout = window.setTimeout(() => {
       const timestamp = new Date().toISOString();
-      localStorage.setItem(storageKey, JSON.stringify({ programs, references, notes, lastSaved: timestamp }));
-      setLastSaved(timestamp);
-      setSaveState('Saved');
+      void updateProjectModule(project.productCode, 'programming', { programs, references, notes, lastSaved: timestamp })
+        .then(() => { setLastSaved(timestamp); setSaveState('Saved'); })
+        .catch(() => setSaveState('Saving...'));
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [notes, programs, references, storageKey]);
+  }, [notes, programs, references, project.productCode]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchProjectModule<StoredProgramming>(project.productCode, 'programming').then(({ data }) => {
+      if (!active) return;
+      setPrograms(data?.programs || []);
+      setReferences(data?.references || []);
+      setNotes(data?.notes || '');
+      setLastSaved(data?.lastSaved || '');
+      loaded.current = true;
+    }).catch(() => { loaded.current = true; });
+    return () => { active = false; };
+  }, [project.productCode]);
 
   const visiblePrograms = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -427,23 +441,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function Meta({ label, value, pill, icon }: { label: string; value: string; pill?: boolean; icon?: ReactNode }) {
   return <div className="border-slate-200 xl:border-l xl:pl-6 first:xl:border-l-0 first:xl:pl-0"><p className="text-xs text-slate-500">{label}</p><div className="mt-1.5 flex items-center gap-2 font-bold">{icon}{pill ? <span className="rounded-full bg-rose-100 px-4 py-1.5 text-rose-600">{value}</span> : <span>{value}</span>}</div></div>;
-}
-
-function readStoredProgramming(key: string): StoredProgramming {
-  const fallback = { programs: seedPrograms, references: [], notes: defaultNotes, lastSaved: new Date().toISOString() };
-  const saved = localStorage.getItem(key);
-  if (!saved) return fallback;
-  try {
-    const parsed = JSON.parse(saved) as Partial<StoredProgramming>;
-    return {
-      programs: Array.isArray(parsed.programs) ? parsed.programs : fallback.programs,
-      references: Array.isArray(parsed.references) ? parsed.references : fallback.references,
-      notes: typeof parsed.notes === 'string' ? parsed.notes : fallback.notes,
-      lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
-    };
-  } catch {
-    return fallback;
-  }
 }
 
 function formatBytes(value: number) {

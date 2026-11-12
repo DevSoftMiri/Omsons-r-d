@@ -25,6 +25,7 @@ import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { downloadFile, NO_FILE_AVAILABLE, resolveFileUrl } from '../../../utils/fileActions';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
+import { fetchProjectModule, updateProjectModule } from '../../../services/projectModuleService';
 
 type DesignCategory = '3D Model' | 'Technical Drawing' | 'Rendering' | 'Concept' | 'Other';
 
@@ -58,12 +59,11 @@ export function ProductDesign() {
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
   const uploadRef = useRef<HTMLInputElement | null>(null);
-  const storageKey = `product-design:${project.productCode}`;
-  const initial = readStoredData(storageKey);
-  const [designs, setDesigns] = useState(initial.designs);
-  const [notes, setNotes] = useState(initial.notes);
-  const [linked, setLinked] = useState(initial.linked);
-  const [lastSaved, setLastSaved] = useState(initial.lastSaved);
+  const loaded = useRef(false);
+  const [designs, setDesigns] = useState<DesignFile[]>(seedDesigns);
+  const [notes, setNotes] = useState(defaultNotes);
+  const [linked, setLinked] = useState<string[]>([]);
+  const [lastSaved, setLastSaved] = useState('');
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [activeCategory, setActiveCategory] = useState<'All Files' | DesignCategory>('All Files');
   const [query, setQuery] = useState('');
@@ -74,14 +74,28 @@ export function ProductDesign() {
 
   useEffect(() => {
     setSaveState('Saving...');
+    if (!loaded.current) return;
     const timeout = window.setTimeout(() => {
       const timestamp = new Date().toISOString();
-      localStorage.setItem(storageKey, JSON.stringify({ designs, notes, linked, lastSaved: timestamp }));
-      setLastSaved(timestamp);
-      setSaveState('Saved');
+      void updateProjectModule(project.productCode, 'product-design', { designs, notes, linked, lastSaved: timestamp })
+        .then(() => { setLastSaved(timestamp); setSaveState('Saved'); })
+        .catch(() => setSaveState('Saving...'));
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [designs, linked, notes, storageKey]);
+  }, [designs, linked, notes, project.productCode]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchProjectModule<StoredDesignData>(project.productCode, 'product-design').then(({ data }) => {
+      if (!active) return;
+      setDesigns(data?.designs || []);
+      setNotes(data?.notes || '');
+      setLinked(data?.linked || []);
+      setLastSaved(data?.lastSaved || '');
+      loaded.current = true;
+    }).catch(() => { loaded.current = true; });
+    return () => { active = false; };
+  }, [project.productCode]);
 
   const tabs = useMemo(() => {
     const counts = designs.reduce<Record<string, number>>((acc, design) => {
@@ -484,23 +498,6 @@ function Meta({ label, value, pill, icon }: { label: string; value: string; pill
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-sm font-bold text-slate-600">{label}</span>{children}</label>;
-}
-
-function readStoredData(key: string): StoredDesignData {
-  const fallback = { designs: seedDesigns, notes: defaultNotes, linked: [], lastSaved: new Date().toISOString() };
-  const saved = localStorage.getItem(key);
-  if (!saved) return fallback;
-  try {
-    const parsed = JSON.parse(saved) as Partial<StoredDesignData>;
-    return {
-      designs: Array.isArray(parsed.designs) ? parsed.designs : fallback.designs,
-      notes: typeof parsed.notes === 'string' ? parsed.notes : fallback.notes,
-      linked: Array.isArray(parsed.linked) ? parsed.linked : fallback.linked,
-      lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
-    };
-  } catch {
-    return fallback;
-  }
 }
 
 function categoryClass(category: DesignCategory) {

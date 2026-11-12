@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight, FileText, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
@@ -8,6 +8,7 @@ import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
+import { fetchProjectModule, updateProjectModule } from '../../../services/projectModuleService';
 
 type ReportEntry = {
   id: string;
@@ -30,14 +31,24 @@ export function Reporting() {
   const { project } = useProjectWorkspace();
   const { completeStage } = useStageCompletion(project);
   const { showToast } = useToast();
-  const storageKey = `reporting:${project.productCode}`;
-  const [reports, setReports] = useState<ReportEntry[]>(() => readReports(storageKey));
+  const loaded = useRef(false);
+  const [reports, setReports] = useState<ReportEntry[]>([]);
   const [form, setForm] = useState(emptyReport);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(reports));
-  }, [reports, storageKey]);
+    if (!loaded.current) return;
+    void updateProjectModule(project.productCode, 'reporting', reports).catch(() => undefined);
+  }, [reports, project.productCode]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchProjectModule<ReportEntry[]>(project.productCode, 'reporting').then(({ data }) => {
+      if (active) setReports(Array.isArray(data) ? data : []);
+      loaded.current = true;
+    }).catch(() => { loaded.current = true; });
+    return () => { active = false; };
+  }, [project.productCode]);
 
   function submitReport(event: FormEvent) {
     event.preventDefault();
@@ -159,16 +170,6 @@ export function Reporting() {
       </section>
     </div>
   );
-}
-
-function readReports(key: string): ReportEntry[] {
-  const saved = localStorage.getItem(key);
-  if (!saved) return [];
-  try {
-    return JSON.parse(saved) as ReportEntry[];
-  } catch {
-    return [];
-  }
 }
 
 function formatDate(value: string) {

@@ -52,11 +52,9 @@ export function TestingValidation() {
   const { showToast } = useToast();
   const userRole = useAppSelector((state) => state.auth.user?.role);
   const canEditTestValues = userRole === 'auditor';
-  const storageKey = `testing-validation:${project.productCode}`;
-  const initial = readStored(storageKey, project.productCode);
-  const [tables, setTables] = useState(initial.tables.map(applyValidationResults));
-  const [backendReady, setBackendReady] = useState(!hasTestingValidationBackend());
-  const [lastSaved, setLastSaved] = useState(initial.lastSaved);
+  const [tables, setTables] = useState<BenchmarkingTableData[]>([]);
+  const [backendReady, setBackendReady] = useState(false);
+  const [lastSaved, setLastSaved] = useState('');
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -68,38 +66,23 @@ export function TestingValidation() {
     if (!hasTestingValidationBackend()) return;
     let active = true;
     fetchTestingValidation(project.productCode)
-      .then((workbook) => { if (active) { setTables((workbook.tables.length ? workbook.tables : initial.tables).map(applyValidationResults)); setLastSaved(workbook.updatedAt || initial.lastSaved); setBackendReady(true); } })
+      .then((workbook) => { if (active) { setTables(workbook.tables.map(applyValidationResults)); setLastSaved(workbook.updatedAt || ''); setBackendReady(true); } })
       .catch(() => { if (active) setBackendReady(true); });
     return () => { active = false; };
   }, [project.productCode]);
 
   useEffect(() => {
     if (!backendReady) return;
-    if (hasTestingValidationBackend()) {
-      if (!canEditTestValues) return;
-      setSaveState('Saving...');
-      const timeout = window.setTimeout(() => {
-        void saveTestingValidation(project.productCode, tables)
-          .then((workbook) => { setLastSaved(workbook.updatedAt || new Date().toISOString()); setSaveState('Saved'); })
-          .catch(() => setSaveState('Saved'));
-      }, 250);
-      return () => window.clearTimeout(timeout);
-    }
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-
+    if (!hasTestingValidationBackend() || !canEditTestValues) return;
     setSaveState('Saving...');
     const timeout = window.setTimeout(() => {
-      const timestamp = new Date().toISOString();
-      localStorage.setItem(storageKey, JSON.stringify({ tables, lastSaved: timestamp }));
-      setLastSaved(timestamp);
-      setSaveState('Saved');
+      void saveTestingValidation(project.productCode, tables)
+        .then((workbook) => { setLastSaved(workbook.updatedAt || new Date().toISOString()); setSaveState('Saved'); })
+        .catch(() => setSaveState('Saving...'));
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [backendReady, canEditTestValues, project.productCode, storageKey, tables]);
+  }, [backendReady, canEditTestValues, project.productCode, tables]);
 
   useEffect(() => {
     let active = true;
@@ -269,21 +252,6 @@ function TopCrumbs({ title, code }: { title: string; code: string }) {
       </div>
     </div>
   );
-}
-
-function readStored(key: string, projectCode: string): StoredValidation {
-  const fallback = { tables: makeDefaultTables(projectCode), lastSaved: new Date().toISOString() };
-  const saved = localStorage.getItem(key);
-  if (!saved) return fallback;
-  try {
-    const parsed = JSON.parse(saved) as Partial<StoredValidation>;
-    return {
-      tables: Array.isArray(parsed.tables) && parsed.tables.length ? parsed.tables.map(applyValidationResults) : fallback.tables,
-      lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
-    };
-  } catch {
-    return fallback;
-  }
 }
 
 function makeTable(name: string, values: string[][]): BenchmarkingTableData {

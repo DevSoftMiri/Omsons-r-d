@@ -11,6 +11,7 @@ import {
 import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
 import { updateProject, requireProjectEditor, projectCreationOptions, addProjectStage, deleteProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
 import { getBomWorkspace, updateBomWorkspace } from '../controllers/bomWorkspaceController.js';
+import { getProjectModule, updateProjectModule } from '../controllers/projectModuleController.js';
 import {
   addPrerequisiteDocument,
   deletePrerequisiteDocument,
@@ -31,6 +32,8 @@ router.patch('/:id', protect, authorize('Admin', 'Staff'), requireProjectEditor,
 router.get('/:id/benchmarking', protect, getBenchmarking);
 router.get('/:id/bom-workspace', protect, getBomWorkspace);
 router.put('/:id/bom-workspace', protect, updateBomWorkspace);
+router.get('/:id/modules/:module', protect, getProjectModule);
+router.put('/:id/modules/:module', protect, updateProjectModule);
 router.post('/:id/benchmarking/tables', protect, createBenchmarkingTable);
 router.patch('/:id/benchmarking/tables/:tableId', protect, updateBenchmarkingTable);
 router.delete('/:id/benchmarking/tables/:tableId', protect, deleteBenchmarkingTable);

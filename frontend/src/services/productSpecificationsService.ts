@@ -39,34 +39,33 @@ export function productSpecificationsStorageKey(projectCode: string) {
 }
 
 export function readProductSpecifications(projectCode: string): ProductSpecificationsData {
-  const fallback = {
+  return {
     summary: '',
     rows: defaultProductSpecificationRows,
     lastSaved: new Date().toISOString()
   };
-  if (typeof window === 'undefined') return fallback;
-  const saved = window.localStorage.getItem(productSpecificationsStorageKey(projectCode));
-  if (!saved) return fallback;
-  try {
-    const parsed = JSON.parse(saved) as Partial<ProductSpecificationsData>;
-    return {
-      summary: typeof parsed.summary === 'string' ? parsed.summary : fallback.summary,
-      rows: normalizeRows(parsed.rows),
-      lastSaved: typeof parsed.lastSaved === 'string' ? parsed.lastSaved : fallback.lastSaved
-    };
-  } catch {
-    return fallback;
-  }
 }
 
-export function saveProductSpecifications(projectCode: string, data: Pick<ProductSpecificationsData, 'summary' | 'rows'>) {
+export async function fetchProductSpecifications(projectCode: string) {
+  const { fetchProjectModule } = await import('./projectModuleService');
+  const result = await fetchProjectModule<ProductSpecificationsData>(projectCode, 'product-specifications');
+  const fallback = readProductSpecifications(projectCode);
+  return result.data ? {
+    summary: result.data.summary || '',
+    rows: normalizeRows(result.data.rows),
+    lastSaved: result.updatedAt || fallback.lastSaved
+  } : fallback;
+}
+
+export async function saveProductSpecifications(projectCode: string, data: Pick<ProductSpecificationsData, 'summary' | 'rows'>) {
   const payload: ProductSpecificationsData = {
     summary: data.summary,
     rows: normalizeRows(data.rows),
     lastSaved: new Date().toISOString()
   };
-  window.localStorage.setItem(productSpecificationsStorageKey(projectCode), JSON.stringify(payload));
-  return payload;
+  const { updateProjectModule } = await import('./projectModuleService');
+  const result = await updateProjectModule(projectCode, 'product-specifications', payload);
+  return { ...payload, lastSaved: result.updatedAt };
 }
 
 function normalizeRows(rows: unknown): ProductSpecificationRow[] {
