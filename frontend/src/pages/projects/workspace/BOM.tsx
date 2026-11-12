@@ -615,7 +615,14 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   function updateMechanicalRow(rowId: string, key: MechanicalBomColumnKey, value: string) {
-    setMechanicalRows((current) => current.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
+    setMechanicalRows((current) => current.map((row) => {
+      if (row.id !== rowId) return row;
+      return {
+        ...row,
+        [key]: value,
+        ...(key === 'qty' || key === 'unitCost' ? { totalCost: '' } : {})
+      };
+    }));
   }
 
   function renameMechanicalBuiltInColumn(key: MechanicalBomColumnKey, label: string) {
