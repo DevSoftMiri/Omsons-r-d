@@ -478,11 +478,11 @@ export function SpreadsheetGrid({
                       <div
                         aria-hidden="true"
                         style={{ fontWeight }}
-                        className={`invisible min-h-9 whitespace-pre-wrap break-words px-2 py-2 text-xs ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold' : ''}`}
+                        className={`invisible min-h-9 whitespace-pre-wrap break-words px-2 py-2 text-sm ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold' : ''}`}
                       >{`${isEditing ? rawValue : value} `}</div>
                     <textarea
                       style={{ fontWeight }}
-                      className={`absolute inset-0 block h-full w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent px-2 py-2 text-xs text-black outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold text-black' : ''} ${selected ? 'bg-primary/[.06] ring-2 ring-inset ring-primary' : ''}`}
+                      className={`absolute inset-0 block h-full w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent px-2 py-2 text-sm text-black outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${rowIndex === 0 && !table.columns.some(column => column.label !== undefined) ? 'font-extrabold text-black' : ''} ${selected ? 'bg-primary/[.06] ring-2 ring-inset ring-primary' : ''}`}
                       aria-label={`Cell ${columnLetter(columnIndex)}${rowIndex + 1}`}
                       data-column-index={columnIndex}
                       data-row-index={rowIndex}
