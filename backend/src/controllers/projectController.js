@@ -15,6 +15,21 @@ async function nextProductCode() {
   return `GLW-${String(count + 101).padStart(4, '0')}`;
 }
 
+async function nextInstrumentCode() {
+  const projects = await Project.find({ productCode: /^INS-\d+$/i }).select('productCode').lean();
+  const highest = projects.reduce((max, project) => {
+    const number = Number(String(project.productCode).slice(4));
+    return Number.isFinite(number) ? Math.max(max, number) : max;
+  }, 0);
+  return `INS-${String(highest + 1).padStart(3, '0')}`;
+}
+
+async function nextCodeForCategory(category) {
+  return String(category || '').trim().toLowerCase() === 'instrument'
+    ? nextInstrumentCode()
+    : nextProductCode();
+}
+
 function uniqueStrings(values) {
   return values
     .map((value) => String(value || '').trim())
@@ -210,7 +225,7 @@ export const createProject = asyncHandler(async (req, res) => {
   if (isStaffUser(req.user) && !teamMembers.some(id => String(id) === String(req.user._id))) teamMembers.push(req.user._id);
   const project = await Project.create({
     name: req.body.name,
-    productCode: req.body.productCode || await nextProductCode(),
+    productCode: req.body.productCode || await nextCodeForCategory(req.body.category),
     category: req.body.category,
     description: req.body.description,
     startDate,

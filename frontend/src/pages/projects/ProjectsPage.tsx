@@ -10,6 +10,7 @@ import type { Project, ProjectStatus, Stage } from '../../types';
 
 const statusOptions = ['All Status', 'Running', 'On Hold', 'Completed', 'Delayed'] as const;
 const baseStageOptions = ['All Stages'] as const;
+const baseCategoryOptions = ['All Categories', 'Instrument', 'Glassware', 'Plasticware'] as const;
 const sortOptions = ['First Created', 'Start Date', 'Target Date', 'Progress', 'Priority', 'Status'] as const;
 
 function statusLabel(status: ProjectStatus) {
@@ -53,6 +54,7 @@ export function ProjectsPage() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [stageFilter, setStageFilter] = useState('All Stages');
+  const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
   const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]>('First Created');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -82,13 +84,19 @@ export function ProjectsPage() {
     return [...baseStageOptions, ...Array.from(new Set(names))];
   }, [projects]);
 
+  const categoryOptions = useMemo(() => {
+    const existingCategories = projects.map((project) => project.category.trim()).filter(Boolean);
+    return [...baseCategoryOptions, ...Array.from(new Set(existingCategories)).filter((category) => !baseCategoryOptions.includes(category as (typeof baseCategoryOptions)[number]))];
+  }, [projects]);
+
   const visibleProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = projects.filter((project) => {
       const matchesSearch = !normalizedQuery || `${project.productCode} ${project.name} ${project.currentStage}`.toLowerCase().includes(normalizedQuery);
       const matchesStage = stageFilter === 'All Stages' || project.currentStage === stageFilter;
+      const matchesCategory = categoryFilter === 'All Categories' || project.category === categoryFilter;
       const matchesStatus = statusFilter === 'All Status' || project.status === statusFilter;
-      return matchesSearch && matchesStage && matchesStatus;
+      return matchesSearch && matchesStage && matchesCategory && matchesStatus;
     });
     return [...filtered].sort((a, b) => {
       if (sortBy === 'Start Date') return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
@@ -98,7 +106,7 @@ export function ProjectsPage() {
       if (sortBy === 'Status') return a.status.localeCompare(b.status);
       return a.productCode.localeCompare(b.productCode, undefined, { numeric: true });
     });
-  }, [projects, query, sortBy, stageFilter, statusFilter]);
+  }, [projects, query, sortBy, stageFilter, categoryFilter, statusFilter]);
 
   return (
     <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
@@ -107,12 +115,14 @@ export function ProjectsPage() {
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <SelectLike value={stageFilter} options={stageOptions} onChange={setStageFilter} />
+          <SelectLike value={categoryFilter} options={categoryOptions} onChange={setCategoryFilter} />
           <SelectLike value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
           <button
             className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#00494B] transition hover:bg-white"
             onClick={() => {
               setQuery('');
               setStageFilter('All Stages');
+              setCategoryFilter('All Categories');
               setStatusFilter('All Status');
             }}
           >

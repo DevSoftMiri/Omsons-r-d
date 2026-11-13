@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node node_modules/nodemon/bin/nodemon.js src/index.js",
     "start": "node src/index.js",
-    "seed:users": "node scripts/seedLoginUsers.js"
+    "seed:users": "node scripts/seedLoginUsers.js",
+    "migrate:instrument-codes": "node scripts/migrateInstrumentCodes.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",

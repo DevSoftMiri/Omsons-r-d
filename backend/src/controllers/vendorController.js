@@ -22,3 +22,15 @@ export const updateVendor = asyncHandler(async (req, res) => {
 
   res.json(vendor);
 });
+
+export const deleteVendor = asyncHandler(async (req, res) => {
+  const vendor = await Vendor.findById(req.params.id);
+
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+
+  await vendor.deleteOne();
+  res.json({ message: 'Vendor deleted successfully', id: String(vendor._id) });
+});

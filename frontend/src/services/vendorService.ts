@@ -108,3 +108,11 @@ export async function updateVendor(id: string, payload: VendorPayload) {
   });
   return normalizeVendor(await parseResponse<any>(response));
 }
+
+export async function deleteVendor(id: string) {
+  const response = await fetch(`${API_BASE}/vendors/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return parseResponse<{ message: string; id: string }>(response);
+}

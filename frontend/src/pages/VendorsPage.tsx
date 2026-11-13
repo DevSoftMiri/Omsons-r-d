@@ -1,10 +1,11 @@
-import { CheckCircle2, ChevronDown, Clock3, Mail, MoreHorizontal, PackageCheck, Phone, Plus, Search, Store, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock3, Mail, MoreHorizontal, PackageCheck, Phone, Search, Store, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PageTopBar } from '../components/PageTopBar';
 import { useToast } from '../components/ToastProvider';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { fetchProjects } from '../services/projectService';
-import { createVendor, fetchVendors, updateVendor, type VendorPaymentType, type VendorRecord, type VendorStatus } from '../services/vendorService';
+import { createVendor, deleteVendor, fetchVendors, updateVendor, type VendorPaymentType, type VendorRecord, type VendorStatus } from '../services/vendorService';
 import { setProjects } from '../store';
 import type { Project } from '../types';
 import { getMissingFields, showMissingFieldsToast } from '../utils/requiredFields';
@@ -257,6 +258,36 @@ export function VendorsPage() {
     }
   }
 
+  async function handleStatusChange(vendor: VendorRow) {
+    if (!vendor.persisted) {
+      showToast({ tone: 'error', title: 'Save vendor first', message: 'This vendor comes from a project BOM and is not stored as a vendor record yet.' });
+      return;
+    }
+    try {
+      const updated = await updateVendor(vendor.id, { status: vendor.status === 'Active' ? 'Inactive' : 'Active' } as any);
+      setSavedVendors((current) => current.map((item) => item.id === updated.id ? updated : item));
+      showToast({ tone: 'success', title: `Vendor ${updated.status === 'Active' ? 'activated' : 'deactivated'}` });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Unable to update vendor status', message: error instanceof Error ? error.message : 'Please try again.' });
+    }
+  }
+
+  async function handleDelete(vendor: VendorRow) {
+    if (!vendor.persisted) return;
+    if (vendor.projects.length) {
+      showToast({ tone: 'error', title: 'Vendor is linked to a project', message: 'Deactivate this vendor instead of deleting it.' });
+      return;
+    }
+    if (!window.confirm(`Delete vendor ${vendor.name}? This action cannot be undone.`)) return;
+    try {
+      await deleteVendor(vendor.id);
+      setSavedVendors((current) => current.filter((item) => item.id !== vendor.id));
+      showToast({ tone: 'success', title: 'Vendor deleted' });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Unable to delete vendor', message: error instanceof Error ? error.message : 'Please try again.' });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f4f8ff] px-6 py-4 lg:px-8">
       <PageTopBar title="Vendors" subtitle="Manage suppliers and vendors used across R&D projects." searchValue={query} onSearchChange={setQuery} searchPlaceholder="Search vendors..." actionLabel="Add Vendor" onAction={() => setIsFormOpen(true)} />
@@ -355,7 +386,7 @@ export function VendorsPage() {
                       preferred: vendor.preferred,
                       status: vendor.status,
                       notes: vendor.notes || ''
-                    }); setIsFormOpen(true); }} />
+                    }); setIsFormOpen(true); }} onToggleStatus={() => handleStatusChange(vendor)} onDelete={() => handleDelete(vendor)} />
                   </td>
                 </tr>
               ))}
@@ -477,18 +508,46 @@ export function VendorsPage() {
   );
 }
 
-function VendorActions({ vendor, onEdit }: { vendor: VendorRow; onEdit: () => void }) {
+function VendorActions({ vendor, onEdit, onToggleStatus, onDelete }: { vendor: VendorRow; onEdit: () => void; onToggleStatus: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const linkedProject = vendor.projects[0];
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
+
+  function run(action: () => void) {
+    action();
+    setOpen(false);
+  }
+
+  function toggleMenu(event: React.MouseEvent<HTMLButtonElement>) {
+    const nextOpen = !open;
+    if (nextOpen) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      setMenuPosition({
+        top: bounds.bottom + 8,
+        left: Math.max(8, bounds.right - 208)
+      });
+    }
+    setOpen(nextOpen);
+  }
+
   return (
-    <div className="group relative inline-block">
-      <button className="grid h-9 w-9 place-items-center rounded-lg border border-[#d8e2f2] text-[#28406e] hover:bg-[#f4f8ff]" title="Vendor actions">
+    <div className="relative inline-block" onClick={(event) => event.stopPropagation()}>
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={toggleMenu} className={`grid h-9 w-9 place-items-center rounded-lg border border-[#d8e2f2] text-[#28406e] hover:bg-[#f4f8ff] ${open ? 'bg-[#f4f8ff]' : ''}`} title="Vendor actions">
         <MoreHorizontal size={18} />
       </button>
-      <div className="invisible absolute right-0 top-10 z-20 w-48 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
-        <button className="menu-action" onClick={onEdit}>View / Edit</button>
-        <button className="menu-action" disabled={!vendor.email} onClick={() => vendor.email && navigator.clipboard?.writeText(vendor.email)}>Copy Email</button>
-        {linkedProject ? <a className="menu-action" href={`/projects/${linkedProject.productCode}/overview`}>Open Linked Project</a> : <button className="menu-action" disabled>No linked project</button>}
-      </div>
+      {open ? createPortal(<div className="fixed z-[100] w-52 rounded-lg border border-slate-200 bg-white p-2 shadow-2xl" style={{ top: menuPosition.top, left: menuPosition.left }} role="menu">
+        <button className="menu-action" onClick={() => run(onEdit)}>View / Edit</button>
+        <button className="menu-action" onClick={() => run(onToggleStatus)}>{vendor.status === 'Active' ? 'Deactivate Vendor' : 'Activate Vendor'}</button>
+        <button className="menu-action" disabled={!vendor.email} onClick={() => run(() => { if (vendor.email) navigator.clipboard?.writeText(vendor.email); })}>Copy Email</button>
+        {linkedProject ? <a className="menu-action" href={`/projects/${linkedProject.productCode}/overview`} onClick={() => setOpen(false)}>Open Linked Project</a> : <button className="menu-action" disabled>No linked project</button>}
+        <button className="menu-action text-rose-600" disabled={!vendor.persisted || vendor.projects.length > 0} title={vendor.projects.length ? 'Deactivate linked vendors instead' : undefined} onClick={() => run(onDelete)}>Delete Vendor</button>
+      </div>, document.body) : null}
     </div>
   );
 }

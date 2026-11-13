@@ -220,7 +220,7 @@ body {
 }
 
 .workspace-compact {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .workspace-compact .text-3xl {
@@ -229,33 +229,33 @@ body {
 }
 
 .workspace-compact .text-2xl {
-  font-size: 1rem;
+  font-size: 1.08rem;
   line-height: 1.35rem;
 }
 
 .workspace-compact .text-xl {
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   line-height: 1.25rem;
 }
 
 .workspace-compact .text-lg {
-  font-size: 0.9rem;
+  font-size: 0.96rem;
   line-height: 1.25rem;
 }
 
 .workspace-compact .text-base,
 .workspace-compact .text-\[15px\] {
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   line-height: 1.2rem;
 }
 
 .workspace-compact .text-sm {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.05rem;
 }
 
 .workspace-compact .text-xs {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   line-height: 0.95rem;
 }
 

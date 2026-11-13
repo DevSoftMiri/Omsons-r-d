@@ -15,7 +15,7 @@ import { useToast } from '../../components/ToastProvider';
 import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFields';
 
 const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
-const categoryOptions = ['Beaker', 'Flask', 'Condenser', 'Pipette', 'Tube'];
+const categoryOptions = ['Instrument', 'Glassware', 'Plasticware', 'Beaker', 'Flask', 'Condenser', 'Pipette', 'Tube'];
 
 const projectSchema = z.object({
   name: z.string().min(3),
