@@ -131,6 +131,7 @@ export function VendorsPage() {
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const projects = useAppSelector((state) => state.projects.projects);
+  const user = useAppSelector((state) => state.auth.user);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<(typeof categoryOptions)[number]>('All Categories');
   const [statusFilter, setStatusFilter] = useState<(typeof statusOptions)[number]>('All Status');
