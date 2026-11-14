@@ -24,6 +24,7 @@ import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
 import { getMissingFields, showMissingFieldsToast } from '../../../utils/requiredFields';
 import { useProjectWorkspace } from './context';
@@ -84,17 +85,14 @@ export function Programming() {
   const [deleteProgram, setDeleteProgram] = useState<Program | null>(null);
   const [showReferences, setShowReferences] = useState(false);
 
-  useEffect(() => {
-    setSaveState('Saving...');
-    if (!loaded.current) return;
-    const timeout = window.setTimeout(() => {
-      const timestamp = new Date().toISOString();
-      void updateProjectModule(project.productCode, 'programming', { programs, references, notes, lastSaved: timestamp })
-        .then(() => { setLastSaved(timestamp); setSaveState('Saved'); })
-        .catch(() => setSaveState('Saving...'));
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [notes, programs, references, project.productCode]);
+  useDebouncedAutosave({
+    value: { programs, references, notes },
+    enabled: loaded.current,
+    save: (value) => updateProjectModule(project.productCode, 'programming', { ...value, lastSaved: new Date().toISOString() }),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { updatedAt?: string }).updatedAt || new Date().toISOString()); setSaveState('Saved'); },
+    onError: () => setSaveState('Saving...')
+  });
 
   useEffect(() => {
     let active = true;
@@ -289,7 +287,7 @@ export function Programming() {
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid program file or mark a program Ready before completing this stage.</p> : null}
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Add at least one valid program file or mark a program Ready before completing this stage.</p>
           <button className={`primary-button h-10 min-w-64 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Programming Complete

@@ -6,6 +6,7 @@ import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import {
   makePrototypeEntry,
@@ -60,21 +61,14 @@ export function Prototyping() {
     };
   }, [project.productCode]);
 
-  useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-
-    setSaveState('Saving...');
-    const timeout = window.setTimeout(() => {
-      void savePrototyping(project.productCode, { entries })
-        .then((saved) => { setLastSaved(saved.lastSaved); setSaveState('Saved'); })
-        .catch(() => setSaveState('Saving...'));
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [entries, project.productCode]);
+  useDebouncedAutosave({
+    value: { entries },
+    enabled: didMount.current,
+    save: (value) => savePrototyping(project.productCode, value),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { lastSaved: string }).lastSaved); setSaveState('Saved'); },
+    onError: () => setSaveState('Saving...')
+  });
 
   const missingFields = useMemo(() => getMissingFields([
     { label: 'Prototype Entry', valid: entries.length > 0 },
@@ -196,7 +190,7 @@ export function Prototyping() {
           </span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Fill required prototype fields and complete previous stages before completing this stage.</p> : null}
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Fill required prototype fields and complete previous stages before completing this stage.</p>
           <button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Prototyping Complete

@@ -20,6 +20,7 @@ import { StageResponseBuilder } from '../../../components/stageResponses/StageRe
 import { useToast } from '../../../components/ToastProvider';
 import { useAppDispatch } from '../../../hooks';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { updateProjectStatus } from '../../../services/projectService';
 import { upsertProject } from '../../../store';
 import type { Stage } from '../../../types';
@@ -76,35 +77,14 @@ export function FinalStage() {
     null,
   );
 
-  useEffect(() => {
-    setSaveState('Saving...');
-    if (!loaded.current) return;
-    const timeout = window.setTimeout(() => {
-      const timestamp = new Date().toISOString();
-      void updateProjectModule(project.productCode, 'final-stage', {
-          summary,
-          issues,
-          decision,
-          documents,
-          approved,
-          approvedBy,
-          approvedAt,
-          comments,
-          lastSaved: timestamp,
-        }).then(() => { setLastSaved(timestamp); setSaveState('Saved'); }).catch(() => setSaveState('Saving...'));
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [
-    approved,
-    approvedAt,
-    approvedBy,
-    comments,
-    decision,
-    documents,
-    issues,
-    project.productCode,
-    summary,
-  ]);
+  useDebouncedAutosave({
+    value: { summary, issues, decision, documents, approved, approvedBy, approvedAt, comments },
+    enabled: loaded.current,
+    save: (value) => updateProjectModule(project.productCode, 'final-stage', { ...value, lastSaved: new Date().toISOString() }),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { updatedAt?: string }).updatedAt || new Date().toISOString()); setSaveState('Saved'); },
+    onError: () => setSaveState('Saving...')
+  });
 
   useEffect(() => {
     let active = true;

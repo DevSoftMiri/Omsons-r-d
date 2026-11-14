@@ -41,21 +41,28 @@ export function Benchmarking() {
   const [importing, setImporting] = useState(false);
   const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; table: BenchmarkingTableData } | null>(null);
   const [sheetName, setSheetName] = useState('');
+  const workbookRef = useRef<BenchmarkingWorkbook>(emptyWorkbook);
   const saveInFlight = useRef<Promise<void>>(Promise.resolve());
-  const saveTimer = useRef<number | null>(null);
-  const dirtyTables = useRef<Set<string>>(new Set());
+  const saveBusy = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const pendingSave = useRef<{ snapshot: BenchmarkingWorkbook; version: number } | null>(null);
+  const dirtyTableVersions = useRef(new Map<string, number>());
+  const saveVersion = useRef(0);
 
   useEffect(() => {
     let active = true;
     fetchBenchmarking(project.productCode)
       .then((data) => {
         if (!active) return;
-        setWorkbook(normalizeWorkbook(data));
+        const loaded = normalizeWorkbook(data);
+        workbookRef.current = loaded;
+        setWorkbook(loaded);
         setSaveStatus('saved');
         setLastSaved(data.updatedAt || new Date().toISOString());
       })
       .catch((error) => {
         if (!active) return;
+        workbookRef.current = emptyWorkbook;
         setWorkbook(emptyWorkbook);
         setMessage(error instanceof Error ? error.message : 'Unable to load benchmarking data');
         setSaveStatus('failed');
@@ -70,44 +77,74 @@ export function Benchmarking() {
   const hasMeaningfulData = useMemo(() => workbook.tables.some((table) => table.rows.some((row) => Object.values(row.cells).some((value) => value.trim()))), [workbook.tables]);
   const canComplete = workbook.tables.length > 0 && hasMeaningfulData && saveStatus === 'saved';
 
-  function scheduleSave(table: BenchmarkingTableData, tablesSnapshot: BenchmarkingTableData[]) {
-    dirtyTables.current.add(table._id);
+  function scheduleSave(table: BenchmarkingTableData, snapshot: BenchmarkingWorkbook) {
+    const version = ++saveVersion.current;
+    dirtyTableVersions.current.set(table._id, version);
+    pendingSave.current = { snapshot, version };
     setSaveStatus('saving');
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(async () => {
-      const tablesToSave = tablesSnapshot.filter((candidate) => dirtyTables.current.has(candidate._id));
-      const operation = (async () => {
+    saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = null;
+      void flushSave();
+    }, 250);
+  }
+
+  async function flushSave() {
+    if (saveBusy.current) return;
+    const pending = pendingSave.current;
+    if (!pending) return;
+    pendingSave.current = null;
+    const dirtyIds = [...dirtyTableVersions.current.entries()];
+    const tablesToSave = pending.snapshot.tables.filter((candidate) => dirtyIds.some(([id]) => id === candidate._id));
+    saveBusy.current = true;
+    const operation = (async () => {
       try {
-        let updated = workbook;
         for (const tableToSave of tablesToSave) {
-          updated = normalizeWorkbook(await updateBenchmarkingTable(project.productCode, tableToSave));
+          await updateBenchmarkingTable(project.productCode, tableToSave);
         }
-        dirtyTables.current.clear();
-        setWorkbook(updated);
-        setSaveStatus('saved');
-        setLastSaved(new Date().toISOString());
-        setMessage('');
+        for (const [id, version] of dirtyIds) {
+          if (dirtyTableVersions.current.get(id) === version) dirtyTableVersions.current.delete(id);
+        }
+        if (!pendingSave.current && dirtyTableVersions.current.size === 0) {
+          setSaveStatus('saved');
+          setLastSaved(new Date().toISOString());
+          setMessage('');
+        }
       } catch (error) {
         setSaveStatus('failed');
         setMessage(error instanceof Error ? error.message : 'Save failed');
       }
-      })();
-      saveInFlight.current = operation;
-      await operation;
-    }, 700);
+    })();
+    saveInFlight.current = operation;
+    await operation;
+    saveBusy.current = false;
+    saveInFlight.current = Promise.resolve();
+    if (pendingSave.current) void flushSave();
+  }
+
+  async function flushPendingSaves() {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      void flushSave();
+    }
+    await saveInFlight.current;
+    if (pendingSave.current) await flushSave();
   }
 
   function updateTable(table: BenchmarkingTableData) {
-    setWorkbook((current) => {
-      const tables = current.tables.map((candidate) => candidate._id === table._id ? table : candidate);
-      scheduleSave(table, tables);
-      return { ...current, reviewStatus: 'draft', tables };
-    });
+    const current = workbookRef.current;
+    const next = { ...current, reviewStatus: 'draft' as const, tables: current.tables.map((candidate) => candidate._id === table._id ? table : candidate) };
+    workbookRef.current = next;
+    setWorkbook(next);
+    scheduleSave(table, next);
   }
 
   async function createTable(values: { name: string; initialColumns: number; initialRows: number; importedTable?: BenchmarkingTableData }) {
     try {
-      setWorkbook(normalizeWorkbook(await createBenchmarkingTable(project.productCode, values)));
+      const created = normalizeWorkbook(await createBenchmarkingTable(project.productCode, values));
+      workbookRef.current = created;
+      setWorkbook(created);
       setShowAddModal(false);
       setSaveStatus('saved');
       setLastSaved(new Date().toISOString());
@@ -122,7 +159,9 @@ export function Benchmarking() {
     if (!deleteTarget) return;
     try {
       await deleteBenchmarkingTable(project.productCode, deleteTarget._id);
-      setWorkbook((current) => ({ ...current, tables: current.tables.filter((table) => table._id !== deleteTarget._id) }));
+      const next = { ...workbookRef.current, tables: workbookRef.current.tables.filter((table) => table._id !== deleteTarget._id) };
+      workbookRef.current = next;
+      setWorkbook(next);
       setDeleteTarget(null);
       setLastSaved(new Date().toISOString());
       setSaveStatus('saved');
@@ -136,7 +175,9 @@ export function Benchmarking() {
     try {
       const imported = importWorksheet(source, name, table);
       const result = await updateBenchmarkingTable(project.productCode, imported);
-      setWorkbook(normalizeWorkbook(result));
+      const updated = normalizeWorkbook(result);
+      workbookRef.current = updated;
+      setWorkbook(updated);
       setSelectedCell(null);
       setSaveStatus('saved');
       setLastSaved(new Date().toISOString());
@@ -154,16 +195,8 @@ export function Benchmarking() {
     setImporting(true);
     setMessage('');
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    const pendingIds = new Set(dirtyTables.current);
     try {
-      await saveInFlight.current;
-      // Flush unsaved edits before replacing a table, including edits in other tables.
-      for (const candidate of workbook.tables) {
-        if (pendingIds.has(candidate._id)) {
-          await updateBenchmarkingTable(project.productCode, candidate);
-        }
-      }
-      dirtyTables.current.clear();
+      await flushPendingSaves();
       setLastSaved(new Date().toISOString());
       setSaveStatus('saved');
       const source = await readSpreadsheet(file);
@@ -176,7 +209,7 @@ export function Benchmarking() {
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Import failed');
-      if (dirtyTables.current.size) setSaveStatus('failed');
+      if (saveBusy.current || pendingSave.current) setSaveStatus('failed');
       setImporting(false);
     }
   }
@@ -300,7 +333,7 @@ export function Benchmarking() {
             Mark Benchmarking Complete
           </button>
         </div>
-        {!canComplete ? <p className="mt-2 text-right text-sm text-slate-500">Create at least one table, enter data, and save changes before completing.</p> : null}
+        <p className={`mt-2 h-5 overflow-hidden text-right text-sm text-slate-500 ${canComplete ? 'invisible' : ''}`}>Create at least one table, enter data, and save changes before completing.</p>
       </section>
     </fieldset>
     {importing ? <p className="mt-3 text-sm text-slate-600" role="status">{sheetPicker ? 'Choose a worksheet to continue.' : 'Importing spreadsheet?'}</p> : null}

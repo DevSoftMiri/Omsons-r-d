@@ -36,31 +36,37 @@ export function BenchmarkingTable({
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(table.name);
   const [fullscreen, setFullscreen] = useState(false);
+  const tableRef = useRef(table);
 
   useEffect(() => {
+    tableRef.current = table;
     setDraftName(table.name);
-  }, [table.name]);
+  }, [table]);
 
   const history = useRef<{ past: BenchmarkingTableData[]; future: BenchmarkingTableData[] }>({ past: [], future: [] });
   function onChangeTable(next: BenchmarkingTableData) {
-    history.current.past.push(table);
-    const historyLimit = Math.max(2, Math.min(100, Math.floor(200000 / Math.max(1, table.rows.length * table.columns.length))));
+    const current = tableRef.current;
+    history.current.past.push(current);
+    const historyLimit = Math.max(2, Math.min(100, Math.floor(200000 / Math.max(1, current.rows.length * current.columns.length))));
     while (history.current.past.length > historyLimit) history.current.past.shift();
     history.current.future = [];
+    tableRef.current = next;
     persistTable(next);
   }
   function travel(redo: boolean) {
     const source = redo ? history.current.future : history.current.past;
     const next = source.pop();
     if (!next) return;
-    (redo ? history.current.past : history.current.future).push(table);
+    (redo ? history.current.past : history.current.future).push(tableRef.current);
+    tableRef.current = next;
     persistTable(next);
   }
 
   function updateCell(rowId: string, columnId: string, value: string) {
+    const current = tableRef.current;
     onChangeTable({
-      ...table,
-      rows: table.rows.map((row) => row.id === rowId ? { ...row, literalCells: row.literalCells?.filter(id => id !== columnId), cells: { ...row.cells, [columnId]: value } } : row)
+      ...current,
+      rows: current.rows.map((row) => row.id === rowId ? { ...row, literalCells: row.literalCells?.filter(id => id !== columnId), cells: { ...row.cells, [columnId]: value } } : row)
     });
   }
 

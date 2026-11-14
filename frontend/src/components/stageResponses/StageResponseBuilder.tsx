@@ -39,6 +39,11 @@ export function StageResponseBuilder({
   const uploadingFileKeys = useRef(new Set<string>());
   const { showToast } = useToast();
   const [blocks, setBlocks] = useState<StageResponseBlock[]>([]);
+  const blocksRef = useRef<StageResponseBlock[]>([]);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSave = useRef<StageResponseBlock[] | null>(null);
+  const changeVersion = useRef(0);
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
   const [attachmentNote, setAttachmentNote] = useState('');
   const [sheetPicker, setSheetPicker] = useState<{ source: WorkBook; block: StageTableBlock; table: BenchmarkingTableData } | null>(null);
@@ -48,7 +53,11 @@ export function StageResponseBuilder({
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
 
   useEffect(() => {
-    readStageResponses(projectCode, stageName).then(setBlocks).catch(() => undefined);
+    readStageResponses(projectCode, stageName).then((next) => {
+      if (changeVersion.current > 0) return;
+      blocksRef.current = next;
+      setBlocks(next);
+    }).catch(() => undefined);
     let active = true;
     fetchProjectAttachments(projectCode, stageName)
       .then((items) => {
@@ -64,7 +73,15 @@ export function StageResponseBuilder({
     function handleResponseUpdate(event: Event) {
       const detail = (event as CustomEvent<{ projectCode: string; stageName: string; newBlockId?: string }>).detail;
       if (detail?.projectCode !== projectCode || detail.stageName !== stageName) return;
-      void readStageResponses(projectCode, stageName).then(setBlocks);
+      const snapshot = (event as CustomEvent<{ projectCode: string; stageName: string; blocks?: StageResponseBlock[]; version?: number }>).detail;
+      if (snapshot.version !== undefined && snapshot.version <= changeVersion.current) return;
+      if (snapshot.blocks) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        pendingSave.current = null;
+        changeVersion.current = snapshot.version ?? changeVersion.current;
+        blocksRef.current = snapshot.blocks;
+        setBlocks(snapshot.blocks);
+      }
       if (detail.newBlockId) setNewBlockId(detail.newBlockId);
     }
     window.addEventListener('stage-response-updated', handleResponseUpdate);
@@ -73,22 +90,45 @@ export function StageResponseBuilder({
 
   function persist(nextBlocks: StageResponseBlock[], newBlockId?: string) {
     const saved = nextBlocks;
+    const version = ++changeVersion.current;
+    blocksRef.current = saved;
     setBlocks(saved);
-    void saveStageResponses(projectCode, stageName, nextBlocks).catch(() => {
-      showToast({ tone: 'error', title: 'Save failed', message: 'Stage response changes could not be saved.' });
-    });
+    pendingSave.current = saved;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      const snapshot = pendingSave.current;
+      if (!snapshot) return;
+      pendingSave.current = null;
+      saveQueue.current = saveQueue.current
+        .catch(() => undefined)
+        .then(() => saveStageResponses(projectCode, stageName, snapshot))
+        .then(() => undefined)
+        .catch(() => {
+          showToast({ tone: 'error', title: 'Save failed', message: 'Stage response changes could not be saved.' });
+        });
+    }, 500);
     window.dispatchEvent(new CustomEvent('stage-response-updated', {
-      detail: { projectCode, stageName, newBlockId }
+      detail: { projectCode, stageName, newBlockId, blocks: saved, version }
     }));
   }
+
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const snapshot = pendingSave.current;
+    if (snapshot) {
+      pendingSave.current = null;
+      saveQueue.current = saveQueue.current.then(() => saveStageResponses(projectCode, stageName, snapshot)).then(() => undefined).catch(() => undefined);
+    }
+  }, [projectCode, stageName]);
 
   function addBlock(type: StageResponseBlock['type']) {
     const now = new Date().toISOString();
     const base = { id: makeStageResponseId(type), createdAt: now, updatedAt: now };
-    if (type === 'table') persist([...blocks, { ...base, type, title: 'Table', table: makeStageResponseTable('Table') }], base.id);
-    if (type === 'text') persist([...blocks, { ...base, type, title: 'Text Area', value: '' }], base.id);
-    if (type === 'checklist') persist([...blocks, { ...base, type, title: 'Checklist', items: [] }], base.id);
-    if (type === 'file') persist([...blocks, { ...base, type, title: 'Files' }], base.id);
+    if (type === 'table') persist([...blocksRef.current, { ...base, type, title: 'Table', table: makeStageResponseTable('Table') }], base.id);
+    if (type === 'text') persist([...blocksRef.current, { ...base, type, title: 'Text Area', value: '' }], base.id);
+    if (type === 'checklist') persist([...blocksRef.current, { ...base, type, title: 'Checklist', items: [] }], base.id);
+    if (type === 'file') persist([...blocksRef.current, { ...base, type, title: 'Files' }], base.id);
     showToast({ tone: 'success', title: `${type[0].toUpperCase()}${type.slice(1)} added`, message: 'You can edit it below.' });
   }
 
@@ -99,13 +139,14 @@ export function StageResponseBuilder({
   }, [blocks, newBlockId]);
 
   function updateBlock(updated: StageResponseBlock) {
-    persist(blocks.map((block) => block.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : block));
+    const next = blocksRef.current.map((block) => block.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : block);
+    persist(next);
   }
 
   function deleteBlock(blockId: string) {
-    const block = blocks.find((candidate) => candidate.id === blockId);
+    const block = blocksRef.current.find((candidate) => candidate.id === blockId);
     if (!window.confirm(`Are you sure you want to delete ${block?.title || 'this section'}?`)) return;
-    persist(blocks.filter((block) => block.id !== blockId));
+    persist(blocksRef.current.filter((block) => block.id !== blockId));
     showToast({ tone: 'success', title: 'Section deleted', message: 'The section was removed from this stage.' });
   }
 
@@ -115,13 +156,14 @@ export function StageResponseBuilder({
       setDraggedBlockId(null);
       return;
     }
-    const sourceIndex = blocks.findIndex((block) => block.id === draggedBlockId);
-    const targetIndex = blocks.findIndex((block) => block.id === targetBlockId);
+    const currentBlocks = blocksRef.current;
+    const sourceIndex = currentBlocks.findIndex((block) => block.id === draggedBlockId);
+    const targetIndex = currentBlocks.findIndex((block) => block.id === targetBlockId);
     if (sourceIndex < 0 || targetIndex < 0) {
       setDraggedBlockId(null);
       return;
     }
-    const reordered = [...blocks];
+    const reordered = [...currentBlocks];
     const [movedBlock] = reordered.splice(sourceIndex, 1);
     const insertionIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
     reordered.splice(insertionIndex, 0, movedBlock);
@@ -130,7 +172,8 @@ export function StageResponseBuilder({
   }
 
   function updateTable(block: StageTableBlock, table: BenchmarkingTableData) {
-    updateBlock({ ...block, title: table.name, table });
+    const current = blocksRef.current.find((candidate): candidate is StageTableBlock => candidate.id === block.id && candidate.type === 'table');
+    if (current) updateBlock({ ...current, title: table.name, table });
   }
 
   function exportCsv(table: BenchmarkingTableData) {
@@ -282,7 +325,7 @@ export function StageResponseBuilder({
                 onDrop={(event) => handleDrop(event, block.id)}
               >
                 <BlockHeader block={block} index={index} onChange={updateBlock} onDelete={() => deleteBlock(block.id)} onDragStart={() => setDraggedBlockId(block.id)} onDragEnd={() => setDraggedBlockId(null)} />
-                {block.type === 'text' ? <textarea className="field mt-3 min-h-32 resize-y bg-white" value={block.value} onChange={(event) => updateBlock({ ...block, value: event.target.value })} /> : null}
+                {block.type === 'text' ? <StageTextBlock block={block} onChange={updateBlock} /> : null}
                 {block.type === 'checklist' ? <ChecklistBlock block={block} onChange={updateBlock} /> : null}
                 {block.type === 'table' ? <div className="mt-3"><BenchmarkingTable index={index} table={block.table} selectedCell={selectedCell} onSelectCell={setSelectedCell} onChangeTable={(table) => updateTable(block, table)} onImportCsv={(table, file) => importCsv(block, table, file)} onExportCsv={exportCsv} onDeleteTable={() => deleteBlock(block.id)} editableColumnLabels /></div> : null}
                 {block.type === 'file' ? <FileBlock attachments={attachmentsForSection(block.id)} note={attachmentNote} onNoteChange={setAttachmentNote} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id, attachmentNote)} /> : null}
@@ -324,9 +367,7 @@ export function StageResponseBuilder({
                   onDragStart={() => setDraggedBlockId(block.id)}
                   onDragEnd={() => setDraggedBlockId(null)}
                 />
-                {block.type === 'text' ? (
-                  <textarea className="field mt-3 min-h-32 resize-y bg-white" value={block.value} onChange={(event) => updateBlock({ ...block, value: event.target.value })} />
-              ) : null}
+                {block.type === 'text' ? <StageTextBlock block={block} onChange={updateBlock} /> : null}
               {block.type === 'checklist' ? <ChecklistBlock block={block} onChange={updateBlock} /> : null}
               {block.type === 'table' ? (
                 <div className="mt-3">
@@ -355,6 +396,29 @@ export function StageResponseBuilder({
         <input className="sr-only" type="file" accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} />
       ) : null}
     </div>
+  );
+}
+
+function StageTextBlock({ block, onChange }: { block: Extract<StageResponseBlock, { type: 'text' }>; onChange: (block: Extract<StageResponseBlock, { type: 'text' }>) => void }) {
+  const [draft, setDraft] = useState(block.value);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current || block.value !== draft) setDraft(block.value);
+  }, [block.value]);
+
+  return (
+    <textarea
+      className="field mt-3 min-h-32 resize-y bg-white"
+      value={draft}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => { focused.current = false; }}
+      onChange={(event) => {
+        const next = event.target.value;
+        setDraft(next);
+        onChange({ ...block, value: next });
+      }}
+    />
   );
 }
 

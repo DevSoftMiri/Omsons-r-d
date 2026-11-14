@@ -9,6 +9,7 @@ import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { readProductSpecifications } from '../../../services/productSpecificationsService';
 import { fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import { resolveFileUrl } from '../../../utils/fileActions';
@@ -71,18 +72,14 @@ export function TestingValidation() {
     return () => { active = false; };
   }, [project.productCode]);
 
-  useEffect(() => {
-    if (!backendReady) return;
-    if (!hasTestingValidationBackend() || !canEditTestValues) return;
-    setSaveState('Saving...');
-    const timeout = window.setTimeout(() => {
-      void saveTestingValidation(project.productCode, tables)
-        .then((workbook) => { setLastSaved(workbook.updatedAt || new Date().toISOString()); setSaveState('Saved'); })
-        .catch(() => setSaveState('Saving...'));
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [backendReady, canEditTestValues, project.productCode, tables]);
+  useDebouncedAutosave({
+    value: tables,
+    enabled: backendReady && hasTestingValidationBackend() && canEditTestValues,
+    save: (value) => saveTestingValidation(project.productCode, value),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { updatedAt?: string }).updatedAt || new Date().toISOString()); setSaveState('Saved'); },
+    onError: () => setSaveState('Saving...')
+  });
 
   useEffect(() => {
     let active = true;
@@ -208,7 +205,7 @@ export function TestingValidation() {
           </span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add validation data, save changes and resolve failed results before completing this stage.</p> : null}
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Add validation data, save changes and resolve failed results before completing this stage.</p>
           <button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Testing & Validation Complete

@@ -7,6 +7,7 @@ import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import {
   readProductSpecifications,
   fetchProductSpecifications,
@@ -39,21 +40,14 @@ export function ProductSpecifications() {
     return () => { active = false; };
   }, [project.productCode]);
 
-  useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-
-    setSaveState('Saving...');
-    const timeout = window.setTimeout(() => {
-      void saveProductSpecifications(project.productCode, { summary, rows })
-        .then((saved) => { setLastSaved(saved.lastSaved); setSaveState('Saved'); })
-        .catch(() => setSaveState('Saved'));
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [project.productCode, rows, summary]);
+  useDebouncedAutosave({
+    value: { summary, rows },
+    enabled: didMount.current,
+    save: (value) => saveProductSpecifications(project.productCode, value),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { lastSaved: string }).lastSaved); setSaveState('Saved'); },
+    onError: () => setSaveState('Saved')
+  });
 
   const hasSpecifications = useMemo(
     () => rows.some((row) => row.parameter.trim() && row.specification.trim()),
@@ -152,7 +146,7 @@ export function ProductSpecifications() {
           </span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add technical specifications and save changes before completing this stage.</p> : null}
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Add technical specifications and save changes before completing this stage.</p>
           <button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Product Specifications Complete

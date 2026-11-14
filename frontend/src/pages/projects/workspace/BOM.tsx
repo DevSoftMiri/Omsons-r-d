@@ -12,6 +12,7 @@ import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
 import { StageResponseBuilder } from '../../../components/stageResponses/StageResponseBuilder';
 import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
+import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
 import { fetchBomWorkspace, updateBomWorkspace } from '../../../services/projectService';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
@@ -287,21 +288,14 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     };
   }, [project.productCode]);
 
-  useEffect(() => {
-    if (!workspaceLoaded) return;
-    setSaveState('Saving...');
-    const timeout = window.setTimeout(() => {
-      const timestamp = new Date().toISOString();
-      const data = { rows, baseColumnWidths, electricalRows, electricalColumnSettings, electricalCustomColumns, mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, electricalTables, mechanicalTables, notes, lastSaved: timestamp };
-      updateBomWorkspace(project.productCode, data)
-        .then(({ updatedAt }) => {
-          setLastSaved(updatedAt);
-          setSaveState('Saved');
-        })
-        .catch(() => setSaveState('Save failed'));
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [baseColumnWidths, electricalColumnSettings, electricalCustomColumns, electricalRows, electricalTables, mechanicalColumnSettings, mechanicalCustomColumns, mechanicalRows, mechanicalTables, notes, project.productCode, rows, workspaceLoaded]);
+  useDebouncedAutosave({
+    value: { rows, baseColumnWidths, electricalRows, electricalColumnSettings, electricalCustomColumns, mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, electricalTables, mechanicalTables, notes },
+    enabled: workspaceLoaded,
+    save: (value) => updateBomWorkspace(project.productCode, { ...value, lastSaved: new Date().toISOString() }),
+    onSaving: () => setSaveState('Saving...'),
+    onSaved: (result) => { setLastSaved((result as { updatedAt: string }).updatedAt); setSaveState('Saved'); },
+    onError: () => setSaveState('Save failed')
+  });
 
   useEffect(() => {
     let active = true;
@@ -1514,7 +1508,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-600" />{saveState}</span>
         </div>
         <div className="text-right">
-          {!canComplete ? <p className="mb-2 text-sm font-semibold text-amber-700">Add at least one valid {isElectricalStage ? 'electrical BOM' : isHighLevelBomStage ? 'electrical and mechanical BOM' : isMechanicalStage ? 'mechanical BOM' : 'BOM'} item to complete this stage.</p> : null}
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Add at least one valid {isElectricalStage ? 'electrical BOM' : isHighLevelBomStage ? 'electrical and mechanical BOM' : isMechanicalStage ? 'mechanical BOM' : 'BOM'} item to complete this stage.</p>
           <button className={`primary-button h-10 min-w-60 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}><Check size={18} />Mark {currentStage} Complete</button>
         </div>
       </section>

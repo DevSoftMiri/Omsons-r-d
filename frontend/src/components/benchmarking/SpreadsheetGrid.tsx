@@ -269,7 +269,11 @@ export function SpreadsheetGrid({
       }
       return;
     }
-    if (key === 'delete' || key === 'backspace') { stop(); changeRange(row, column, () => ''); return; }
+    if (key === 'backspace' && !editing) {
+      setEditing({ row, column, original: table.rows[row].cells[table.columns[column].id] || '' });
+      return;
+    }
+    if (key === 'delete') { stop(); changeRange(row, column, () => ''); return; }
     const direction = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[event.key];
     if (direction && !ctrl && !event.altKey) { stop(); focusCell(row + direction[0], column + direction[1], event.shiftKey); return; }
     if (!ctrl && !event.altKey && event.key.length === 1) {
