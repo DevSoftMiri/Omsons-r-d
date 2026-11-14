@@ -1,6 +1,6 @@
 import { ExcelTableActions } from '../../../components/benchmarking/ExcelTableActions';
 import { dataTable, tableRecords } from '../../../components/benchmarking/structuredTableExcel';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectStageHeader } from '../../../components/ProjectStageHeader';
@@ -26,7 +26,7 @@ export function ProductSpecifications() {
   const [rows, setRows] = useState(initial.rows);
   const [lastSaved, setLastSaved] = useState(initial.lastSaved);
   const [saveState, setSaveState] = useState<'Saving...' | 'Saved'>('Saved');
-  const didMount = useRef(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -35,14 +35,18 @@ export function ProductSpecifications() {
       setSummary(saved.summary);
       setRows(saved.rows);
       setLastSaved(saved.lastSaved);
-      didMount.current = true;
-    }).catch(() => undefined);
+      setLoaded(true);
+    }).catch(() => {
+      // A failed read should not permanently disable autosave. The local
+      // defaults are still valid data to send on the first edit.
+      setLoaded(true);
+    });
     return () => { active = false; };
   }, [project.productCode]);
 
   useDebouncedAutosave({
     value: { summary, rows },
-    enabled: didMount.current,
+    enabled: loaded,
     save: (value) => saveProductSpecifications(project.productCode, value),
     onSaving: () => setSaveState('Saving...'),
     onSaved: (result) => { setLastSaved((result as { lastSaved: string }).lastSaved); setSaveState('Saved'); },

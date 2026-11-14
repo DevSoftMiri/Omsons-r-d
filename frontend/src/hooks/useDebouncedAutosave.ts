@@ -18,6 +18,10 @@ export function useDebouncedAutosave<T>({ value, enabled, save, onSaving, onSave
   const pendingRef = useRef<T | null>(null);
   const inFlightRef = useRef(false);
   const generationRef = useRef(0);
+  // Callers commonly build the value object inline. Track its contents rather
+  // than its object identity, otherwise onSaving() causes a rerender which
+  // continuously restarts the debounce timer and leaves the UI on Saving....
+  const valueKey = JSON.stringify(value);
 
   valueRef.current = value;
   saveRef.current = save;
@@ -38,7 +42,7 @@ export function useDebouncedAutosave<T>({ value, enabled, save, onSaving, onSave
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = null;
     };
-  }, [value, enabled, delay]);
+  }, [valueKey, enabled, delay]);
 
   async function flush(generation: number) {
     if (inFlightRef.current || pendingRef.current === null) return;
