@@ -9,6 +9,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TeamMembersPage } from './pages/TeamMembersPage';
 import { VendorsPage } from './pages/VendorsPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { CreateProject } from './pages/projects/CreateProject';
 import { ProjectsPage } from './pages/projects/ProjectsPage';
 import { Attachments } from './pages/projects/workspace/Attachments';
@@ -75,6 +76,7 @@ export function App() {
         <Route path="projects/create" element={<CreateProject />} />
         <Route path="team" element={user.role === 'admin' ? <TeamMembersPage /> : <Navigate to="/dashboard" replace />} />
         <Route path="vendors" element={<VendorsPage />} />
+        <Route path="inventory" element={<InventoryPage />} />
         <Route path="certificates" element={<CertificatesPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={user.role === 'auditor' ? <Navigate to="/dashboard" replace /> : <SettingsPage />} />

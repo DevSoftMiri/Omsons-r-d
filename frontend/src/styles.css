@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keep numeric fields clean and consistent with the rest of the form. */
+.field[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.field[type='number']::-webkit-inner-spin-button,
+.field[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .stage-section-order-controls {
   position: absolute;
   top: 0.75rem;

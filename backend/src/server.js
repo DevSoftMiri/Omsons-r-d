@@ -5,6 +5,7 @@ import projectRoutes from './routes/projectRoutes.js';
 import vendorRoutes from './routes/vendorRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import inventoryRoutes from './routes/inventoryRoutes.js';
 import testingValidationRoutes from './routes/testingValidationRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/vendors', vendorRoutes);
   app.use('/api/reports', reportRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/inventory', inventoryRoutes);
   app.use('/api/projects', testingValidationRoutes);
 
   app.use(notFound);

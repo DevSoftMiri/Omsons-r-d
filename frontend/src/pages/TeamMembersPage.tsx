@@ -1,4 +1,4 @@
-import { ChevronDown, Crown, Eye, EyeOff, FolderOpen, KeyRound, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, UserRound, UsersRound, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Crown, Eye, EyeOff, FolderOpen, KeyRound, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, UserRound, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PageTopBar } from '../components/PageTopBar';
@@ -53,12 +53,19 @@ export function TeamMembersPage() {
   }, [dispatch]);
 
   async function refreshData() {
-    const [projectItems, accountItems] = await Promise.all([
-      fetchProjects().catch(() => projects),
-      fetchStaffAccounts().catch(() => staffAccounts)
-    ]);
-    dispatch(setProjects(projectItems));
-    setStaffAccounts(accountItems);
+    const [projectResult, accountResult] = await Promise.allSettled([fetchProjects(), fetchStaffAccounts()]);
+    if (projectResult.status === 'fulfilled') {
+      dispatch(setProjects(projectResult.value));
+    } else {
+      dispatch(setProjects([]));
+      showToast({ tone: 'error', title: 'Projects could not be loaded', message: projectResult.reason instanceof Error ? projectResult.reason.message : 'Refresh the page and try again.' });
+    }
+    if (accountResult.status === 'fulfilled') {
+      setStaffAccounts(accountResult.value);
+    } else {
+      setStaffAccounts([]);
+      showToast({ tone: 'error', title: 'Team members could not be loaded', message: accountResult.reason instanceof Error ? accountResult.reason.message : 'Refresh the page and try again.' });
+    }
   }
 
   const members = useMemo<TeamRow[]>(() => staffAccounts.map((account) => {
@@ -95,13 +102,23 @@ export function TeamMembersPage() {
 
   async function assignProject(member: TeamRow, projectId: string) {
     if (!projectId) return;
-    try {
-      const updated = await addProjectTeamMember(projectId, member._id);
-      dispatch(upsertProject(updated));
-      showToast({ tone: 'success', title: 'Project assigned', message: `${member.name} was assigned to ${updated.productCode}.` });
-    } catch (error) {
-      showToast({ tone: 'error', title: 'Assignment failed', message: error instanceof Error ? error.message : 'Unable to assign project.' });
+    return addProjectTeamMember(projectId, member._id);
+  }
+
+  async function assignProjects(member: TeamRow, projectIds: string[]) {
+    const results = await Promise.allSettled(projectIds.map((projectId) => assignProject(member, projectId)));
+    const successful = results.filter((result): result is PromiseFulfilledResult<Project> => result.status === 'fulfilled' && Boolean(result.value));
+    const failed = results.length - successful.length;
+    const failureMessage = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
+    successful.forEach((result) => dispatch(upsertProject(result.value)));
+    if (successful.length && !failed) {
+      showToast({ tone: 'success', title: 'Projects assigned', message: `${successful.length} project${successful.length === 1 ? '' : 's'} assigned to ${member.name}.` });
+    } else if (successful.length) {
+      showToast({ tone: 'error', title: 'Some assignments failed', message: `${successful.length} assigned and ${failed} failed. ${failureMessage instanceof Error ? failureMessage.message : 'Please retry the failed projects.'}` });
+    } else {
+      showToast({ tone: 'error', title: 'Assignment failed', message: failureMessage instanceof Error ? failureMessage.message : 'Unable to assign the selected projects.' });
     }
+    return successful.map((result) => result.value);
   }
 
   async function removeAssignment(member: TeamRow, project: Project) {
@@ -238,7 +255,7 @@ export function TeamMembersPage() {
         <ManageMemberDialog
           member={activeMember}
           projects={projects}
-          onAssign={(projectId) => assignProject(activeMember, projectId)}
+          onAssign={(projectIds) => assignProjects(activeMember, projectIds)}
           onClose={() => setActiveMemberId(null)}
           onRemove={(project) => removeAssignment(activeMember, project)}
           onSaved={(account) => {
@@ -298,16 +315,21 @@ function AddStaffDialog({ onClose, onSaved, showToast }: { onClose: () => void; 
   );
 }
 
-function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onSaved, showToast }: { member: TeamRow; projects: Project[]; onAssign: (projectId: string) => void; onClose: () => void; onRemove: (project: Project) => void; onSaved: (account: StaffAccount) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
+function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onSaved, showToast }: { member: TeamRow; projects: Project[]; onAssign: (projectIds: string[]) => Promise<Project[]>; onClose: () => void; onRemove: (project: Project) => void; onSaved: (account: StaffAccount) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
   const [form, setForm] = useState({ name: member.name, email: member.email, password: '', designation: member.designation || member.role, role: member.role, isActive: member.isActive });
-  const [projectId, setProjectId] = useState('');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const availableProjects = projects.filter((project) => !member.assignedProjects.some((assigned) => assigned.id === project.id));
-  const canAssignAsTeamMember = member.role === 'Staff';
+  const canAssignAsTeamMember = member.role === 'Staff' || member.role === 'Auditor';
+  const visibleProjects = availableProjects.filter((project) => `${project.productCode} ${project.name}`.toLowerCase().includes(projectSearch.trim().toLowerCase()));
+  const selectedProjects = availableProjects.filter((project) => selectedProjectIds.includes(project.id));
 
   async function saveDetails() {
     const missing = getMissingFields([
@@ -329,6 +351,27 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
     }
   }
 
+  async function toggleAccountStatus() {
+    setSavingStatus(true);
+    const isActive = !form.isActive;
+    try {
+      const updated = await updateStaffAccount(member._id, {
+        name: form.name,
+        email: form.email,
+        designation: form.designation,
+        role: form.role,
+        isActive
+      });
+      setForm((current) => ({ ...current, isActive: updated.isActive }));
+      onSaved(updated);
+      showToast({ tone: 'success', title: updated.isActive ? 'Account activated' : 'Account deactivated' });
+    } catch (error) {
+      showToast({ tone: 'error', title: 'Status update failed', message: error instanceof Error ? error.message : 'Unable to update account status.' });
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
   async function savePassword() {
     const missing = getMissingFields([{ label: 'Password with at least 8 characters', valid: newPassword.length >= 8 }]);
     if (showMissingFieldsToast(showToast, missing)) return;
@@ -344,12 +387,14 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
     }
   }
 
-  async function assignSelectedProject() {
-    if (showMissingFieldsToast(showToast, projectId ? [] : ['Project'])) return;
+  async function assignSelectedProjects() {
+    if (showMissingFieldsToast(showToast, selectedProjectIds.length ? [] : ['Project'])) return;
     setAssigning(true);
     try {
-      await onAssign(projectId);
-      setProjectId('');
+      const assigned = await onAssign(selectedProjectIds);
+      const assignedIds = new Set(assigned.map((project) => project.id));
+      setSelectedProjectIds((current) => current.filter((id) => !assignedIds.has(id)));
+      setProjectSearch('');
     } finally {
       setAssigning(false);
     }
@@ -383,6 +428,23 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
               <span className={roleClass(member.designation || member.role)}>{member.designation || member.role}</span>
             </div>
             <StaffFields form={form} setForm={setForm} />
+            <div className={`mt-5 flex min-h-[84px] items-center justify-between gap-4 rounded-lg border px-3 py-2.5 shadow-sm ${form.isActive ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${form.isActive ? 'bg-emerald-100' : 'bg-slate-200'}`}>
+                  <ShieldCheck className={form.isActive ? 'text-emerald-600' : 'text-slate-500'} size={21} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900">Account Status</p>
+                  <p className="mt-0.5 max-w-[280px] text-xs leading-4 text-slate-600">Control whether this user can log in and access assigned projects.</p>
+                </div>
+              </div>
+              <button type="button" role="switch" aria-checked={Boolean(form.isActive)} aria-label={form.isActive ? 'Deactivate account' : 'Activate account'} disabled={savingStatus} onClick={toggleAccountStatus} className="inline-flex shrink-0 items-center gap-2 disabled:cursor-wait disabled:opacity-70">
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${form.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}><span className={`h-1.5 w-1.5 rounded-full ${form.isActive ? 'bg-emerald-600' : 'bg-slate-500'}`} />{form.isActive ? 'Active' : 'Inactive'}</span>
+                <span className={`relative inline-flex h-7 w-12 items-center rounded-full p-1 transition ${form.isActive ? 'bg-[#079669]' : 'bg-slate-400'}`}>
+                  <span className={`h-5 w-5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition-transform ${form.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                </span>
+              </button>
+            </div>
             <div className="mt-5 flex justify-end">
               <button className="primary-button h-10 min-w-32 justify-center" onClick={saveDetails} disabled={savingDetails}>{savingDetails ? 'Saving...' : 'Save Details'}</button>
             </div>
@@ -400,12 +462,34 @@ function ManageMemberDialog({ member, projects, onAssign, onClose, onRemove, onS
               {!member.assignedProjects.length ? <p className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">No project assignments yet.</p> : null}
             </div>
             {canAssignAsTeamMember ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <select className="field h-10" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-                  <option value="">Select project</option>
-                  {availableProjects.map((project) => <option key={project.id} value={project.id}>{project.productCode} - {project.name}</option>)}
-                </select>
-                <button className="secondary-button h-10 shrink-0 justify-center text-primary" onClick={assignSelectedProject} disabled={assigning}>{assigning ? 'Assigning...' : 'Assign'}</button>
+              <div className="relative mt-4">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button type="button" className="field flex min-h-10 flex-1 items-center justify-between gap-3 text-left" onClick={() => setProjectMenuOpen((open) => !open)} disabled={assigning}>
+                    <span className={selectedProjects.length ? 'font-semibold text-slate-700' : 'text-slate-400'}>
+                      {selectedProjects.length ? `${selectedProjects.length} project${selectedProjects.length === 1 ? '' : 's'} selected` : 'Select projects to assign'}
+                    </span>
+                    {projectMenuOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                  </button>
+                  <button className="secondary-button h-10 shrink-0 justify-center text-primary" onClick={assignSelectedProjects} disabled={assigning || !selectedProjectIds.length}>{assigning ? 'Assigning...' : `Assign${selectedProjectIds.length ? ` (${selectedProjectIds.length})` : ''}`}</button>
+                </div>
+                {projectMenuOpen ? (
+                  <div className="absolute inset-x-0 top-12 z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_35px_rgba(21,40,80,0.18)]">
+                    <div className="border-b border-slate-100 p-2">
+                      <input autoFocus className="field h-9 w-full" value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="Search projects..." />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto p-1">
+                      {visibleProjects.map((project) => {
+                        const selected = selectedProjectIds.includes(project.id);
+                        return <button type="button" key={project.id} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[#f4f8ff]" onClick={() => setSelectedProjectIds((current) => selected ? current.filter((id) => id !== project.id) : [...current, project.id])}>
+                          <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${selected ? 'border-primary bg-primary text-white' : 'border-slate-300 text-transparent'}`}><Check size={13} strokeWidth={3} /></span>
+                          <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-700">{project.productCode}</span><span className="block truncate text-xs text-slate-500">{project.name}</span></span>
+                        </button>;
+                      })}
+                      {!visibleProjects.length ? <p className="px-3 py-5 text-center text-sm text-slate-500">No unassigned projects found.</p> : null}
+                    </div>
+                    {selectedProjectIds.length ? <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2"><span className="text-xs font-semibold text-slate-500">{selectedProjectIds.length} selected</span><button type="button" className="text-xs font-bold text-primary hover:underline" onClick={() => setSelectedProjectIds([])}>Clear selection</button></div> : null}
+                  </div>
+                ) : null}
               </div>
             ) : <p className="mt-3 text-sm font-semibold text-slate-500">Admins can be selected as reporting owners, not ordinary team members.</p>}
           </section>
@@ -453,7 +537,6 @@ function StaffFields({ form, setForm, includePassword = false }: { form: { name:
       <Field label="Login Email"><input className="field" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
       <Field label="Designation"><select className="field" value={form.designation} onChange={(event) => setForm({ ...form, designation: event.target.value })}>{availableDesignations.map((item) => <option key={item}>{item}</option>)}</select></Field>
       {includePassword ? <Field label="Password"><input className="field" type="password" value={form.password || ''} onChange={(event) => setForm({ ...form, password: event.target.value })} /></Field> : null}
-      {!includePassword ? <label className="mt-7 flex items-center gap-2 text-sm font-bold text-slate-600"><input type="checkbox" checked={form.isActive ?? true} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /> Active account</label> : null}
     </div>
   );
 }

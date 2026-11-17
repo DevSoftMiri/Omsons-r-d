@@ -1,4 +1,4 @@
-import { FileBadge, FileText, FlaskConical, LayoutDashboard, LogOut, Settings, Users, Warehouse } from 'lucide-react';
+import { Boxes, FileBadge, FileText, FlaskConical, LayoutDashboard, LogOut, Settings, Users, Warehouse } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { logout } from '../store';
@@ -8,6 +8,7 @@ const navItems = [
   { label: 'Projects', href: '/projects', icon: FlaskConical },
   { label: 'Team Members', href: '/team', icon: Users },
   { label: 'Vendors', href: '/vendors', icon: Warehouse },
+  { label: 'Inventory', href: '/inventory', icon: Boxes },
   { label: 'Certificates', href: '/certificates', icon: FileBadge },
   { label: 'Reports', href: '/reports', icon: FileText },
   { label: 'Settings', href: '/settings', icon: Settings }
