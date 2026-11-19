@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Clock3, Mail, MoreHorizontal, PackageCheck, Phone, Search, Store, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock3, Mail, MoreHorizontal, Phone, Search, Store, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PageTopBar } from '../components/PageTopBar';
@@ -22,6 +22,7 @@ interface VendorRow {
   email?: string;
   location?: string;
   suppliedComponents: string;
+  gstNumber?: string;
   paymentType: VendorPaymentType;
   advancePercentage: number;
   creditDays: number;
@@ -45,7 +46,7 @@ const emptyForm = {
   email: '',
   location: '',
   supply: '',
-  projectId: '',
+  gstNumber: '',
   paymentType: 'Advance' as VendorPaymentType,
   advancePercentage: '',
   creditDays: '',
@@ -112,6 +113,7 @@ function buildVendorsFromProjects(projects: Project[]): VendorRow[] {
         email: '',
         location: '',
         suppliedComponents: item.materialName,
+        gstNumber: '',
         paymentType: 'Advance',
         advancePercentage: 0,
         creditDays: 0,
@@ -170,7 +172,7 @@ export function VendorsPage() {
   const filteredVendors = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return vendors.filter((vendor) => {
-      const searchable = `${vendor.name} ${vendor.contactPerson} ${vendor.category} ${vendor.email || ''}`.toLowerCase();
+      const searchable = `${vendor.name} ${vendor.contactPerson} ${vendor.category} ${vendor.email || ''} ${vendor.gstNumber || ''}`.toLowerCase();
       const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
       const matchesCategory = categoryFilter === 'All Categories' || vendor.category === categoryFilter;
       const matchesStatus = statusFilter === 'All Status' || vendor.status === statusFilter;
@@ -179,7 +181,6 @@ export function VendorsPage() {
   }, [categoryFilter, query, statusFilter, vendors]);
 
   const activeCount = vendors.filter((vendor) => vendor.status === 'Active').length;
-  const linkedCount = vendors.filter((vendor) => vendor.projects.length > 0).length;
 
   function updateForm<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -214,7 +215,6 @@ export function VendorsPage() {
       return;
     }
 
-    const linkedProject = projects.find((project) => project.id === form.projectId);
     const category = form.category || categoryFromText(form.supply);
     const payload = {
       name: form.name.trim(),
@@ -226,6 +226,7 @@ export function VendorsPage() {
       email: form.email.trim(),
       location: form.location.trim(),
       suppliedComponents: form.supply.trim(),
+      gstNumber: form.gstNumber.trim().toUpperCase(),
       paymentType: form.paymentType,
       advancePercentage: form.paymentType === 'Advance' ? advancePercentage : 0,
       creditDays: form.paymentType === 'Credit' ? creditDays : 0,
@@ -244,11 +245,7 @@ export function VendorsPage() {
         if (editingSavedVendor) return current.map((vendor) => vendor.id === saved.id ? saved : vendor);
         return [...current, saved];
       });
-      if (linkedProject && !linkedProject.bom.some((item) => item.vendor?.trim().toLowerCase() === saved.name.trim().toLowerCase())) {
-        showToast({ tone: 'success', title: 'Vendor saved', message: 'Project assignment is shown when the vendor is used in a project BOM.' });
-      } else {
-        showToast({ tone: 'success', title: editingSavedVendor ? 'Vendor updated' : 'Vendor added' });
-      }
+      showToast({ tone: 'success', title: editingSavedVendor ? 'Vendor updated' : 'Vendor added' });
       closeForm();
     } catch (error) {
       showToast({
@@ -297,7 +294,6 @@ export function VendorsPage() {
         <VendorStat icon={UsersRound} label="Total Vendors" value={vendors.length} tone="blue" />
         <VendorStat icon={CheckCircle2} label="Active Vendors" value={activeCount} tone="green" />
         <VendorStat icon={Clock3} label="Inactive Vendors" value={vendors.length - activeCount} tone="orange" />
-        <VendorStat icon={PackageCheck} label="Linked to Projects" value={linkedCount} tone="purple" />
       </section>
 
       <section className="rounded-lg border border-[#dde6f2] bg-white p-5 shadow-[0_18px_55px_rgba(21,40,80,0.08)]">
@@ -326,9 +322,10 @@ export function VendorsPage() {
                 <th className="w-[150px] px-4 py-3">Category</th>
                 <th className="w-[220px] px-4 py-3">Components</th>
                 <th className="w-[150px] px-4 py-3">Payment</th>
+                <th className="w-[170px] px-4 py-3">GST Number</th>
                 <th className="w-[170px] px-4 py-3">Contact Person</th>
                 <th className="w-[210px] px-4 py-3">Contact</th>
-                <th className="w-[135px] px-4 py-3">Projects</th>
+                <th className="w-[170px] px-4 py-3">Location</th>
                 <th className="w-[120px] px-4 py-3">Status</th>
                 <th className="w-[90px] rounded-r-lg px-4 py-3">Actions</th>
               </tr>
@@ -352,8 +349,8 @@ export function VendorsPage() {
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-sm font-bold text-[#20385f]">{paymentSummary(vendor)}</p>
-                    {vendor.paymentTerms ? <p className="mt-1 line-clamp-2 text-xs font-medium text-[#53688d]">{vendor.paymentTerms}</p> : null}
                   </td>
+                  <td className="px-4 py-4 text-sm font-semibold text-[#20385f]">{vendor.gstNumber || '--'}</td>
                   <td className="px-4 py-4">
                     <p className="font-bold text-[#20385f]">{vendor.contactPerson || '--'}</p>
                     <p className="text-sm font-medium text-[#53688d]">{vendor.designation || 'Contact person'}</p>
@@ -364,9 +361,7 @@ export function VendorsPage() {
                       <p className="flex items-center gap-2"><Mail size={14} className="text-[#00494B]" />{vendor.email || '--'}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    {vendor.projects.length ? <span className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-xs font-bold text-[#00494B]">{vendor.projects.length} Project{vendor.projects.length > 1 ? 's' : ''}</span> : <span className="text-sm font-semibold text-[#7a8aa8]">--</span>}
-                  </td>
+                  <td className="px-4 py-4 text-sm font-semibold text-[#20385f]">{vendor.location || '--'}</td>
                   <td className="px-4 py-4"><span className={`team-status ${vendor.status.toLowerCase()}`}>{vendor.status}</span></td>
                   <td className="px-4 py-4">
                     <VendorActions vendor={vendor} onEdit={() => { setEditingVendorId(vendor.id); setForm({
@@ -379,7 +374,7 @@ export function VendorsPage() {
                       email: vendor.email || '',
                       location: vendor.location || '',
                       supply: vendor.suppliedComponents || vendor.notes || vendor.category,
-                      projectId: vendor.projects[0]?.id || '',
+                      gstNumber: vendor.gstNumber || '',
                       paymentType: vendor.paymentType,
                       advancePercentage: String(vendor.advancePercentage || ''),
                       creditDays: String(vendor.creditDays || ''),
@@ -448,11 +443,8 @@ export function VendorsPage() {
                 <FormField label="Components / Materials Supplied" required className="md:col-span-3">
                   <textarea required value={form.supply} onChange={(event) => updateForm('supply', event.target.value)} className="field min-h-[52px] resize-none px-3 py-1.5 text-sm" placeholder="E.g. Borosilicate glass tubes, bottles, components..." />
                 </FormField>
-                <FormField label="Assigned Projects" className="md:col-span-3">
-                  <select value={form.projectId} onChange={(event) => updateForm('projectId', event.target.value)} className="field h-9 px-3 py-1.5 text-sm">
-                    <option value="">Select projects</option>
-                    {projects.map((project) => <option key={project.id} value={project.id}>{project.productCode} - {project.name}</option>)}
-                  </select>
+                <FormField label="GST Number" className="md:col-span-3">
+                  <input value={form.gstNumber} onChange={(event) => updateForm('gstNumber', event.target.value.toUpperCase())} className="field h-9 px-3 py-1.5 text-sm" placeholder="e.g. 22AAAAA0000A1Z5" maxLength={15} />
                 </FormField>
                 <FormField label="Payment Type" required className="md:col-span-2">
                   <select required value={form.paymentType} onChange={(event) => updateForm('paymentType', event.target.value as VendorPaymentType)} className="field h-9 px-3 py-1.5 text-sm">
@@ -512,7 +504,6 @@ export function VendorsPage() {
 function VendorActions({ vendor, onEdit, onToggleStatus, onDelete }: { vendor: VendorRow; onEdit: () => void; onToggleStatus: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-  const linkedProject = vendor.projects[0];
   useEffect(() => {
     if (!open) return undefined;
     const close = () => setOpen(false);
@@ -546,7 +537,6 @@ function VendorActions({ vendor, onEdit, onToggleStatus, onDelete }: { vendor: V
         <button className="menu-action" onClick={() => run(onEdit)}>View / Edit</button>
         <button className="menu-action" onClick={() => run(onToggleStatus)}>{vendor.status === 'Active' ? 'Deactivate Vendor' : 'Activate Vendor'}</button>
         <button className="menu-action" disabled={!vendor.email} onClick={() => run(() => { if (vendor.email) navigator.clipboard?.writeText(vendor.email); })}>Copy Email</button>
-        {linkedProject ? <a className="menu-action" href={`/projects/${linkedProject.productCode}/overview`} onClick={() => setOpen(false)}>Open Linked Project</a> : <button className="menu-action" disabled>No linked project</button>}
         <button className="menu-action text-rose-600" disabled={!vendor.persisted || vendor.projects.length > 0} title={vendor.projects.length ? 'Deactivate linked vendors instead' : undefined} onClick={() => run(onDelete)}>Delete Vendor</button>
       </div>, document.body) : null}
     </div>

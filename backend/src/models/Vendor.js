@@ -11,6 +11,7 @@ const vendorSchema = new mongoose.Schema(
     location: String,
     category: String,
     suppliedComponents: { type: String, trim: true },
+    gstNumber: { type: String, trim: true, uppercase: true },
     paymentType: { type: String, enum: ['Advance', 'Credit'], default: 'Advance' },
     advancePercentage: { type: Number, min: 0, max: 100, default: 0 },
     creditDays: { type: Number, min: 0, default: 0 },

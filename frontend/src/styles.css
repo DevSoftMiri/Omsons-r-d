@@ -5,6 +5,7 @@
 /* Keep numeric fields clean and consistent with the rest of the form. */
 .field[type='number'] {
   -moz-appearance: textfield;
+  -webkit-appearance: textfield;
   appearance: textfield;
 }
 

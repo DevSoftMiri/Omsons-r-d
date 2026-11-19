@@ -14,6 +14,7 @@ export interface VendorRecord {
   email?: string;
   location?: string;
   suppliedComponents: string;
+  gstNumber?: string;
   paymentType: VendorPaymentType;
   advancePercentage: number;
   creditDays: number;
@@ -33,6 +34,7 @@ export interface VendorPayload {
   email?: string;
   location?: string;
   suppliedComponents: string;
+  gstNumber?: string;
   paymentType: VendorPaymentType;
   advancePercentage: number;
   creditDays: number;
@@ -67,6 +69,7 @@ function normalizeVendor(raw: any): VendorRecord {
     email: raw.email || '',
     location: raw.location || '',
     suppliedComponents: raw.suppliedComponents || '',
+    gstNumber: raw.gstNumber || '',
     paymentType: raw.paymentType === 'Credit' ? 'Credit' : 'Advance',
     advancePercentage: Number(raw.advancePercentage || 0),
     creditDays: Number(raw.creditDays || 0),
