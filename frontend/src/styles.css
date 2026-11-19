@@ -24,7 +24,8 @@
   gap: 0.125rem;
 }
 
-.stage-section-orderable > :first-child {
+.stage-section-order-header {
+  position: relative;
   padding-right: 4rem;
 }
 
@@ -816,6 +817,17 @@ body {
   .field:focus {
     border-color: #00494B;
   }
+
+.category-select {
+  min-height: 2.75rem;
+  cursor: pointer;
+  color: #20385f;
+  font-weight: 600;
+}
+
+.category-select:invalid {
+  color: #94a3b8;
+}
 
   .grid-head {
     @apply border border-slate-200 bg-slate-50 px-2 py-2 text-left text-xs font-bold uppercase tracking-normal text-slate-500;

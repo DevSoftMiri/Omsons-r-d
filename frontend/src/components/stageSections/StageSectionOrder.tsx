@@ -33,7 +33,7 @@ export function StageSectionOrder({
           );
           if (hasCompletionAction) {
             element.dataset.stageSectionIgnore = 'true';
-            element.querySelector<HTMLElement>(':scope > [data-stage-section-controls]')?.remove();
+            element.querySelector<HTMLElement>(':scope > :first-child > [data-stage-section-controls]')?.remove();
             element.style.order = '';
             return false;
           }
@@ -70,12 +70,15 @@ export function StageSectionOrder({
         element.draggable = false;
         element.style.cursor = '';
 
-        let controls = element.querySelector<HTMLElement>(':scope > [data-stage-section-controls]');
+        const header = element.querySelector<HTMLElement>(':scope > :first-child');
+        if (!header) return;
+        header.classList.add('stage-section-order-header');
+        let controls = header.querySelector<HTMLElement>(':scope > [data-stage-section-controls]');
         if (!controls) {
           controls = document.createElement('div');
           controls.dataset.stageSectionControls = 'true';
           controls.className = 'stage-section-order-controls';
-          element.appendChild(controls);
+          header.appendChild(controls);
         }
         controls.innerHTML = '';
         const position = order.indexOf(id);
@@ -93,7 +96,7 @@ export function StageSectionOrder({
       button.disabled = disabled;
       button.title = `${direction === 'up' ? 'Move section up' : 'Move section down'}`;
       button.ariaLabel = button.title;
-      button.textContent = direction === 'up' ? '↑' : '↓';
+      button.textContent = direction === 'up' ? '\u2191' : '\u2193';
       return button;
     }
 

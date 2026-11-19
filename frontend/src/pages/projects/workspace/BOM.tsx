@@ -14,6 +14,7 @@ import { useToast } from '../../../components/ToastProvider';
 import { useStageCompletion } from '../../../hooks/useStageCompletion';
 import { useDebouncedAutosave } from '../../../hooks/useDebouncedAutosave';
 import { deleteProjectAttachment, fetchProjectAttachments, uploadProjectAttachment, type ProjectAttachment } from '../../../services/attachmentService';
+import { fetchInventory, type InventoryItem } from '../../../services/inventoryService';
 import { fetchBomWorkspace, updateBomWorkspace } from '../../../services/projectService';
 import { NO_FILE_AVAILABLE, openFile, resolveFileUrl } from '../../../utils/fileActions';
 import { showMissingFieldsToast } from '../../../utils/requiredFields';
@@ -36,6 +37,8 @@ type BomRow = {
 
 type ElectricalBomRow = {
   id: string;
+  inventoryItemId?: string;
+  inventoryItemCode?: string;
   item: string;
   specification: string;
   qty: string;
@@ -55,6 +58,8 @@ type ElectricalBomRow = {
 
 type MechanicalBomRow = {
   id: string;
+  inventoryItemId?: string;
+  inventoryItemCode?: string;
   srNo: string;
   partNumber: string;
   item: string;
@@ -189,13 +194,14 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   const [baseColumnWidths, setBaseColumnWidths] = useState<Record<BaseBomColumnKey, number>>(() => storedBom.baseColumnWidths);
   const [saveState, setSaveState] = useState<'Saved' | 'Saving...' | 'Save failed'>('Saved');
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<ProjectAttachment[]>([]);
-  const [electricalRows, setElectricalRows] = useState<ElectricalBomRow[]>(() => storedBom.electricalRows);
+  const [electricalRows, setElectricalRows] = useState<ElectricalBomRow[]>(() => storedBom.electricalRows.length ? storedBom.electricalRows : Array.from({ length: 5 }, () => makeElectricalRow('', '', '1', 'Pc', '', '', '', '', '', '', '', '', '')));
   const [electricalColumnSettings, setElectricalColumnSettings] = useState<Array<BomColumnSetting<ElectricalBomColumnKey>>>(() => storedBom.electricalColumnSettings);
   const [electricalCustomColumns, setElectricalCustomColumns] = useState<BomCustomColumn[]>(() => storedBom.electricalCustomColumns);
   const [electricalFiles, setElectricalFiles] = useState<ProjectAttachment[]>([]);
   const [uploadingElectrical, setUploadingElectrical] = useState(false);
-  const [mechanicalRows, setMechanicalRows] = useState<MechanicalBomRow[]>(() => storedBom.mechanicalRows);
+  const [mechanicalRows, setMechanicalRows] = useState<MechanicalBomRow[]>(() => storedBom.mechanicalRows.length ? storedBom.mechanicalRows : Array.from({ length: 5 }, (_, index) => makeMechanicalRow(String(index + 1), '', '', '', '', '1', 'Pcs')));
   const [mechanicalColumnSettings, setMechanicalColumnSettings] = useState<Array<BomColumnSetting<MechanicalBomColumnKey>>>(() => storedBom.mechanicalColumnSettings);
   const [mechanicalCustomColumns, setMechanicalCustomColumns] = useState<BomCustomColumn[]>(() => storedBom.mechanicalCustomColumns);
   const [mechanicalFiles, setMechanicalFiles] = useState<ProjectAttachment[]>([]);
@@ -265,10 +271,10 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
           const saved = data as Partial<ReturnType<typeof readStoredBom>>;
           if (Array.isArray(saved.rows)) setRows(saved.rows);
           if (saved.baseColumnWidths) setBaseColumnWidths(readBaseColumnWidths(saved.baseColumnWidths));
-          if (Array.isArray(saved.electricalRows)) setElectricalRows(saved.electricalRows);
+          if (Array.isArray(saved.electricalRows) && saved.electricalRows.length) setElectricalRows(saved.electricalRows);
           if (Array.isArray(saved.electricalColumnSettings)) setElectricalColumnSettings(mergeColumnSettings(defaultElectricalColumnSettings, saved.electricalColumnSettings));
           if (Array.isArray(saved.electricalCustomColumns)) setElectricalCustomColumns(saved.electricalCustomColumns);
-          if (Array.isArray(saved.mechanicalRows)) setMechanicalRows(saved.mechanicalRows);
+          if (Array.isArray(saved.mechanicalRows) && saved.mechanicalRows.length) setMechanicalRows(saved.mechanicalRows);
           if (Array.isArray(saved.mechanicalColumnSettings)) setMechanicalColumnSettings(mergeColumnSettings(defaultMechanicalColumnSettings, saved.mechanicalColumnSettings));
           if (Array.isArray(saved.mechanicalCustomColumns)) setMechanicalCustomColumns(saved.mechanicalCustomColumns);
           if (Array.isArray(saved.electricalTables)) setElectricalTables(saved.electricalTables);
@@ -287,6 +293,16 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       active = false;
     };
   }, [project.productCode]);
+
+  useEffect(() => {
+    let active = true;
+    fetchInventory().then((items) => {
+      if (active) setInventoryItems(items);
+    }).catch(() => {
+      if (active) setInventoryItems([]);
+    });
+    return () => { active = false; };
+  }, []);
 
   useDebouncedAutosave({
     value: { rows, baseColumnWidths, electricalRows, electricalColumnSettings, electricalCustomColumns, mechanicalRows, mechanicalColumnSettings, mechanicalCustomColumns, electricalTables, mechanicalTables, notes },
@@ -491,6 +507,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
     setElectricalRows((current) => current.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
   }
 
+  function applyInventoryToElectricalRow(rowId: string, item: InventoryItem) {
+    setElectricalRows((current) => current.map((row) => row.id === rowId ? {
+      ...row,
+      inventoryItemId: item.id,
+      inventoryItemCode: item.itemCode,
+      item: item.itemName,
+      specification: item.specification,
+      unit: item.unit,
+      pricePerUnit: String(item.price),
+      supplierSource: item.vendorName
+    } : row));
+  }
+
   function renameElectricalBuiltInColumn(key: ElectricalBomColumnKey, label: string) {
     setElectricalColumnSettings((current) => current.map((column) => column.key === key ? { ...column, label } : column));
   }
@@ -664,6 +693,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
         ...(key === 'qty' || key === 'unitCost' ? { totalCost: '' } : {})
       };
     }));
+  }
+
+  function applyInventoryToMechanicalRow(rowId: string, item: InventoryItem) {
+    setMechanicalRows((current) => current.map((row) => row.id === rowId ? {
+      ...row,
+      inventoryItemId: item.id,
+      inventoryItemCode: item.itemCode,
+      item: item.itemName,
+      specification: item.specification,
+      unit: item.unit,
+      unitCost: String(item.price),
+      supplier: item.vendorName
+    } : row));
   }
 
   function renameMechanicalBuiltInColumn(key: MechanicalBomColumnKey, label: string) {
@@ -1104,7 +1146,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {fullscreenBomTable === 'electrical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {fullscreenBomTable === 'electrical' ? 'Exit Full Screen' : 'Full Screen'}
             </button>
-            <ExcelTableActions table={dataTable('Electrical BOM', [...electricalColumnSettings.map(col => col.label), ...electricalCustomColumns.map(col => col.label)], electricalRows.map(row => [...electricalColumnSettings.map(col => row[col.key]), ...electricalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
+            <ExcelTableActions table={dataTable('Electrical BOM', [...electricalColumnSettings.map(col => col.label), ...electricalCustomColumns.map(col => col.label)], electricalRows.map(row => [...electricalColumnSettings.map(col => String(row[col.key] ?? '')), ...electricalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
               const itemLabel = electricalColumnSettings.find(col => col.key === 'item')?.label || 'Item';
               const records = tableRecords(table, [itemLabel]);
               const imported = records.map(record => ({
@@ -1194,7 +1236,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                     const editing = editingBomCell?.stage === 'electrical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === String(column.key);
                     return (
                       <td key={column.key} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
-                        <input
+                        {column.key === 'item' ? <InventoryItemInput
+                          value={rawValue}
+                          items={inventoryItems}
+                          onChange={(value) => updateElectricalRow(row.id, column.key, value)}
+                          onSelect={(item) => applyInventoryToElectricalRow(row.id, item)}
+                          onFocus={() => setEditingBomCell({ stage: 'electrical', rowId: row.id, columnKey: String(column.key) })}
+                          onBlur={() => setEditingBomCell(null)}
+                          onKeyDown={(event) => handleBomCellKeyDown(event, 'electrical', rowIndex, columnIndex)}
+                          rowIndex={rowIndex}
+                          columnIndex={columnIndex}
+                          tableId="electrical"
+                          className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''}`}
+                        /> : <input
                           className={`h-9 w-full bg-transparent px-2 outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="electrical"
                           data-column-index={columnIndex}
@@ -1206,7 +1260,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                           onChange={(event) => updateElectricalRow(row.id, column.key, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'electrical', rowId: row.id, columnKey: String(column.key) })}
                           onKeyDown={(event) => handleBomCellKeyDown(event, 'electrical', rowIndex, columnIndex)}
-                        />
+                        />}
                       </td>
                     );
                   })}
@@ -1310,7 +1364,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               {fullscreenBomTable === 'mechanical' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {fullscreenBomTable === 'mechanical' ? 'Exit Full Screen' : 'Full Screen'}
             </button>
-            <ExcelTableActions table={dataTable('Mechanical BOM', [...mechanicalColumnSettings.map(col => col.label), ...mechanicalCustomColumns.map(col => col.label)], mechanicalRows.map(row => [...mechanicalColumnSettings.map(col => row[col.key]), ...mechanicalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
+            <ExcelTableActions table={dataTable('Mechanical BOM', [...mechanicalColumnSettings.map(col => col.label), ...mechanicalCustomColumns.map(col => col.label)], mechanicalRows.map(row => [...mechanicalColumnSettings.map(col => String(row[col.key] ?? '')), ...mechanicalCustomColumns.map(col => row.customCells?.[col.id] || '')]))} onImport={table => {
               const itemLabel = mechanicalColumnSettings.find(col => col.key === 'item')?.label || 'Item';
               const records = tableRecords(table, [itemLabel]);
               const imported = records.map(record => ({
@@ -1400,7 +1454,19 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                     const editing = editingBomCell?.stage === 'mechanical' && editingBomCell.rowId === row.id && editingBomCell.columnKey === String(column.key);
                     return (
                       <td key={column.key} className={`border border-slate-200 p-0 ${column.formula ? 'bg-cyan-100/80' : result.error ? 'bg-rose-50' : ''}`}>
-                        <input
+                        {column.key === 'item' ? <InventoryItemInput
+                          value={rawValue}
+                          items={inventoryItems}
+                          onChange={(value) => updateMechanicalRow(row.id, column.key, value)}
+                          onSelect={(item) => applyInventoryToMechanicalRow(row.id, item)}
+                          onFocus={() => setEditingBomCell({ stage: 'mechanical', rowId: row.id, columnKey: String(column.key) })}
+                          onBlur={() => setEditingBomCell(null)}
+                          onKeyDown={(event) => handleBomCellKeyDown(event, 'mechanical', rowIndex, columnIndex)}
+                          rowIndex={rowIndex}
+                          columnIndex={columnIndex}
+                          tableId="mechanical"
+                          className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''}`}
+                        /> : <input
                           className={`h-8 w-full bg-transparent px-1.5 text-xs outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${column.className?.includes('text-center') ? 'text-center' : ''} ${column.formula ? 'font-bold text-slate-900' : result.error ? 'text-rose-700' : ''}`}
                           data-bom-table="mechanical"
                           data-column-index={columnIndex}
@@ -1412,7 +1478,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
                           onChange={(event) => updateMechanicalRow(row.id, column.key, event.target.value)}
                           onFocus={() => setEditingBomCell({ stage: 'mechanical', rowId: row.id, columnKey: String(column.key) })}
                           onKeyDown={(event) => handleBomCellKeyDown(event, 'mechanical', rowIndex, columnIndex)}
-                        />
+                        />}
                       </td>
                     );
                   })}
@@ -1809,6 +1875,80 @@ function ReferenceDocuments({
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-sm font-bold text-slate-600">{label}</span>{children}</label>;
+}
+
+function InventoryItemInput({
+  value,
+  items,
+  onChange,
+  onSelect,
+  onFocus,
+  onBlur,
+  onKeyDown,
+  rowIndex,
+  columnIndex,
+  tableId,
+  className
+}: {
+  value: string;
+  items: InventoryItem[];
+  onChange: (value: string) => void;
+  onSelect: (item: InventoryItem) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  rowIndex: number;
+  columnIndex: number;
+  tableId: string;
+  className: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = items
+    .filter((item) => `${item.itemName} ${item.itemCode} ${item.specification}`.toLowerCase().includes(value.trim().toLowerCase()))
+    .slice(0, 8);
+
+  return (
+    <div className="relative">
+      <input
+        className={className}
+        data-bom-table={tableId}
+        data-row-index={rowIndex}
+        data-column-index={columnIndex}
+        value={value}
+        onChange={(event) => { onChange(event.target.value); setOpen(true); }}
+        onFocus={() => { setOpen(true); onFocus(); }}
+        onBlur={() => { window.setTimeout(() => setOpen(false), 120); onBlur(); }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setOpen(false);
+            return;
+          }
+          onKeyDown(event);
+        }}
+        placeholder="Search inventory item..."
+      />
+      {open && matches.length ? (
+        <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 text-left shadow-[0_16px_35px_rgba(15,23,42,0.18)]">
+          {matches.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="block w-full rounded-md px-3 py-2 text-left transition hover:bg-cyan-50"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => { onSelect(item); setOpen(false); }}
+            >
+              <span className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 text-xs">
+                <span className="font-bold text-cyan-800">{item.itemCode || '--'}</span>
+                <span className="min-w-0 font-bold text-slate-800">{item.itemName || '--'}</span>
+              </span>
+              <span className="mt-1 block truncate text-xs text-slate-500">{item.specification || 'No specification available'}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function SummaryCard({ icon, tone, label, value, note }: { icon: ReactNode; tone: 'blue' | 'green' | 'orange'; label: string; value: string; note: string }) {

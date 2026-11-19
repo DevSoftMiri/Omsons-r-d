@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { getMissingFields, showMissingFieldsToast } from '../../utils/requiredFi
 
 const configurableStages = workflowStages.filter((stage) => stage !== 'Final Stage');
 const categoryOptions = ['Instrument', 'Glassware', 'Plasticware', 'Beaker', 'Flask', 'Condenser', 'Pipette', 'Tube'];
+const customCategoryStorageKey = 'project-category-options';
 
 const projectSchema = z.object({
   name: z.string().min(3),
@@ -45,11 +46,13 @@ export function CreateProject() {
   const [draggedStage, setDraggedStage] = useState<StageName | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>(categoryOptions);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: '',
-      category: 'Beaker',
+      category: '',
       description: '',
       startDate: new Date().toISOString().slice(0, 10),
       targetDate: '',
@@ -61,8 +64,32 @@ export function CreateProject() {
   });
   const startDate = form.watch('startDate');
   const targetDate = form.watch('targetDate');
+  const categoryValue = form.watch('category');
   const adminAccounts = useMemo(() => accounts.filter((account) => account.role === 'Admin'), [accounts]);
   const staffAccounts = useMemo(() => accounts.filter((account) => account.role === 'Staff'), [accounts]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(customCategoryStorageKey) || '[]');
+      const customCategories = Array.isArray(saved)
+        ? saved.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()) && item.trim().toLowerCase() !== 'bea')
+        : [];
+      setAvailableCategories(Array.from(new Set([...categoryOptions, ...customCategories])));
+      localStorage.setItem(customCategoryStorageKey, JSON.stringify(customCategories));
+    } catch {
+      localStorage.removeItem(customCategoryStorageKey);
+    }
+  }, []);
+
+  function addCustomCategory() {
+    const category = categoryValue.trim();
+    if (!category || categoryOptions.some((item) => item.toLowerCase() === category.toLowerCase())) return;
+    const next = [...availableCategories.filter((item) => item.toLowerCase() !== category.toLowerCase()), category];
+    setAvailableCategories(next);
+    localStorage.setItem(customCategoryStorageKey, JSON.stringify(next.filter((item) => !categoryOptions.includes(item))));
+    form.setValue('category', category, { shouldDirty: true, shouldValidate: true });
+    setCategoryOpen(false);
+  }
 
   useEffect(() => {
     let active = true;
@@ -180,10 +207,53 @@ export function CreateProject() {
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Category">
-            <input className="field" list="project-category-options" placeholder="Select or type category" {...form.register('category')} />
-            <datalist id="project-category-options">
-              {categoryOptions.map((item) => <option key={item} value={item} />)}
-            </datalist>
+            <div className="relative">
+              <input
+                required
+                autoComplete="off"
+                className="field category-select pr-10"
+                placeholder="Select or type category"
+                {...form.register('category')}
+                value={categoryValue}
+                onFocus={() => setCategoryOpen(true)}
+                onChange={(event) => form.setValue('category', event.target.value, { shouldDirty: true, shouldValidate: true })}
+                onBlur={(event) => {
+                  window.setTimeout(() => setCategoryOpen(false), 120);
+                }}
+              />
+              <ChevronDown className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition-transform ${categoryOpen ? 'rotate-180' : ''}`} size={17} />
+              {categoryOpen ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.16)]">
+                  {availableCategories.filter((item) => item.toLowerCase().includes(categoryValue.trim().toLowerCase())).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-teal-50 hover:text-[#00494B]"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        form.setValue('category', item, { shouldDirty: true, shouldValidate: true });
+                        setCategoryOpen(false);
+                      }}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                  {categoryValue.trim() && !availableCategories.some((item) => item.toLowerCase() === categoryValue.trim().toLowerCase()) ? (
+                    <button
+                      type="button"
+                      className="mt-1 block w-full border-t border-slate-100 px-3 py-2.5 text-left text-sm font-bold text-[#00494B] transition hover:bg-teal-50"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={addCustomCategory}
+                    >
+                      + Add “{categoryValue.trim()}”
+                    </button>
+                  ) : null}
+                  {!availableCategories.some((item) => item.toLowerCase().includes(categoryValue.trim().toLowerCase())) && !categoryValue.trim() ? (
+                    <p className="px-3 py-2 text-sm text-slate-400">No categories available</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </Field>
           <Field label="Priority">
             <select className="field" {...form.register('priority')}>
