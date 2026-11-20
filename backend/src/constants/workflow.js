@@ -5,7 +5,7 @@ export const WORKFLOW_STAGES = [
   'Programming',
   'Prototyping',
   'Testing & Validation',
-  'FAT Test',
+  'PAT Test',
   'Electrical BOM',
   'Mechanical BOM',
   'Product Documents',

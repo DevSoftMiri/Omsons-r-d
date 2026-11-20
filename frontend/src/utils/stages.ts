@@ -9,7 +9,7 @@ export const coreStageRoutes: Record<CoreStageName, string> = {
   'Electrical Product Design': 'electrical-product-design',
   'High Level BOM': 'high-level-bom',
   Programming: 'programming',
-  'FAT Test': 'fat-test',
+  'PAT Test': 'pat-test',
   Prototyping: 'prototyping',
   'Testing & Validation': 'testing-validation',
   'Mechanical BOM': 'mechanical-bom',

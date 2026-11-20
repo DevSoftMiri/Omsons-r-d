@@ -7,7 +7,7 @@ export const workflowStages: Stage['name'][] = [
   'Programming',
   'Prototyping',
   'Testing & Validation',
-  'FAT Test',
+  'PAT Test',
   'Electrical BOM',
   'Mechanical BOM',
   'Product Documents',

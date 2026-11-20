@@ -7,7 +7,7 @@ export type CoreStageName =
   | 'Electrical Product Design'
   | 'High Level BOM'
   | 'Programming'
-  | 'FAT Test'
+  | 'PAT Test'
   | 'Prototyping'
   | 'Testing & Validation'
   | 'Mechanical BOM'
