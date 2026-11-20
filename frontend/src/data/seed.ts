@@ -2,18 +2,18 @@ import type { Project, Stage } from '../types';
 
 export const workflowStages: Stage['name'][] = [
   'Product Specifications',
-  'Research Data',
-  'Benchmarking',
-  'Electrical BOM',
-  'Mechanical Product Design',
   'Electrical Product Design',
-  'High Level BOM',
+  'Mechanical Product Design',
   'Programming',
-  'PAT test',
   'Prototyping',
   'Testing & Validation',
+  'FAT Test',
+  'Electrical BOM',
   'Mechanical BOM',
   'Product Documents',
+  'Research Data',
+  'Benchmarking',
+  'High Level BOM',
   'Final Stage'
 ];
 

@@ -46,7 +46,7 @@ const nextActionText: Record<CoreStageName, string[]> = {
   'Electrical Product Design': ['Add design notes', 'Review electrical design tasks', 'Mark design complete'],
   'High Level BOM': ['Add BOM notes', 'Review high level components', 'Mark high level BOM complete'],
   Programming: ['Validate machine parameters', 'Complete PLC logic checklist', 'Run final programming validation'],
-  'PAT test': ['Record PAT checks', 'Review safety results', 'Mark PAT test complete'],
+  'FAT Test': ['Record FAT checks', 'Review safety results', 'Mark FAT Test complete'],
   Prototyping: ['Track prototype notes', 'Review prototype checklist', 'Mark prototyping complete'],
   'Testing & Validation': ['Record validation test', 'Attach test report', 'Mark testing complete'],
   'Mechanical BOM': ['Review mechanical parts', 'Upload mechanical BOM document', 'Confirm drawings and suppliers'],

@@ -60,7 +60,7 @@ export function App() {
         <Route path="mechanical-bom" element={<BOM currentStage="Mechanical BOM" />} />
         <Route path="product-design" element={<ProductDesign />} />
         <Route path="programming" element={<Programming />} />
-        <Route path="pat-test" element={<StandardStage stageName="PAT test" />} />
+        <Route path="fat-test" element={<StandardStage stageName="FAT Test" />} />
         <Route path="prototyping" element={<Prototyping />} />
         <Route path="testing-validation" element={<TestingValidation />} />
         <Route path="reporting" element={<Reporting />} />
