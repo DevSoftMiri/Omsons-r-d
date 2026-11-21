@@ -11,6 +11,8 @@ import {
   makeStageResponseId,
   makeStageResponseTable,
   readStageResponses,
+  readLegacyStageResponses,
+  clearLegacyStageResponses,
   saveStageResponses,
   type StageChecklistBlock,
   type StageResponseBlock,
@@ -18,6 +20,7 @@ import {
 } from '../../services/stageResponseService';
 import { resolveFileUrl } from '../../utils/fileActions';
 import { useToast } from '../ToastProvider';
+import { useAppSelector } from '../../hooks';
 
 const acceptedFileTypes = '*/*';
 const supportedFileTypesLabel = 'Any file format (max 10 MB per file)';
@@ -38,7 +41,10 @@ export function StageResponseBuilder({
   // before the previous upload has been reflected in the list.
   const uploadingFileKeys = useRef(new Set<string>());
   const { showToast } = useToast();
+  const userRole = useAppSelector((state) => state.auth.user?.role);
+  const canManageResponses = userRole === 'staff' || userRole === 'auditor';
   const [blocks, setBlocks] = useState<StageResponseBlock[]>([]);
+  const [responseError, setResponseError] = useState('');
   const blocksRef = useRef<StageResponseBlock[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
@@ -53,11 +59,22 @@ export function StageResponseBuilder({
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
 
   useEffect(() => {
-    readStageResponses(projectCode, stageName).then((next) => {
+    readStageResponses(projectCode, stageName).then(async (next) => {
       if (changeVersion.current > 0) return;
-      blocksRef.current = next;
-      setBlocks(next);
-    }).catch(() => undefined);
+      let sharedBlocks = next;
+      if (!sharedBlocks.length && canManageResponses) {
+        const legacyBlocks = readLegacyStageResponses(projectCode, stageName);
+        if (legacyBlocks.length) {
+          await saveStageResponses(projectCode, stageName, legacyBlocks);
+          clearLegacyStageResponses(projectCode, stageName);
+          sharedBlocks = legacyBlocks;
+        }
+      }
+      blocksRef.current = sharedBlocks;
+      setBlocks(sharedBlocks);
+    }).catch((error) => {
+      setResponseError(error instanceof Error ? error.message : 'Unable to load response sections.');
+    });
     let active = true;
     fetchProjectAttachments(projectCode, stageName)
       .then((items) => {
@@ -89,6 +106,7 @@ export function StageResponseBuilder({
   }, [projectCode, stageName]);
 
   function persist(nextBlocks: StageResponseBlock[], newBlockId?: string) {
+    if (!canManageResponses) return;
     const saved = nextBlocks;
     const version = ++changeVersion.current;
     blocksRef.current = saved;
@@ -105,6 +123,7 @@ export function StageResponseBuilder({
         .then(() => saveStageResponses(projectCode, stageName, snapshot))
         .then(() => undefined)
         .catch(() => {
+          setResponseError('Stage response changes could not be saved.');
           showToast({ tone: 'error', title: 'Save failed', message: 'Stage response changes could not be saved.' });
         });
     }, 500);
@@ -123,6 +142,7 @@ export function StageResponseBuilder({
   }, [projectCode, stageName]);
 
   function addBlock(type: StageResponseBlock['type']) {
+    if (!canManageResponses) return;
     const now = new Date().toISOString();
     const base = { id: makeStageResponseId(type), createdAt: now, updatedAt: now };
     if (type === 'table') persist([...blocksRef.current, { ...base, type, title: 'Table', table: makeStageResponseTable('Table') }], base.id);
@@ -313,6 +333,7 @@ export function StageResponseBuilder({
   if (mode === 'blocks') {
     return (
       <div className="pb-4">
+        {responseError ? <p className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{responseError}</p> : null}
         {sheetPickerView}
       {addTableView}
         {blocks.length ? blocks.map((block, index) => (
@@ -320,7 +341,7 @@ export function StageResponseBuilder({
                 data-stage-section={`response-${block.id}`}
                 id={`stage-response-${block.id}`}
                 key={block.id}
-                className={`mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-soft transition-opacity ${draggedBlockId === block.id ? 'opacity-50' : ''}`}
+                className={`mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-soft transition-opacity ${draggedBlockId === block.id ? 'opacity-50' : ''} ${!canManageResponses ? 'pointer-events-none' : ''}`}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => handleDrop(event, block.id)}
               >
@@ -338,16 +359,15 @@ export function StageResponseBuilder({
 
   return (
     <div className="pb-4" data-stage-section-ignore={mode === 'controls' ? 'true' : undefined}>
+      {responseError ? <p className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{responseError}</p> : null}
       {sheetPickerView}
       {addTableView}
-        {
-        <div className="flex flex-wrap justify-end gap-2">
+        {canManageResponses ? <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => setShowAddTable(true)}><Table2 size={16} />Add Table</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('text')}><Type size={16} />Add Text Area</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('checklist')}><CheckSquare size={16} />Add Checklist</button>
           <button type="button" className="secondary-button h-10 text-primary" onClick={() => addBlock('file')}><FileUp size={16} />Upload File</button>
-        </div>
-        }
+        </div> : null}
 
           {mode !== 'controls' && blocks.length ? (
           <div className="mt-4 space-y-4">
@@ -355,7 +375,7 @@ export function StageResponseBuilder({
               <section
                 id={`stage-response-${block.id}`}
                 key={block.id}
-                className={`rounded-lg border border-slate-200 bg-white p-4 shadow-soft transition-opacity ${draggedBlockId === block.id ? 'opacity-50' : ''}`}
+                className={`rounded-lg border border-slate-200 bg-white p-4 shadow-soft transition-opacity ${draggedBlockId === block.id ? 'opacity-50' : ''} ${!canManageResponses ? 'pointer-events-none' : ''}`}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => handleDrop(event, block.id)}
               >

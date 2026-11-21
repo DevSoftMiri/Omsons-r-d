@@ -36,6 +36,20 @@ export function stageResponseStorageKey(projectCode: string, stageName: string) 
   return `stage-responses:${projectCode}:${stageName}`;
 }
 
+export function readLegacyStageResponses(projectCode: string, stageName: string): StageResponseBlock[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(stageResponseStorageKey(projectCode, stageName));
+    return raw ? normalizeBlocks(JSON.parse(raw)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function clearLegacyStageResponses(projectCode: string, stageName: string) {
+  if (typeof window !== 'undefined') window.localStorage.removeItem(stageResponseStorageKey(projectCode, stageName));
+}
+
 export function stageSectionOrderStorageKey(projectCode: string, stageName: string) {
   return `stage-section-order:${projectCode}:${stageName}`;
 }

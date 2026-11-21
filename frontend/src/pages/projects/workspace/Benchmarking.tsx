@@ -274,7 +274,7 @@ export function Benchmarking() {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Product research workspace</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-900">Benchmarking</h1>
           <p className="mt-1 text-sm text-slate-600">Create comparison sheets with competitor/reference products to define target requirements for R&D.</p>
-          {message ? <p className="mt-2 text-sm font-semibold text-amber-700">{message}</p> : null}
+          {message ? <p className="mt-2 text-sm font-semibold text-rose-700">{message}</p> : null}
         </div>
         <div className="flex gap-2">
           <button className="primary-button" onClick={() => setShowAddModal(true)}><Plus size={18} />Add Table</button>

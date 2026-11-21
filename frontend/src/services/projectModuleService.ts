@@ -13,7 +13,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
 export async function fetchProjectModule<T>(projectId: string, module: string) {
   const response = await fetch(`${API_BASE}/projects/${projectId}/modules/${encodeURIComponent(module)}`, { headers: authHeaders() });
-  return parseResponse<{ data: T | null; updatedAt: string | null }>(response);
+  return parseResponse<{ data: T | null; updatedAt: string | null; module?: string; projectId?: string; exists?: boolean }>(response);
+}
+
+export async function fetchApiHealth() {
+  const response = await fetch(`${API_BASE}/health`);
+  return parseResponse<{ ok: boolean; service: string; database: string; environment: string }>(response);
 }
 
 export async function updateProjectModule<T>(projectId: string, module: string, data: T) {

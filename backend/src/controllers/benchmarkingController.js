@@ -120,11 +120,22 @@ export const createBenchmarkingTable = asyncHandler(async (req, res) => {
 export const updateBenchmarkingTable = asyncHandler(async (req, res) => {
   const project = await findProject(req.params.id);
   const benchmarking = await getOrCreateBenchmarking(project._id);
-  const table = benchmarking.tables.id(req.params.tableId);
+  let table = benchmarking.tables.id(req.params.tableId);
 
   if (!table) {
-    res.status(404);
-    throw new Error('Benchmarking table not found');
+    // Reconcile tables created by an older/local client into the shared
+    // workbook instead of losing the user's first edit because its client id
+    // does not match the MongoDB subdocument id.
+    if (!Array.isArray(req.body.columns) || !Array.isArray(req.body.rows)) {
+      res.status(404);
+      throw new Error('Benchmarking table not found');
+    }
+    benchmarking.tables.push({
+      name: req.body.name || `Table ${benchmarking.tables.length + 1}`,
+      columns: req.body.columns,
+      rows: req.body.rows
+    });
+    table = benchmarking.tables[benchmarking.tables.length - 1];
   }
 
   if (req.body.name !== undefined) table.name = req.body.name;

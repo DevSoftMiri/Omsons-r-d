@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import mongoose from 'mongoose';
 import authRoutes from './routes/authRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import vendorRoutes from './routes/vendorRoutes.js';
@@ -17,7 +18,12 @@ export function createApp() {
   app.use('/uploads', express.static('uploads'));
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'glassware-rnd-api' });
+    res.json({
+      ok: mongoose.connection.readyState === 1,
+      service: 'glassware-rnd-api',
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      environment: process.env.NODE_ENV || 'development'
+    });
   });
 
   app.use('/api/auth', authRoutes);

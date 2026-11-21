@@ -19,6 +19,7 @@ import { calculateValidationResult } from './validationResult';
 import { useAppSelector } from '../../../hooks';
 import { useAppDispatch } from '../../../hooks';
 import { fetchTestingValidation, hasTestingValidationBackend, saveTestingValidation, completeTestingValidation } from '../../../services/testingValidationService';
+import { readStageResponses } from '../../../services/stageResponseService';
 import { upsertProject } from '../../../store';
 import type { Project } from '../../../types';
 
@@ -67,7 +68,22 @@ export function TestingValidation() {
     if (!hasTestingValidationBackend()) return;
     let active = true;
     fetchTestingValidation(project.productCode)
-      .then((workbook) => { if (active) { setTables(workbook.tables.map(applyValidationResults)); setLastSaved(workbook.updatedAt || ''); setBackendReady(true); } })
+      .then(async (workbook) => {
+        if (!active) return;
+        let nextTables = workbook.tables || [];
+        // Staff-created Testing & Validation response tables are stored in the
+        // shared stage-response module. Show them when no formal Auditor
+        // workbook exists yet, so read-only users still see shared content.
+        if (!nextTables.length) {
+          const blocks = await readStageResponses(project.productCode, 'Testing & Validation');
+          nextTables = blocks.filter((block): block is Extract<typeof block, { type: 'table' }> => block.type === 'table').map((block) => block.table);
+        }
+        if (active) {
+          setTables(nextTables.map(applyValidationResults));
+          setLastSaved(workbook.updatedAt || '');
+          setBackendReady(true);
+        }
+      })
       .catch(() => { if (active) setBackendReady(true); });
     return () => { active = false; };
   }, [project.productCode]);
@@ -94,7 +110,7 @@ export function TestingValidation() {
     [tables]
   );
   const hasFailingResult = useMemo(() => tables.some(hasFailResult), [tables]);
-  const canComplete = tables.length >= 2 && hasMeaningfulData && !hasFailingResult && saveState === 'Saved';
+  const canComplete = canEditTestValues && tables.length >= 2 && hasMeaningfulData && !hasFailingResult && saveState === 'Saved';
 
   function updateTable(table: BenchmarkingTableData) {
     setTables((current) => current.map((candidate) => candidate._id === table._id ? applyValidationResults(table) : candidate));
@@ -205,8 +221,8 @@ export function TestingValidation() {
           </span>
         </div>
         <div className="text-right">
-          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete ? 'invisible' : ''}`}>Add validation data, save changes and resolve failed results before completing this stage.</p>
-          <button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} onClick={handleCompleteStage}>
+          <p className={`mb-2 h-5 overflow-hidden text-sm font-semibold text-amber-700 ${canComplete || !canEditTestValues ? 'invisible' : ''}`}>Add validation data, save changes and resolve failed results before completing this stage.</p>
+          <button className={`primary-button h-10 min-w-72 justify-center ${!canComplete ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!canComplete} disabled={!canEditTestValues} onClick={handleCompleteStage}>
             <Check size={18} />
             Mark Testing & Validation Complete
           </button>
