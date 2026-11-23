@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler';
 import { Certificate } from '../models/Certificate.js';
 import { Project } from '../models/Project.js';
 import { REQUIRED_PREREQUISITE_DOCUMENTS } from '../constants/prerequisites.js';
-import { deleteProjectDocument, uploadProjectDocument } from '../services/supabaseStorageService.js';
+import { createProjectDocumentUpload, deleteProjectDocument, uploadProjectDocument } from '../services/supabaseStorageService.js';
 import { notifyProjectUsers } from '../services/notificationService.js';
 
 function safeFileName(name) {
@@ -205,6 +205,28 @@ export const uploadPrerequisite = asyncHandler(async (req, res) => {
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
 
+  res.status(201).json(certificate);
+});
+
+export const createPrerequisiteUpload = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const type = decodeURIComponent(req.params.type);
+  const name = String(req.body.name || '').trim();
+  if (!name) { res.status(400); throw new Error('File name is required'); }
+  if (!getProjectDocumentTypes(project).some((item) => item.toLowerCase() === type.toLowerCase())) { res.status(400); throw new Error('Invalid prerequisite document type'); }
+  const path = `projects/${project._id}/prerequisites/${safeDocumentType(type)}/${Date.now()}-${safeFileName(name)}`;
+  res.json(await createProjectDocumentUpload({ path }));
+});
+
+export const completePrerequisiteUpload = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const type = decodeURIComponent(req.params.type);
+  const { storagePath, publicUrl, name, mimeType, fileSize } = req.body;
+  if (!storagePath || !name) { res.status(400); throw new Error('Upload metadata is incomplete'); }
+  if (!storagePath.startsWith(`projects/${project._id}/prerequisites/`) || Number(fileSize) > 10 * 1024 * 1024) { res.status(400); throw new Error('Invalid prerequisite upload'); }
+  const existing = await Certificate.findOne({ project: project._id, type });
+  if (existing?.storagePath) await deleteProjectDocument(existing.storagePath);
+  const certificate = await Certificate.findOneAndUpdate({ project: project._id, type }, { project: project._id, type, fileName: name, mimeType, fileSize, storagePath, publicUrl, fileUrl: publicUrl, status: 'Uploaded', uploadedBy: req.user?._id, approvedBy: undefined, reviewNotes: undefined, rejectedReason: undefined }, { new: true, upsert: true, setDefaultsOnInsert: true });
   res.status(201).json(certificate);
 });
 

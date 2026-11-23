@@ -33,6 +33,12 @@ export interface PrerequisitePayload {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+function getSupabaseClient() {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Supabase upload configuration is missing.');
+  return createClient(url, key);
+}
 const REQUIRED_DOCUMENT_TYPES = [
   'ISO Certificate',
   'Calibration Certificate',
@@ -148,24 +154,17 @@ export async function fetchPrerequisites(projectId: string) {
 }
 
 export async function uploadPrerequisite(projectId: string, type: string, file: File) {
+  if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds the 10 MB upload limit.`);
   if (!hasBackendAuth()) {
     return saveLocalUpload(projectId, type, file);
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await fetch(`${API_BASE}/projects/${projectId}/prerequisites/${encodeURIComponent(type)}/upload`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: formData
-  });
-  if (response.ok) return (response.json() as Promise<UploadedCertificate>).then((certificate) => normalizeCertificate(certificate) as UploadedCertificate);
-
-  const error = await response.json().catch(() => ({ message: 'Request failed' }));
-  if (response.status === 404 || error.message === 'Project not found') {
-    return saveLocalUpload(projectId, type, file);
-  }
-  throw new Error(error.message || 'Upload failed');
+  const prefix = `${API_BASE}/projects/${projectId}/prerequisites/${encodeURIComponent(type)}`;
+  const uploadInfo = await parseResponse<any>(await fetch(`${prefix}/upload-url`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ name: file.name }) }));
+  const { error: uploadError } = await getSupabaseClient().storage.from(uploadInfo.bucket).uploadToSignedUrl(uploadInfo.storagePath, uploadInfo.token, file);
+  if (uploadError) throw new Error(uploadError.message);
+  const response = await fetch(`${prefix}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ storagePath: uploadInfo.storagePath, publicUrl: uploadInfo.publicUrl, name: file.name, mimeType: file.type, fileSize: file.size }) });
+  return parseResponse<UploadedCertificate>(response).then((certificate) => normalizeCertificate(certificate) as UploadedCertificate);
 }
 
 export async function addPrerequisiteDocument(projectId: string, type: string) {
@@ -281,3 +280,5 @@ export async function deletePrerequisite(projectId: string, certificateId: strin
     throw new Error(error.message || 'Request failed');
   }
 }
+import { createClient } from '@supabase/supabase-js';
+

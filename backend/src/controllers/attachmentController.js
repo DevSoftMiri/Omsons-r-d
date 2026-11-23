@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import asyncHandler from 'express-async-handler';
 import { Attachment } from '../models/Attachment.js';
 import { Project } from '../models/Project.js';
-import { deleteProjectDocument, uploadProjectDocument } from '../services/supabaseStorageService.js';
+import { createProjectDocumentUpload, deleteProjectDocument, uploadProjectDocument } from '../services/supabaseStorageService.js';
 
 function safeFileName(name) {
   return name
@@ -71,6 +71,26 @@ export const uploadAttachment = asyncHandler(async (req, res) => {
     note
   });
 
+  res.status(201).json(attachment);
+});
+
+export const createAttachmentUpload = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const name = String(req.body.name || '').trim();
+  if (!name) { res.status(400); throw new Error('File name is required'); }
+  const stage = String(req.body.stage || 'Attachments');
+  const sectionId = req.body.sectionId || undefined;
+  const sectionPath = sectionId ? `/${safeStage(sectionId)}` : '';
+  const path = `projects/${project._id}/${safeStage(stage)}${sectionPath}/${Date.now()}-${safeFileName(name)}`;
+  res.json(await createProjectDocumentUpload({ path }));
+});
+
+export const completeAttachmentUpload = asyncHandler(async (req, res) => {
+  const project = await findProject(req.params.id);
+  const { storagePath, publicUrl, name, mimeType, fileSize, stage = 'Attachments', sectionId, note } = req.body;
+  if (!storagePath || !name) { res.status(400); throw new Error('Upload metadata is incomplete'); }
+  if (!storagePath.startsWith(`projects/${project._id}/`) || Number(fileSize) > 10 * 1024 * 1024) { res.status(400); throw new Error('Invalid attachment upload'); }
+  const attachment = await Attachment.create({ project: project._id, stage, sectionId, name, mimeType, fileSize, storagePath, url: publicUrl, fileUrl: publicUrl, uploadedBy: req.user?._id, note: note?.trim() || undefined });
   res.status(201).json(attachment);
 });
 

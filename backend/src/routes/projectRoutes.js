@@ -8,7 +8,7 @@ import {
   importBenchmarkingTable,
   updateBenchmarkingTable
 } from '../controllers/benchmarkingController.js';
-import { deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
+import { completeAttachmentUpload, createAttachmentUpload, deleteAttachment, listAttachments, uploadAttachment } from '../controllers/attachmentController.js';
 import { updateProject, requireProjectEditor, projectCreationOptions, addProjectStage, deleteProjectStage, addProjectTeamMember, createProject, deleteProject, getProject, listProjectTeamCandidates, listProjects, removeProjectTeamMember, reorderProjectStages, updateProjectReportTo, updateProjectStatus, updateStage } from '../controllers/projectController.js';
 import { getBomWorkspace, updateBomWorkspace } from '../controllers/bomWorkspaceController.js';
 import { getProjectModule, updateProjectModule } from '../controllers/projectModuleController.js';
@@ -16,6 +16,8 @@ import {
   addPrerequisiteDocument,
   deletePrerequisiteDocument,
   deletePrerequisite,
+  completePrerequisiteUpload,
+  createPrerequisiteUpload,
   listPrerequisites,
   reviewPrerequisite,
   updatePrerequisiteDocument,
@@ -50,6 +52,8 @@ router.patch('/:id/stages/reorder', protect, authorize('Admin', 'Staff'), requir
 router.patch('/:id/status', protect, authorize('Admin', 'Staff'), requireProjectEditor, updateProjectStatus);
 router.delete('/:id', protect, authorize('Admin'), deleteProject);
 router.get('/:id/attachments', protect, listAttachments);
+router.post('/:id/attachments/upload-url', protect, createAttachmentUpload);
+router.post('/:id/attachments/complete', protect, completeAttachmentUpload);
 router.post('/:id/attachments/upload', protect, attachmentUpload.single('file'), uploadAttachment);
 router.delete('/:id/attachments/:attachmentId', protect, deleteAttachment);
 router.get('/:id/prerequisites', protect, listPrerequisites);
@@ -57,6 +61,8 @@ router.post('/:id/prerequisites/documents', protect, authorize('Admin'), addPrer
 router.patch('/:id/prerequisites/documents/:type', protect, authorize('Admin'), updatePrerequisiteDocument);
 router.delete('/:id/prerequisites/documents/:type', protect, authorize('Admin'), deletePrerequisiteDocument);
 router.post('/:id/prerequisites/:type/upload', protect, prerequisiteUpload.single('file'), uploadPrerequisite);
+router.post('/:id/prerequisites/:type/upload-url', protect, createPrerequisiteUpload);
+router.post('/:id/prerequisites/:type/complete', protect, completePrerequisiteUpload);
 router.patch('/:id/prerequisites/:certificateId/review', protect, authorize('Admin'), reviewPrerequisite);
 router.delete('/:id/prerequisites/:certificateId', protect, authorize('Admin'), deletePrerequisite);
 router.get('/:id', protect, getProject);

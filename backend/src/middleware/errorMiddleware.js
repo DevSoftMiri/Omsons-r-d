@@ -11,7 +11,7 @@ export function errorHandler(error, _req, res, _next) {
     : error.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   res.status(status).json({
     message: error.code === 'LIMIT_FILE_SIZE'
-      ? 'Attachment exceeds the 10 MB limit.'
+      ? 'Attachment exceeds the 4 MB upload limit.'
       : error.message || 'Upload failed.',
     stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
   });

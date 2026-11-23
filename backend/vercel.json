@@ -6,6 +6,17 @@
       "destination": "/api/index.js"
     }
   ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://omsonsr-d.omsonsinstruments.in" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
+        { "key": "Vary", "value": "Origin" }
+      ]
+    }
+  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 30

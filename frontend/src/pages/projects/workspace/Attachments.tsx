@@ -79,7 +79,7 @@ export function Attachments() {
     const validFiles = Array.from(selectedFiles).filter((file) => acceptedFileTypes.split(',').includes(file.type));
 
     if (!validFiles.length) {
-      setMessage('Please upload PDF, JPG, PNG, or WebP files.');
+      setMessage('Please upload PDF, JPG, PNG, or WebP files under 4 MB.');
       return;
     }
 
@@ -172,7 +172,7 @@ export function Attachments() {
                   click to upload
                 </label>
               </p>
-              <p className="mt-1.5 text-xs text-slate-500">Supported formats: PDF, JPG, PNG, WebP | Max file size: 10MB per file</p>
+              <p className="mt-1.5 text-xs text-slate-500">Supported formats: PDF, JPG, PNG, WebP | Max file size: 4MB per file</p>
               <input id="attachments-upload" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={handleInputChange} />
             </div>
           </div>
@@ -184,7 +184,7 @@ export function Attachments() {
               <h3 className="font-bold">Upload Guidelines</h3>
             </div>
             <ul className="space-y-1.5 text-xs text-slate-600">
-              {['You can upload PDF, JPG, PNG, and WebP files.', 'Maximum file size is 10MB per file.', 'Use clear and descriptive file names.', 'These files will be stored with this project only.'].map((item) => (
+              {['You can upload PDF, JPG, PNG, and WebP files under 4MB.', 'Maximum file size is 4MB per file.', 'Use clear and descriptive file names.', 'These files will be stored with this project only.'].map((item) => (
                 <li key={item} className="flex gap-3">
                   <span className="mt-2 h-2 w-2 rounded-full bg-primary" />
                   <span>{item}</span>

@@ -34,6 +34,15 @@ export async function uploadProjectDocument({ path, buffer, mimeType }) {
   };
 }
 
+export async function createProjectDocumentUpload({ path }) {
+  const client = getSupabaseClient();
+  const bucket = getProjectDocumentsBucket();
+  const { data, error } = await client.storage.from(bucket).createSignedUploadUrl(path);
+  if (error) throw new Error(error.message);
+  const { data: publicData } = client.storage.from(bucket).getPublicUrl(path);
+  return { bucket, storagePath: path, token: data.token, publicUrl: publicData.publicUrl };
+}
+
 export async function deleteProjectDocument(path) {
   if (!path) return;
   const client = getSupabaseClient();

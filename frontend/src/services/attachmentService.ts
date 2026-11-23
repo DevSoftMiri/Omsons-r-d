@@ -1,4 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+function getSupabaseClient() {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Supabase upload configuration is missing.');
+  return createClient(url, key);
+}
 
 export interface ProjectAttachment {
   _id: string;
@@ -77,23 +85,16 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
     return attachment;
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('stage', stage);
-  if (sectionId) formData.append('sectionId', sectionId);
-  if (note?.trim()) formData.append('note', note.trim());
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60000);
-  try {
-    const response = await fetch(`${API_BASE}/projects/${projectId}/attachments/upload`, {
-      method: 'POST', headers: authHeaders(), body: formData, signal: controller.signal
-    });
-    return await parseResponse<ProjectAttachment>(response);
-  } catch (error) {
-    if (controller.signal.aborted) throw new Error('Upload timed out. Please check the attachment list before trying again.');
-    throw error;
-  } finally { clearTimeout(timer); }
+  const uploadInfo = await parseResponse<any>(await fetch(`${API_BASE}/projects/${projectId}/attachments/upload-url`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ name: file.name, stage, sectionId })
+  }));
+  const { error } = await getSupabaseClient().storage.from(uploadInfo.bucket).uploadToSignedUrl(uploadInfo.storagePath, uploadInfo.token, file);
+  if (error) throw new Error(error.message);
+  return parseResponse<ProjectAttachment>(await fetch(`${API_BASE}/projects/${projectId}/attachments/complete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ storagePath: uploadInfo.storagePath, publicUrl: uploadInfo.publicUrl, name: file.name, mimeType: file.type, fileSize: file.size, stage, sectionId, note })
+  }));
 
 }
 
