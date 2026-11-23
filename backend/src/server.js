@@ -13,7 +13,23 @@ import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  const allowedOrigins = new Set([
+    'https://omsonsr-d.omsonsinstruments.in',
+    'https://omsons-r-d.vercel.app',
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.replace(/\/$/, '')] : [])
+  ]);
+
+  app.use(cors({
+    origin(origin, callback) {
+      // Allow non-browser requests (health checks, server-to-server calls).
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204
+  }));
+  app.options('*', cors());
   app.use(express.json({ limit: '10mb' }));
   app.use('/uploads', express.static('uploads'));
 

@@ -16,11 +16,23 @@ async function ensureDatabase() {
 }
 
 export default async function handler(req, res) {
-  await ensureDatabase();
-
   if (!app) {
     app = createApp();
   }
 
-  return app(req, res);
+  try {
+    await ensureDatabase();
+    return app(req, res);
+  } catch (error) {
+    // The Express CORS middleware cannot run if initialization fails first.
+    // Keep the browser response readable instead of turning the failure into
+    // a misleading CORS error.
+    const origin = req.headers.origin;
+    if (origin === 'https://omsonsr-d.omsonsinstruments.in' || origin === 'https://omsons-r-d.vercel.app') {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    console.error('API initialization failed:', error);
+    return res.status(503).json({ message: 'API temporarily unavailable.' });
+  }
 }

@@ -4,9 +4,15 @@ export function notFound(req, res, next) {
 }
 
 export function errorHandler(error, _req, res, _next) {
-  const status = error.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
+  // Multer errors otherwise surface as an unhelpful connection failure in
+  // some Vite proxy/browser combinations.
+  const status = error.code === 'LIMIT_FILE_SIZE'
+    ? 413
+    : error.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   res.status(status).json({
-    message: error.message,
+    message: error.code === 'LIMIT_FILE_SIZE'
+      ? 'Attachment exceeds the 10 MB limit.'
+      : error.message || 'Upload failed.',
     stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
   });
 }

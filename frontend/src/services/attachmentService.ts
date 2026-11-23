@@ -41,7 +41,7 @@ function writeLocal(projectId: string, stage: string, attachments: ProjectAttach
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    const error = await response.json().catch(async () => ({ message: await response.text().catch(() => 'Request failed') }));
     throw new Error(error.message || 'Request failed');
   }
   return response.json() as Promise<T>;
