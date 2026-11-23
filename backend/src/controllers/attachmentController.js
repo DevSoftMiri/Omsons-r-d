@@ -39,10 +39,6 @@ export const listAttachments = asyncHandler(async (req, res) => {
 
 export const uploadAttachment = asyncHandler(async (req, res) => {
   const requestedStage = req.body.stage || req.query.stage || 'Attachments';
-  if (requestedStage === 'Testing & Validation' && req.user.role === 'Admin') {
-    res.status(403);
-    throw new Error('Admins have read-only access to Testing & Validation files');
-  }
   const project = await findProject(req.params.id);
   const stage = requestedStage;
   const sectionId = req.body.sectionId || undefined;
@@ -84,11 +80,6 @@ export const deleteAttachment = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Attachment not found');
   }
-  if (attachment.stage === 'Testing & Validation' && req.user.role === 'Admin') {
-    res.status(403);
-    throw new Error('Admins have read-only access to Testing & Validation files');
-  }
-
   await deleteProjectDocument(attachment.storagePath);
   await attachment.deleteOne();
   res.status(204).end();

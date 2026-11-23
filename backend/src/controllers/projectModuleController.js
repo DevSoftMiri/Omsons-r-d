@@ -36,10 +36,6 @@ export const getProjectModule = asyncHandler(async (req, res) => {
 });
 
 export const updateProjectModule = asyncHandler(async (req, res) => {
-  if (String(req.params.module) === 'stage-responses:Testing & Validation' && req.user.role === 'Admin') {
-    res.status(403);
-    throw new Error('Admins have read-only access to Testing & Validation response sections');
-  }
   const project = await findProject(req.params.id, req.user);
   if (!validateData(req.body?.data, req.params.module)) {
     res.status(400);
