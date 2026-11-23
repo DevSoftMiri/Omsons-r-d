@@ -42,7 +42,10 @@ export function StageResponseBuilder({
   const uploadingFileKeys = useRef(new Set<string>());
   const { showToast } = useToast();
   const userRole = useAppSelector((state) => state.auth.user?.role);
-  const canManageResponses = userRole === 'staff' || userRole === 'auditor';
+  // Admins should have the same stage-content controls as staff and auditors.
+  // They were previously excluded here, which hid upload/edit controls and
+  // also prevented response changes from being persisted.
+  const canManageResponses = userRole === 'admin' || userRole === 'staff' || userRole === 'auditor';
   const [blocks, setBlocks] = useState<StageResponseBlock[]>([]);
   const [responseError, setResponseError] = useState('');
   const blocksRef = useRef<StageResponseBlock[]>([]);
@@ -352,7 +355,7 @@ export function StageResponseBuilder({
                 {block.type === 'file' ? <FileBlock attachments={attachmentsForSection(block.id)} note={attachmentNote} onNoteChange={setAttachmentNote} onDelete={removeAttachment} onUpload={(event) => uploadFiles(event, block.id, attachmentNote)} /> : null}
               </section>
             )) : null}
-        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} /> : null}
+        {!hasFileBlock ? <input data-stage-section-ignore="true" className="sr-only" type="file" multiple accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} /> : null}
       </div>
     );
   }
@@ -413,7 +416,7 @@ export function StageResponseBuilder({
       ) : null}
 
       {!hasFileBlock ? (
-        <input className="sr-only" type="file" accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} />
+        <input className="sr-only" type="file" multiple accept={acceptedFileTypes} onChange={(event) => { if (firstFileBlockId) uploadFiles(event, firstFileBlockId, attachmentNote); }} />
       ) : null}
     </div>
   );
@@ -516,8 +519,8 @@ function FileBlock({ attachments, note, onNoteChange, onUpload, onDelete }: { at
       <div className="flex flex-wrap items-end gap-3">
         <label className="secondary-button h-10 cursor-pointer text-primary">
           <FileUp size={16} />
-          Choose File
-          <input className="hidden" type="file" accept={acceptedFileTypes} onChange={onUpload} />
+          Choose Files
+          <input className="hidden" type="file" multiple accept={acceptedFileTypes} onChange={onUpload} />
         </label>
         <label className="min-w-64 flex-1">
           <span className="mb-1 block text-xs font-bold text-slate-600">Note <span className="font-normal text-slate-400">(optional)</span></span>
