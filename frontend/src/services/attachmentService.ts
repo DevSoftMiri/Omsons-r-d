@@ -2,16 +2,17 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export type UploadProgress = (progress: number) => void;
 
-async function uploadSignedFile(uploadInfo: { storagePath: string; token: string }, file: File, onProgress?: UploadProgress) {
+async function uploadSignedFile(uploadInfo: { bucket: string; storagePath: string; token: string }, file: File, onProgress?: UploadProgress) {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) throw new Error('Supabase upload configuration is missing.');
   await new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open('POST', `${url}/storage/v1/object/upload/sign/${uploadInfo.storagePath.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(uploadInfo.token)}`);
+    request.open('PUT', `${url}/storage/v1/object/upload/sign/${[uploadInfo.bucket, ...uploadInfo.storagePath.split('/')].map(encodeURIComponent).join('/')}?token=${encodeURIComponent(uploadInfo.token)}`);
     request.setRequestHeader('apikey', key);
     request.setRequestHeader('Authorization', `Bearer ${key}`);
     request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    request.setRequestHeader('x-upsert', 'false');
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
     };
