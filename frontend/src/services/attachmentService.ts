@@ -1,11 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-function getSupabaseClient() {
+
+export type UploadProgress = (progress: number) => void;
+
+async function uploadSignedFile(uploadInfo: { storagePath: string; token: string }, file: File, onProgress?: UploadProgress) {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) throw new Error('Supabase upload configuration is missing.');
-  return createClient(url, key);
+  await new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('POST', `${url}/storage/v1/object/upload/sign/${uploadInfo.storagePath.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(uploadInfo.token)}`);
+    request.setRequestHeader('apikey', key);
+    request.setRequestHeader('Authorization', `Bearer ${key}`);
+    request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onload = () => request.status >= 200 && request.status < 300
+      ? resolve()
+      : reject(new Error(`Supabase upload failed (${request.status}).`));
+    request.onerror = () => reject(new Error('Supabase upload failed. Check your connection and try again.'));
+    request.onabort = () => reject(new Error('Upload was cancelled.'));
+    request.send(file);
+  });
 }
 
 export interface ProjectAttachment {
@@ -64,7 +80,7 @@ export async function fetchProjectAttachments(projectId: string, stage = 'Attach
   return parseResponse<ProjectAttachment[]>(response);
 }
 
-export async function uploadProjectAttachment(projectId: string, stage: string, file: File, sectionId?: string, note?: string) {
+export async function uploadProjectAttachment(projectId: string, stage: string, file: File, sectionId?: string, note?: string, onProgress?: UploadProgress) {
   if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds the 10 MB upload limit.`);
   if (!hasBackendAuth()) {
     const url = URL.createObjectURL(file);
@@ -89,8 +105,7 @@ export async function uploadProjectAttachment(projectId: string, stage: string, 
     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ name: file.name, stage, sectionId })
   }));
-  const { error } = await getSupabaseClient().storage.from(uploadInfo.bucket).uploadToSignedUrl(uploadInfo.storagePath, uploadInfo.token, file);
-  if (error) throw new Error(error.message);
+  await uploadSignedFile(uploadInfo, file, onProgress);
   return parseResponse<ProjectAttachment>(await fetch(`${API_BASE}/projects/${projectId}/attachments/complete`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ storagePath: uploadInfo.storagePath, publicUrl: uploadInfo.publicUrl, name: file.name, mimeType: file.type, fileSize: file.size, stage, sectionId, note })

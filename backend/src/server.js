@@ -14,6 +14,8 @@ export function createApp() {
   const app = express();
 
   const allowedOrigins = new Set([
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
     'https://omsonsr-d.omsonsinstruments.in',
     'https://omsons-r-d.vercel.app',
     ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.replace(/\/$/, '')] : [])

@@ -9,6 +9,7 @@ import {
   FileImage,
   FileText,
   Info,
+  Loader2,
   MoreVertical,
   Search,
   Trash2,
@@ -36,6 +37,7 @@ type AttachmentFile = {
   url: string;
   mimeType: string;
 };
+type UploadItem = { id: string; name: string; progress: number; status: 'uploading' | 'success' | 'error'; error?: string };
 
 const acceptedFileTypes = 'application/pdf,image/jpeg,image/png,image/webp';
 
@@ -50,6 +52,7 @@ export function Attachments() {
   const [previewFile, setPreviewFile] = useState<AttachmentFile | null>(null);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -79,14 +82,23 @@ export function Attachments() {
     const validFiles = Array.from(selectedFiles).filter((file) => acceptedFileTypes.split(',').includes(file.type));
 
     if (!validFiles.length) {
-      setMessage('Please upload PDF, JPG, PNG, or WebP files under 4 MB.');
+      setMessage('Please upload PDF, JPG, PNG, or WebP files under 10 MB.');
       return;
     }
 
     try {
       for (const file of validFiles) {
-        const uploaded = await uploadProjectAttachment(project.productCode, 'Attachments', file);
-        setFiles(current => [toAttachmentFile(uploaded), ...current]);
+        const id = `${file.name}-${file.size}-${Date.now()}`;
+        setUploads(current => [...current, { id, name: file.name, progress: 0, status: 'uploading' }]);
+        try {
+          const uploaded = await uploadProjectAttachment(project.productCode, 'Attachments', file, undefined, undefined, (progress) => setUploads(current => current.map(item => item.id === id ? { ...item, progress } : item)));
+          setFiles(current => [toAttachmentFile(uploaded), ...current]);
+          setUploads(current => current.map(item => item.id === id ? { ...item, progress: 100, status: 'success' } : item));
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'Upload failed';
+          setUploads(current => current.map(item => item.id === id ? { ...item, status: 'error', error: reason } : item));
+          throw error;
+        }
       }
       setMessage(`${validFiles.length} file(s) uploaded.`);
     } catch (error) {
@@ -172,8 +184,9 @@ export function Attachments() {
                   click to upload
                 </label>
               </p>
-              <p className="mt-1.5 text-xs text-slate-500">Supported formats: PDF, JPG, PNG, WebP | Max file size: 4MB per file</p>
+              <p className="mt-1.5 text-xs text-slate-500">Supported formats: PDF, JPG, PNG, WebP | Max file size: 10MB per file</p>
               <input id="attachments-upload" className="sr-only" type="file" accept={acceptedFileTypes} multiple onChange={handleInputChange} />
+              {uploads.length ? <div className="mt-3 w-full max-w-xl space-y-2 text-left">{uploads.map((upload) => <div key={upload.id} className="rounded-lg border border-slate-200 bg-white p-2.5"><div className="flex items-center gap-2 text-xs font-semibold"><span className="min-w-0 flex-1 truncate">{upload.name}</span>{upload.status === 'uploading' ? <><Loader2 className="animate-spin text-primary" size={14} /><span>{upload.progress}%</span></> : upload.status === 'success' ? <span className="text-emerald-600">Uploaded</span> : <span className="text-rose-600">Failed</span>}</div>{upload.status === 'uploading' ? <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${upload.progress}%` }} /></div> : null}{upload.status === 'error' ? <p className="mt-1 text-xs text-rose-600">{upload.error}</p> : null}</div>)}</div> : null}
             </div>
           </div>
           <div className="border-slate-200 lg:border-l lg:pl-5">
@@ -184,7 +197,7 @@ export function Attachments() {
               <h3 className="font-bold">Upload Guidelines</h3>
             </div>
             <ul className="space-y-1.5 text-xs text-slate-600">
-              {['You can upload PDF, JPG, PNG, and WebP files under 4MB.', 'Maximum file size is 4MB per file.', 'Use clear and descriptive file names.', 'These files will be stored with this project only.'].map((item) => (
+              {['You can upload PDF, JPG, PNG, and WebP files under 10MB.', 'Maximum file size is 10MB per file.', 'Use clear and descriptive file names.', 'These files will be stored with this project only.'].map((item) => (
                 <li key={item} className="flex gap-3">
                   <span className="mt-2 h-2 w-2 rounded-full bg-primary" />
                   <span>{item}</span>
