@@ -31,19 +31,20 @@ export function ResearchData() {
     return () => { active = false; };
   }, [project.productCode]);
 
-  async function uploadFile(file: File) {
+  async function uploadFiles(files: File[]) {
+    if (!files.length) return;
     setUploading(true);
     setMessage('');
-    try {
-      const uploaded = await uploadProjectAttachment(project.productCode, 'Research Data', file, undefined, note);
-      setAttachments((current) => [uploaded, ...current]);
+    const results = await Promise.allSettled(files.map((file) => uploadProjectAttachment(project.productCode, 'Research Data', file, undefined, note)));
+    const uploaded = results.filter((result): result is PromiseFulfilledResult<ProjectAttachment> => result.status === 'fulfilled').map((result) => result.value);
+    const failed = results.length - uploaded.length;
+    if (uploaded.length) {
+      setAttachments((current) => [...uploaded, ...current]);
       setNote('');
-      showToast({ tone: 'success', title: 'Research file uploaded', message: note.trim() ? 'The file and note were saved.' : 'The file was saved.' });
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to upload research file.');
-    } finally {
-      setUploading(false);
+      showToast({ tone: failed ? 'error' : 'success', title: failed ? 'Some research files failed' : 'Research files uploaded', message: `${uploaded.length} uploaded${failed ? `, ${failed} failed` : ''}.` });
     }
+    if (failed) setMessage(`${failed} file${failed === 1 ? '' : 's'} could not be uploaded.`);
+    setUploading(false);
   }
 
   async function removeFile(attachment: ProjectAttachment) {
@@ -76,9 +77,9 @@ export function ResearchData() {
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
           <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/30 p-4 text-center hover:bg-blue-50">
             <UploadCloud className="text-primary" size={30} />
-            <span className="mt-2 font-bold text-primary">{uploading ? 'Uploading...' : 'Choose a research file'}</span>
+            <span className="mt-2 font-bold text-primary">{uploading ? 'Uploading...' : 'Choose research files'}</span>
             <span className="mt-1 text-xs text-slate-500">PDF, images, documents, spreadsheets, CSV, or text files</span>
-            <input className="sr-only" type="file" accept={acceptedFileTypes} disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ''; }} />
+            <input className="sr-only" type="file" multiple accept={acceptedFileTypes} disabled={uploading} onChange={(event) => { void uploadFiles(Array.from(event.target.files || [])); event.target.value = ''; }} />
           </label>
           <label className="grid gap-1.5 font-semibold text-slate-700"><span>Note for this file</span><textarea className="field min-h-28 resize-y" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add source, findings, or context..." /></label>
         </div>

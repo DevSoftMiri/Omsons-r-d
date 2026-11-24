@@ -2,12 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { workflowStages } from '../../data/seed';
 import { useAppDispatch } from '../../hooks';
 import { upsertProject } from '../../store';
-import { fetchProjectCreationOptions, createProject as createProjectApi } from '../../services/projectService';
+import { fetchProject, fetchProjectCreationOptions, createProject as createProjectApi, updateProject as updateProjectApi } from '../../services/projectService';
 import { readActiveWorkflowStages } from '../../services/adminModuleStorage';
 import { type StaffAccount } from '../../services/authService';
 import type { StageName } from '../../types';
@@ -36,6 +36,8 @@ const projectSchema = z.object({
 type ProjectFormValues = z.infer<typeof projectSchema>;
 
 export function CreateProject() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const editMode = Boolean(projectId);
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -48,6 +50,7 @@ export function CreateProject() {
   const [saving, setSaving] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<string[]>(categoryOptions);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [loadingProject, setLoadingProject] = useState(editMode);
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -110,6 +113,32 @@ export function CreateProject() {
     };
   }, [form]);
 
+  useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+    fetchProject(projectId).then((project) => {
+      if (!active) return;
+      form.reset({
+        name: project.name,
+        category: project.category,
+        description: project.description,
+        startDate: project.startDate,
+        targetDate: project.targetDate,
+        reportTo: project.reportToId || '',
+        teamMemberIds: project.teamMembers.map((member) => member.id),
+        priority: project.priority,
+        status: project.status
+      });
+      setOrderedStages(project.stages.filter((stage) => stage.name !== 'Final Stage').map((stage) => stage.name));
+      setError('');
+    }).catch((loadError) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load project');
+    }).finally(() => {
+      if (active) setLoadingProject(false);
+    });
+    return () => { active = false; };
+  }, [projectId, form]);
+
   async function onInvalid() {
     const values = form.getValues();
     const missing = getMissingFields([
@@ -135,17 +164,29 @@ export function CreateProject() {
     setSaving(true);
     setError('');
     try {
-      const project = await createProjectApi({
-        ...values,
-        selectedStages: orderedStages,
-        customStages: orderedStages.filter((stage) => !configurableStages.includes(stage)),
-        reportTo: values.reportTo || '',
-        teamMemberIds: values.teamMemberIds
-      });
+      const project = editMode
+        ? await updateProjectApi(projectId!, {
+          category: values.category,
+          description: values.description,
+          startDate: values.startDate,
+          targetDate: values.targetDate,
+          reportTo: values.reportTo || '',
+          teamMemberIds: values.teamMemberIds,
+          priority: values.priority,
+          status: values.status,
+          stageNames: [...orderedStages, 'Final Stage']
+        })
+        : await createProjectApi({
+          ...values,
+          selectedStages: orderedStages,
+          customStages: orderedStages.filter((stage) => !configurableStages.includes(stage)),
+          reportTo: values.reportTo || '',
+          teamMemberIds: values.teamMemberIds
+        });
       dispatch(upsertProject(project));
       navigate(`/projects/${project.productCode}/overview`);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Unable to create project');
+      setError(createError instanceof Error ? createError.message : editMode ? 'Unable to update project' : 'Unable to create project');
     } finally {
       setSaving(false);
     }
@@ -200,10 +241,10 @@ export function CreateProject() {
         Projects
       </Link>
       <form className="panel mx-auto max-w-3xl space-y-4" onSubmit={form.handleSubmit(onCreate, onInvalid)}>
-        <h2 className="text-2xl font-bold">Create New Project</h2>
+        <h2 className="text-2xl font-bold">{editMode ? 'Edit Project' : 'Create New Project'}</h2>
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
         <Field label="Project Name" error={form.formState.errors.name?.message}>
-          <input className="field" placeholder="Project name" {...form.register('name')} />
+          <input className="field disabled:bg-slate-100" placeholder="Project name" readOnly={editMode} {...form.register('name')} />
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Category">
@@ -372,9 +413,9 @@ export function CreateProject() {
             })}
           </div>
         </div>
-        <button className="primary-button justify-center disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={!orderedStages.length || saving}>
+        <button className="primary-button justify-center disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={!orderedStages.length || saving || loadingProject}>
           <Plus size={18} />
-          {saving ? 'Creating...' : 'Create Project'}
+          {saving ? (editMode ? 'Saving...' : 'Creating...') : editMode ? 'Save Changes' : 'Create Project'}
         </button>
       </form>
     </div>

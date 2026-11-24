@@ -242,7 +242,7 @@ export function ProductDesign() {
       </section>
 
       <input ref={uploadRef} className="hidden" type="file" accept={acceptedDesignTypes} />
-      {showUpload ? <UploadModal onClose={() => setShowUpload(false)} onUpload={(file, category, title, description) => { addDesign(file, category, title, description); setShowUpload(false); }} showToast={showToast} /> : null}
+      {showUpload ? <UploadModal onClose={() => setShowUpload(false)} onUpload={(files, category, title, description) => { files.forEach((file) => addDesign(file, category, title, description)); setShowUpload(false); }} showToast={showToast} /> : null}
       {preview ? <PreviewModal design={preview} onClose={() => setPreview(null)} /> : null}
       {deleteFile ? <DeleteDialog design={deleteFile} onCancel={() => setDeleteFile(null)} onDelete={() => removeDesign(deleteFile.id)} /> : null}
       {showLinkModal ? <LinkAttachmentModal linked={linked} onClose={() => setShowLinkModal(false)} onSave={(items) => { setLinked(items); setShowLinkModal(false); }} /> : null}
@@ -297,8 +297,8 @@ function PreviewArt({ design }: { design: DesignFile }) {
   return <div className="grid h-full place-items-center bg-white"><ConceptArt /></div>;
 }
 
-function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; onUpload: (file: File, category: DesignCategory, title: string, description: string) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
-  const [file, setFile] = useState<File | null>(null);
+function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; onUpload: (files: File[], category: DesignCategory, title: string, description: string) => void; showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void }) {
+  const [files, setFiles] = useState<File[]>([]);
   const [category, setCategory] = useState<DesignCategory>('Technical Drawing');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -306,12 +306,12 @@ function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; on
   function submit(event: FormEvent) {
     event.preventDefault();
     const missing = getMissingFields([
-      { label: 'Design File', valid: Boolean(file) },
+      { label: 'Design File', valid: files.length > 0 },
       { label: 'Design Type', value: category }
     ]);
     if (showMissingFieldsToast(showToast, missing)) return;
-    if (!file) return;
-    onUpload(file, category, title, description);
+    if (!files.length) return;
+    onUpload(files, category, title, description);
   }
 
   return (
@@ -322,10 +322,10 @@ function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; on
           <button type="button" className="icon-button h-9 w-9" onClick={onClose}><X size={16} /></button>
         </div>
         <label className="grid min-h-32 cursor-pointer place-items-center rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4 text-center">
-          <input className="hidden" type="file" accept={acceptedDesignTypes} onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <input className="hidden" type="file" multiple accept={acceptedDesignTypes} onChange={(event) => setFiles(Array.from(event.target.files || []))} />
           <div>
             <Upload className="mx-auto text-primary" size={34} />
-            <p className="mt-2 font-bold text-primary">{file ? file.name : 'Browse Design File'}</p>
+            <p className="mt-2 font-bold text-primary">{files.length ? `${files.length} design file${files.length === 1 ? '' : 's'} selected` : 'Browse Design Files'}</p>
             <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG, WebP, STEP, STP, STL, OBJ</p>
           </div>
         </label>
@@ -337,7 +337,7 @@ function UploadModal({ onClose, onUpload, showToast }: { onClose: () => void; on
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" className="secondary-button h-10" onClick={onClose}>Cancel</button>
-          <button className={`primary-button h-10 ${!file ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!file}>Upload Design</button>
+          <button className={`primary-button h-10 ${!files.length ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!files.length}>Upload Design{files.length > 1 ? 's' : ''}</button>
         </div>
       </form>
     </div>

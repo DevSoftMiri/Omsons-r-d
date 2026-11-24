@@ -129,18 +129,15 @@ export function FinalStage() {
     [requiredStages],
   );
 
-  function addDocument(file: File, description: string) {
-    setDocuments((current) => [
-      {
-        id: `doc_${Date.now()}`,
-        fileName: file.name,
-        description: description || 'Final stage document',
-        uploadedOn: new Date().toISOString(),
-        size: file.size,
-        url: URL.createObjectURL(file),
-      },
-      ...current,
-    ]);
+  function addDocument(files: File[], description: string) {
+    setDocuments((current) => [...files.map((file, index) => ({
+      id: `doc_${Date.now()}_${index}`,
+      fileName: file.name,
+      description: description || 'Final stage document',
+      uploadedOn: new Date().toISOString(),
+      size: file.size,
+      url: URL.createObjectURL(file),
+    })), ...current]);
     setShowDocument(false);
   }
 
@@ -678,15 +675,15 @@ function DocumentModal({
   showToast,
 }: {
   onClose: () => void;
-  onUpload: (file: File, description: string) => void;
+  onUpload: (files: File[], description: string) => void;
   showToast: (toast: { tone: 'success' | 'error'; title: string; message?: string }) => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [description, setDescription] = useState('');
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (showMissingFieldsToast(showToast, file ? [] : ['Document File'])) return;
-    if (file) onUpload(file, description);
+    if (showMissingFieldsToast(showToast, files.length ? [] : ['Document File'])) return;
+    if (files.length) onUpload(files, description);
   }
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
@@ -708,12 +705,13 @@ function DocumentModal({
           <input
             className="hidden"
             type="file"
+            multiple
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              setFile(event.target.files?.[0] || null)
+              setFiles(Array.from(event.target.files || []))
             }
           />
           <span className="font-bold">
-            {file ? file.name : 'Upload Document'}
+            {files.length ? `${files.length} document${files.length === 1 ? '' : 's'} selected` : 'Upload Documents'}
           </span>
         </label>
         <div className="mt-4">
@@ -733,8 +731,8 @@ function DocumentModal({
           >
             Cancel
           </button>
-          <button className={`primary-button h-10 ${!file ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!file}>
-            Upload Document
+          <button className={`primary-button h-10 ${!files.length ? 'cursor-not-allowed bg-slate-300 hover:bg-slate-300' : ''}`} aria-disabled={!files.length}>
+            Upload Document{files.length > 1 ? 's' : ''}
           </button>
         </div>
       </form>

@@ -422,8 +422,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   async function uploadElectricalDocument(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
     const validTypes = [
       'application/pdf',
       'text/csv',
@@ -433,23 +433,18 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       'image/png',
       'image/webp'
     ];
-    const validExtension = /\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name);
-    if (!validTypes.includes(file.type) && !validExtension) {
+    const invalid = files.filter((file) => !validTypes.includes(file.type) && !/\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name));
+    if (invalid.length) {
       showToast({ tone: 'error', title: 'Invalid document', message: 'Upload a PDF, Excel/CSV, JPG, PNG, or WebP file for Electrical BOM.' });
       event.target.value = '';
       return;
     }
     setUploadingElectrical(true);
-    try {
-      const attachment = await uploadProjectAttachment(project.productCode, electricalBomStage, file);
-      setElectricalFiles((current) => [attachment, ...current]);
-      showToast({ tone: 'success', title: 'Electrical BOM document uploaded', message: `${attachment.name} was added.` });
-    } catch (error) {
-      showToast({ tone: 'error', title: 'Upload failed', message: error instanceof Error ? error.message : 'Electrical BOM document could not be uploaded.' });
-    } finally {
-      setUploadingElectrical(false);
-      event.target.value = '';
-    }
+    const results = await Promise.allSettled(files.filter((file) => !invalid.includes(file)).map((file) => uploadProjectAttachment(project.productCode, electricalBomStage, file)));
+    const uploaded = results.filter((result): result is PromiseFulfilledResult<ProjectAttachment> => result.status === 'fulfilled').map((result) => result.value);
+    setElectricalFiles((current) => [...uploaded, ...current]);
+    showToast({ tone: uploaded.length === files.length ? 'success' : 'error', title: uploaded.length === files.length ? 'Electrical BOM files uploaded' : 'Some electrical BOM files failed', message: `${uploaded.length} uploaded.` });
+    setUploadingElectrical(false); event.target.value = '';
   }
 
   async function deleteElectricalDocument(file: ProjectAttachment) {
@@ -463,8 +458,8 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
   }
 
   async function uploadMechanicalDocument(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
     const validTypes = [
       'application/pdf',
       'text/csv',
@@ -474,23 +469,18 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
       'image/png',
       'image/webp'
     ];
-    const validExtension = /\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name);
-    if (!validTypes.includes(file.type) && !validExtension) {
+    const invalid = files.filter((file) => !validTypes.includes(file.type) && !/\.(pdf|csv|xls|xlsx|jpg|jpeg|png|webp)$/i.test(file.name));
+    if (invalid.length) {
       showToast({ tone: 'error', title: 'Invalid document', message: 'Upload a PDF, Excel/CSV, JPG, PNG, or WebP file for Mechanical BOM.' });
       event.target.value = '';
       return;
     }
     setUploadingMechanical(true);
-    try {
-      const attachment = await uploadProjectAttachment(project.productCode, mechanicalBomStage, file);
-      setMechanicalFiles((current) => [attachment, ...current]);
-      showToast({ tone: 'success', title: 'Mechanical BOM document uploaded', message: `${attachment.name} was added.` });
-    } catch (error) {
-      showToast({ tone: 'error', title: 'Upload failed', message: error instanceof Error ? error.message : 'Mechanical BOM document could not be uploaded.' });
-    } finally {
-      setUploadingMechanical(false);
-      event.target.value = '';
-    }
+    const results = await Promise.allSettled(files.filter((file) => !invalid.includes(file)).map((file) => uploadProjectAttachment(project.productCode, mechanicalBomStage, file)));
+    const uploaded = results.filter((result): result is PromiseFulfilledResult<ProjectAttachment> => result.status === 'fulfilled').map((result) => result.value);
+    setMechanicalFiles((current) => [...uploaded, ...current]);
+    showToast({ tone: uploaded.length === files.length ? 'success' : 'error', title: uploaded.length === files.length ? 'Mechanical BOM files uploaded' : 'Some mechanical BOM files failed', message: `${uploaded.length} uploaded.` });
+    setUploadingMechanical(false); event.target.value = '';
   }
 
   async function deleteMechanicalDocument(file: ProjectAttachment) {
@@ -1309,7 +1299,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               <Upload size={16} />
               {uploadingElectrical ? 'Uploading...' : 'Upload Valid Document'}
             </label>
-            <input id="electrical-bom-upload" className="sr-only" type="file" accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadElectricalDocument} />
+            <input id="electrical-bom-upload" className="sr-only" type="file" multiple accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadElectricalDocument} />
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {electricalFiles.map((file) => (
@@ -1527,7 +1517,7 @@ export function BOM({ currentStage = 'BOM' }: { currentStage?: 'BOM' | 'Electric
               <Upload size={16} />
               {uploadingMechanical ? 'Uploading...' : 'Upload Valid Document'}
             </label>
-            <input id="mechanical-bom-upload" className="sr-only" type="file" accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadMechanicalDocument} />
+            <input id="mechanical-bom-upload" className="sr-only" type="file" multiple accept=".pdf,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp" onChange={uploadMechanicalDocument} />
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {mechanicalFiles.map((file) => (

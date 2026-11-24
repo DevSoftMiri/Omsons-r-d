@@ -267,3 +267,12 @@ export async function updateProjectDetails(projectId: string, payload: Pick<Proj
   });
   return normalizeProject(await parseResponse<any>(response));
 }
+
+export async function updateProject(projectId: string, payload: Partial<ProjectCreatePayload> & { stageNames?: StageName[] }) {
+  const response = await fetch(`${API_BASE}/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload)
+  });
+  return normalizeProject(await parseResponse<any>(response));
+}

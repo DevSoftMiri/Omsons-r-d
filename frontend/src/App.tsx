@@ -74,6 +74,7 @@ export function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/create" element={<CreateProject />} />
+        <Route path="projects/:projectId/edit" element={<CreateProject />} />
         <Route path="team" element={user.role === 'admin' ? <TeamMembersPage /> : <Navigate to="/dashboard" replace />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="inventory" element={<InventoryPage />} />

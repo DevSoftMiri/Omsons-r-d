@@ -290,6 +290,7 @@ function ProjectCardActions({ project }: { project: Project }) {
       <div className="invisible absolute right-0 top-8 z-20 w-44 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-soft transition group-hover:visible group-hover:opacity-100">
         <Link className="menu-action" to={`/projects/${project.productCode}/overview`}>Open</Link>
         <Link className="menu-action" to={`/projects/${project.productCode}/${getStageRoute(project.currentStage, project)}`}>View Current Stage</Link>
+        {user?.role === 'admin' ? <Link className="menu-action" to={`/projects/${project.productCode}/edit`}>Edit Project</Link> : null}
         {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('Running')}>Mark Running</button> : null}
         {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('On Hold')}>Put On Hold</button> : null}
         {Boolean(user) ? <button className="menu-action" onClick={() => setStatus('Delayed')}>Mark Delayed</button> : null}

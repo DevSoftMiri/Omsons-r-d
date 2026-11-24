@@ -172,12 +172,18 @@ export const projectCreationOptions = asyncHandler(async (_req, res) => {
 export const updateProject = asyncHandler(async (req, res) => {
   const project = await Project.findOne(projectQuery(req.params.id));
   if (!project) { res.status(404); throw new Error('Project not found'); }
+  if (req.body.name !== undefined && String(req.body.name).trim() !== project.name) {
+    res.status(400); throw new Error('Project name cannot be changed');
+  }
+  if (req.body.productCode !== undefined && String(req.body.productCode).trim() !== project.productCode) {
+    res.status(400); throw new Error('Project code cannot be changed');
+  }
   const startDate = new Date(req.body.startDate ?? project.startDate);
   const targetDate = new Date(req.body.targetDate ?? project.targetDate);
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(targetDate.getTime()) || targetDate < startDate) {
     res.status(400); throw new Error('Valid Start Date and End Date are required; End Date cannot be before Start Date');
   }
-  for (const [field, min] of [['name', 3], ['category', 1], ['description', 10]]) {
+  for (const [field, min] of [['category', 1], ['description', 10]]) {
     if (req.body[field] !== undefined) {
       if (typeof req.body[field] !== 'string' || req.body[field].trim().length < min) {
         res.status(400); throw new Error(`${field} must contain at least ${min} characters`);
@@ -188,6 +194,24 @@ export const updateProject = asyncHandler(async (req, res) => {
   if (req.body.priority !== undefined) {
     if (!['Low', 'Medium', 'High'].includes(req.body.priority)) { res.status(400); throw new Error('Invalid priority'); }
     project.priority = req.body.priority;
+  }
+  if (req.body.status !== undefined) {
+    if (!['Running', 'On Hold', 'Completed', 'Delayed'].includes(req.body.status)) { res.status(400); throw new Error('Invalid status'); }
+    project.status = req.body.status;
+  }
+  if (req.body.reportTo !== undefined) project.reportTo = await resolveReportTo(req.body.reportTo, req.user);
+  if (req.body.teamMemberIds !== undefined) project.teamMembers = await resolveTeamMembers(req.body);
+  if (Array.isArray(req.body.stageNames)) {
+    const stageNames = normalizeStageNames(req.body);
+    const existingByName = new Map(project.stages.map((stage) => [stage.name.toLowerCase(), stage]));
+    project.stages = stageNames.map((name, index) => {
+      const existing = existingByName.get(name.toLowerCase());
+      if (existing) return existing;
+      return { name, status: index === 0 ? 'Pending' : 'Locked', progress: 0 };
+    });
+    if (!project.stages.some((stage) => stage.name === project.currentStage)) {
+      project.currentStage = project.stages.find((stage) => stage.status !== 'Completed')?.name || 'Final Stage';
+    }
   }
   project.startDate = startDate;
   project.targetDate = targetDate;
